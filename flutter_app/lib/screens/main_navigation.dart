@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import '../widgets/custom_ui.dart';
 import 'config_screen.dart';
 import 'device_screen.dart';
@@ -14,11 +13,18 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> {
   int index = 1;
-  final ValueNotifier<List<Map<String, dynamic>>> globalConfig = ValueNotifier([]);
+
+  final ValueNotifier<List<Map<String, dynamic>>> globalConfig =
+      ValueNotifier([]);
+
+  // ✅ Move pages HERE (inside class)
+  late final List<Widget> pages;
 
   @override
-  Widget build(BuildContext context) {
-    final pages = [
+  void initState() {
+    super.initState();
+
+    pages = [
       DeviceScreen(
         onLoadToConfig: (cfg) {
           globalConfig.value = cfg;
@@ -38,7 +44,10 @@ class _MainNavigationState extends State<MainNavigation> {
         icon: Icons.insights_outlined,
       ),
     ];
+  }
 
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       body: IndexedStack(index: index, children: pages),
       bottomNavigationBar: StitchBottomNavigation(

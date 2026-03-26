@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:async';
 
+import '../widgets/sensor_matrix.dart';
 import 'package:flutter/material.dart';
 
 import '../services/storage_service.dart';
@@ -31,7 +32,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
     super.initState();
     _loadCurrentConfig();
 
-    _refreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       if (mounted) {
         _loadCurrentConfig();
       }
@@ -48,10 +49,12 @@ class _DeviceScreenState extends State<DeviceScreen> {
         : List<Map<String, dynamic>>.from(jsonDecode(raw));
 
     if (!mounted) return;
-    setState(() {
-      deviceConfig = parsed;
-      loading = false;
-    });
+      if (jsonEncode(parsed) != jsonEncode(deviceConfig)) {
+        setState(() {
+        deviceConfig = parsed;
+        loading = false;
+      });
+    }
   }
 
   Future<void> _saveCurrent() async {
@@ -342,7 +345,10 @@ class _DeviceScreenState extends State<DeviceScreen> {
                         const SizedBox(height: 16),
                         _buildDiagnosticsPanel(context),
                         const SizedBox(height: 16),
-                        _buildSensorMatrix(context),
+                        SensorMatrix(
+                          deviceConfig: deviceConfig,
+                          onLoad: widget.onLoadToConfig,
+                        )
                       ],
                     ),
                   ),
@@ -403,135 +409,6 @@ class _DeviceScreenState extends State<DeviceScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildSensorMatrix(BuildContext context) {
-    if (deviceConfig.isEmpty) {
-      return const StitchEmptyState(
-        title: 'No Live Sensors',
-        subtitle:
-            'Your live node screen is ready. Load a saved profile or build one in Architect to populate this matrix.',
-        icon: Icons.sensors_outlined,
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'GPIO SENSOR MATRIX',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: StitchColors.primary,
-                      ),
-                ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  'POLLING RATE: 500ms',
-                  style: Theme.of(context).textTheme.labelMedium,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        ...deviceConfig.asMap().entries.map((entry) {
-          final index = entry.key;
-          final item = entry.value;
-          final accentColors = [
-            StitchColors.primaryContainer,
-            StitchColors.secondary,
-            StitchColors.secondaryContainer,
-            StitchColors.tertiaryFixed,
-          ];
-          final accent = accentColors[index % accentColors.length];
-          final strength = ((index + 2) * 0.18).clamp(0.18, 1.0);
-
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: StitchPanel(
-              color: StitchColors.surfaceLowest,
-              child: Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: Colors.black,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Icon(
-                      _iconForSensor(item['sensor']?.toString() ?? ''),
-                      color: accent,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          item['sensor']?.toString() ?? 'Unknown Sensor',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'GPIO ${item['pin']} - ${item['type']}',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  SizedBox(
-                    width: 88,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          _mockLiveValue(item),
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 8),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(20),
-                          child: LinearProgressIndicator(
-                            value: strength,
-                            minHeight: 4,
-                            color: accent,
-                            backgroundColor:
-                                Colors.white.withValues(alpha: 0.05),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }),
-        const SizedBox(height: 8),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: StitchGhostButton(
-            onPressed: () => widget.onLoadToConfig(deviceConfig),
-            child: const Text('LOAD INTO ARCHITECT'),
-          ),
-        ),
-      ],
     );
   }
 
