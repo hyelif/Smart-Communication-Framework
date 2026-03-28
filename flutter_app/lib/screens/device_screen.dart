@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../services/api_service.dart';
 import '../services/storage_service.dart';
 import '../widgets/app_theme.dart';
 import '../widgets/custom_ui.dart';
@@ -26,6 +27,8 @@ class DeviceScreen extends StatefulWidget {
 
 class _DeviceScreenState extends State<DeviceScreen> {
   List<Map<String, dynamic>> deviceConfig = [];
+  Map<String, dynamic>? _nodeHealth;
+  String? _healthMessage;
   bool loading = true;
   bool _isRefreshing = false;
   bool _hasLoadedOnce = false;
@@ -61,17 +64,40 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
     _isRefreshing = true;
     try {
-      final data = await StorageService.loadConfig();
+      final configFuture = StorageService.loadConfig();
+      final healthFuture = ApiService.fetchHealth();
+
+      final data = await configFuture;
       final raw = data['config'] as String?;
       final parsed = raw == null
           ? <Map<String, dynamic>>[]
           : List<Map<String, dynamic>>.from(jsonDecode(raw));
+      Map<String, dynamic>? nextHealth;
+      String? nextHealthMessage;
+
+      try {
+        final healthResult = await healthFuture;
+        if (healthResult['ok'] == true &&
+            healthResult['data'] is Map<String, dynamic>) {
+          nextHealth = Map<String, dynamic>.from(
+            healthResult['data'] as Map<String, dynamic>,
+          );
+        } else {
+          nextHealthMessage = ApiService.friendlyApiMessage(healthResult);
+        }
+      } catch (e) {
+        nextHealthMessage = ApiService.friendlyConnectionMessage(e);
+      }
 
       if (!mounted) return;
       final changed = !_sameConfig(parsed, deviceConfig);
-      if (changed || loading) {
+      final healthChanged = !mapEquals(nextHealth, _nodeHealth) ||
+          nextHealthMessage != _healthMessage;
+      if (changed || healthChanged || loading) {
         setState(() {
           deviceConfig = parsed;
+          _nodeHealth = nextHealth;
+          _healthMessage = nextHealthMessage;
           loading = false;
         });
       }
@@ -82,6 +108,19 @@ class _DeviceScreenState extends State<DeviceScreen> {
         setState(() => loading = false);
       }
     }
+  }
+
+  bool get _nodeOnline => _nodeHealth?['status'] == 'ok';
+
+  String _healthString(String key, String fallback) {
+    final value = _nodeHealth?[key];
+    if (value == null) return fallback;
+    final text = value.toString().trim();
+    return text.isEmpty ? fallback : text;
+  }
+
+  bool _healthBool(String key) {
+    return _nodeHealth?[key] == true;
   }
 
   bool _sameConfig(
@@ -220,14 +259,20 @@ class _DeviceScreenState extends State<DeviceScreen> {
                             return Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Row(
+                                Row(
                                   children: [
-                                    StitchStatusDot(),
-                                    SizedBox(width: 8),
+                                    StitchStatusDot(
+                                      color: _nodeOnline
+                                          ? StitchColors.primaryContainer
+                                          : StitchColors.error,
+                                    ),
+                                    const SizedBox(width: 8),
                                     Text(
-                                      'SYSTEM ONLINE',
+                                      _nodeOnline ? 'SYSTEM ONLINE' : 'NODE OFFLINE',
                                       style: TextStyle(
-                                        color: StitchColors.primaryContainer,
+                                        color: _nodeOnline
+                                            ? StitchColors.primaryContainer
+                                            : StitchColors.error,
                                         fontSize: 11,
                                         fontWeight: FontWeight.w800,
                                         letterSpacing: 2.0,
@@ -253,9 +298,9 @@ class _DeviceScreenState extends State<DeviceScreen> {
                                         ),
                                       ),
                                       const SizedBox(height: 8),
-                                        Text(
-                                          deviceConfig.isEmpty
-                                              ? 'No active live config loaded'
+                                      Text(
+                                        deviceConfig.isEmpty
+                                            ? 'No active live config loaded'
                                             : 'Pinned sensors: ${deviceConfig.length}  -  Live layout ready',
                                         style: Theme.of(context).textTheme.bodyMedium,
                                       ),
@@ -396,31 +441,43 @@ class _DeviceScreenState extends State<DeviceScreen> {
   }
 
   Widget _buildConnectivityPanel(BuildContext context) {
+    final ssid = _healthString('ssid', 'NOT CONNECTED');
+    final accessPointIp = _healthString('ip', '--');
+    final clients = _healthString('clients', '0');
+    final configCount = _healthString('configCount', deviceConfig.length.toString());
+    final lockStatus = _nodeOnline
+        ? (_healthBool('locked') ? 'LOCKED' : 'OPEN')
+        : '--';
+
     return StitchPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const StitchSectionLabel('Connectivity', icon: Icons.wifi_rounded),
           const SizedBox(height: 18),
-          _metaRow('SSID', deviceConfig.isEmpty ? 'UNLINKED' : 'LAB_NET_5G'),
-          _metaRow('RSSI', deviceConfig.isEmpty ? '--' : '-54 dBm'),
-          _metaRow('Local IP', deviceConfig.isEmpty ? '--' : '192.168.1.144'),
+          _metaRow('Node Status', _nodeOnline ? 'ONLINE' : 'OFFLINE'),
+          _metaRow('SSID', ssid),
+          _metaRow('AP IP', accessPointIp),
+          _metaRow('Clients', clients),
+          _metaRow('Saved Nodes', configCount),
+          _metaRow('Security', lockStatus),
+          if (_healthMessage != null) _metaRow('Note', _healthMessage!),
         ],
       ),
     );
   }
 
   Widget _buildDiagnosticsPanel(BuildContext context) {
-    final lines = deviceConfig.isEmpty
-        ? const [
-            '[boot] Waiting for saved configuration...',
-            '[idle] No live node telemetry available.',
-            '[hint] Load a profile into Architect to push layout.',
+    final lines = _nodeOnline
+        ? [
+            '[wifi] Node AP reachable at ${_healthString('ip', '192.168.4.1')}',
+            '[ap] SSID ${_healthString('ssid', 'AQUA_NODE')} with ${_healthString('clients', '0')} client(s)',
+            '[node] Security ${_healthBool('locked') ? 'locked' : 'open'} and ${_healthString('configCount', deviceConfig.length.toString())} config slot(s) loaded',
           ]
         : [
-            '[14:22:01] Sensor matrix loaded (${deviceConfig.length} active)',
-            '[14:22:05] Secure storage restored last session config',
-            '[14:22:10] Node ready for deployment sync',
+            '[wifi] ESP32 health endpoint is not reachable.',
+            '[hint] Connect this phone to the node Wi-Fi AP and pull to refresh.',
+            '[local] Cached layout has ${deviceConfig.length} configured sensor node(s).',
           ];
 
     return StitchPanel(

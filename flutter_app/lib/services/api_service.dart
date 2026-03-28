@@ -100,4 +100,35 @@ class ApiService {
       'body': response.body,
     };
   }
+
+  static Future<Map<String, dynamic>> fetchHealth() async {
+    final uri = Uri.parse('$baseUrl/health');
+    final response = await http
+        .get(uri)
+        .timeout(const Duration(seconds: 5));
+
+    if (response.statusCode != 200) {
+      return {
+        'ok': false,
+        'statusCode': response.statusCode,
+        'body': response.body,
+      };
+    }
+
+    final decoded = jsonDecode(response.body);
+
+    if (decoded is Map<String, dynamic>) {
+      return {
+        'ok': true,
+        'statusCode': response.statusCode,
+        'data': decoded,
+      };
+    }
+
+    return {
+      'ok': false,
+      'statusCode': response.statusCode,
+      'body': response.body,
+    };
+  }
 }
