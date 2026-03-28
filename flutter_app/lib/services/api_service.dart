@@ -5,6 +5,20 @@ import 'package:http/http.dart' as http;
 class ApiService {
   static const String baseUrl = 'http://192.168.4.1';
 
+  static String friendlyConnectionMessage([Object? error]) {
+    final message = error?.toString().toLowerCase() ?? '';
+    if (message.contains('socketexception') ||
+        message.contains('clientexception') ||
+        message.contains('failed host lookup') ||
+        message.contains('connection refused') ||
+        message.contains('connection closed') ||
+        message.contains('timed out')) {
+      return 'ESP32 not connected. Join the node Wi-Fi and try again.';
+    }
+
+    return 'ESP32 is unavailable right now. Try again in a moment.';
+  }
+
   static Future<Map<String, dynamic>> sendConfig(
     List<Map<String, dynamic>> config,
   ) async {

@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
-import '../widgets/custom_ui.dart';
+
 import '../widgets/app_theme.dart';
+import '../widgets/custom_ui.dart';
 
 class SensorMatrix extends StatelessWidget {
   final List<Map<String, dynamic>> deviceConfig;
   final void Function(List<Map<String, dynamic>>) onLoad;
+
+  static const _accentColors = [
+    StitchColors.primaryContainer,
+    StitchColors.secondary,
+    StitchColors.secondaryContainer,
+    StitchColors.tertiaryFixed,
+  ];
 
   const SensorMatrix({
     super.key,
@@ -46,7 +54,7 @@ class SensorMatrix extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  'POLLING RATE: 500ms',
+                  'LIVE SNAPSHOT',
                   style: Theme.of(context).textTheme.labelMedium,
                 ),
               ),
@@ -54,89 +62,79 @@ class SensorMatrix extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-
-        // 🔥 sensor list
         ...deviceConfig.asMap().entries.map((entry) {
           final index = entry.key;
           final item = entry.value;
-
-          final accentColors = [
-            StitchColors.primaryContainer,
-            StitchColors.secondary,
-            StitchColors.secondaryContainer,
-            StitchColors.tertiaryFixed,
-          ];
-
-          final accent = accentColors[index % accentColors.length];
+          final accent = _accentColors[index % _accentColors.length];
           final strength = ((index + 2) * 0.18).clamp(0.18, 1.0);
 
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
-            child: StitchPanel(
-              color: StitchColors.surfaceLowest,
-              child: Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: Colors.black,
-                      borderRadius: BorderRadius.circular(14),
+            child: RepaintBoundary(
+              child: StitchPanel(
+                color: StitchColors.surfaceLowest,
+                child: Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: Colors.black,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(
+                        _iconForSensor(item['sensor']?.toString() ?? ''),
+                        color: accent,
+                      ),
                     ),
-                    child: Icon(
-                      _iconForSensor(item['sensor']?.toString() ?? ''),
-                      color: accent,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          item['sensor']?.toString() ?? 'Unknown Sensor',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'GPIO ${item['pin']} - ${item['type']}',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  SizedBox(
-                    width: 88,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          _mockLiveValue(item),
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 8),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(20),
-                          child: LinearProgressIndicator(
-                            value: strength,
-                            minHeight: 4,
-                            color: accent,
-                            backgroundColor:
-                                Colors.white.withValues(alpha: 0.05),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item['sensor']?.toString() ?? 'Unknown Sensor',
+                            style: Theme.of(context).textTheme.titleMedium,
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 4),
+                          Text(
+                            'GPIO ${item['pin']} - ${item['type']}',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 14),
+                    SizedBox(
+                      width: 88,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            _mockLiveValue(item),
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          const SizedBox(height: 8),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(20),
+                            child: LinearProgressIndicator(
+                              value: strength,
+                              minHeight: 4,
+                              color: accent,
+                              backgroundColor:
+                                  Colors.white.withValues(alpha: 0.05),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           );
         }),
-
         const SizedBox(height: 8),
-
         Align(
           alignment: Alignment.centerLeft,
           child: StitchGhostButton(

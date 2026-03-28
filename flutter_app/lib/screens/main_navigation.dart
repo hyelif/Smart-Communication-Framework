@@ -52,7 +52,10 @@ class _MainNavigationState extends State<MainNavigation> {
       body: IndexedStack(index: index, children: pages),
       bottomNavigationBar: StitchBottomNavigation(
         currentIndex: index,
-        onTap: (value) => setState(() => index = value),
+        onTap: (value) {
+          if (value == index) return;
+          setState(() => index = value);
+        },
       ),
     );
   }

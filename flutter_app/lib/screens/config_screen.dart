@@ -1,6 +1,11 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
+import '../services/file_exchange_service.dart';
 import '../services/storage_service.dart';
 import '../widgets/app_theme.dart';
 import '../widgets/custom_ui.dart';
@@ -19,6 +24,10 @@ class _ConfigScreenState extends State<ConfigScreen> {
   bool _isKeyVisible = false;
   bool _isDeploying = false;
   bool _isLoadingNode = false;
+  bool _isRefreshingPage = false;
+  bool _isImportingFile = false;
+  bool _isExportingFile = false;
+  Timer? _refreshTimer;
 
   static const Map<String, List<int>> pinGroups = {
     'AI': [32, 33, 34, 35, 36, 39],
@@ -38,21 +47,62 @@ class _ConfigScreenState extends State<ConfigScreen> {
   @override
   void initState() {
     super.initState();
-    _loadStoredDraft();
+    _refreshPage();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) {
+        _refreshPage();
+      }
+    });
   }
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     _keyController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadStoredDraft() async {
-    final stored = await StorageService.loadConfig();
-    final key = stored['key'] as String?;
-    if (key != null && mounted) {
-      _keyController.text = key;
+  Future<void> _refreshPage({bool showFeedback = false}) async {
+    if (_isRefreshingPage) return;
+    setState(() => _isRefreshingPage = true);
+    try {
+      final stored = await StorageService.loadConfig();
+      final key = stored['key'] as String?;
+      final raw = stored['config'] as String?;
+      final parsed = raw == null || raw.isEmpty
+          ? <Map<String, dynamic>>[]
+          : List<Map<String, dynamic>>.from(jsonDecode(raw));
+
+      if (!mounted) return;
+
+      if (key != null && _keyController.text != key) {
+        _keyController.text = key;
+      }
+
+      if (!_sameConfig(parsed, widget.configNotifier.value)) {
+        widget.configNotifier.value = parsed;
+      }
+
+      if (showFeedback) {
+        showStitchMessage(context, 'Architect page refreshed.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isRefreshingPage = false);
+      }
     }
+  }
+
+  bool _sameConfig(
+    List<Map<String, dynamic>> left,
+    List<Map<String, dynamic>> right,
+  ) {
+    if (identical(left, right)) return true;
+    if (left.length != right.length) return false;
+    for (var i = 0; i < left.length; i++) {
+      if (!mapEquals(left[i], right[i])) return false;
+    }
+    return true;
   }
 
   Future<void> _saveSnapshot() async {
@@ -61,9 +111,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
       _keyController.text.trim(),
     );
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Architect draft saved locally.')),
-    );
+    showStitchMessage(context, 'Architect draft saved locally.');
   }
 
   Future<void> _loadFromNode() async {
@@ -77,32 +125,33 @@ class _ConfigScreenState extends State<ConfigScreen> {
       if (result['ok'] == true) {
         final data = result['data'];
         if (data is Map<String, dynamic> && data['config'] is List) {
-          final loaded = List<Map<String, dynamic>>.from(data['config'] as List);
+          final loaded = (data['config'] as List)
+              .whereType<Map>()
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList();
           widget.configNotifier.value = loaded;
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Loaded config from ESP32.')),
-          );
+          showStitchMessage(context, 'Loaded config from ESP32.');
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('ESP32 returned invalid config format.')),
+          showStitchMessage(
+            context,
+            'ESP32 returned invalid config format.',
+            isError: true,
           );
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Load failed. Status: ${result['statusCode']}'),
-          ),
+        showStitchMessage(
+          context,
+          'ESP32 not connected. Join the node Wi-Fi and try again.',
+          isError: true,
         );
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Cannot reach ESP32. Connect phone to AQUA_NODE Wi-Fi first. Error: $e',
-          ),
-        ),
+      showStitchMessage(
+        context,
+        ApiService.friendlyConnectionMessage(e),
+        isError: true,
       );
     } finally {
       if (mounted) {
@@ -113,8 +162,10 @@ class _ConfigScreenState extends State<ConfigScreen> {
 
   Future<void> _deployToNode() async {
     if (widget.configNotifier.value.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Add at least one sensor node first.')),
+      showStitchMessage(
+        context,
+        'Add at least one sensor node first.',
+        isError: true,
       );
       return;
     }
@@ -132,30 +183,69 @@ class _ConfigScreenState extends State<ConfigScreen> {
       if (!mounted) return;
 
       if (result['ok'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Config deployed to ESP32 successfully.'),
-          ),
-        );
+        showStitchMessage(context, 'Config deployed to ESP32 successfully.');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Deploy failed. Status: ${result['statusCode']}'),
-          ),
+        showStitchMessage(
+          context,
+          'ESP32 not connected. Join the node Wi-Fi and try again.',
+          isError: true,
         );
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Cannot reach ESP32. Connect phone to AQUA_NODE Wi-Fi first. Error: $e',
-          ),
-        ),
+      showStitchMessage(
+        context,
+        ApiService.friendlyConnectionMessage(e),
+        isError: true,
       );
     } finally {
       if (mounted) {
         setState(() => _isDeploying = false);
+      }
+    }
+  }
+
+  Future<void> _importFromFile() async {
+    if (_isImportingFile) return;
+    setState(() => _isImportingFile = true);
+
+    try {
+      final loaded = await FileExchangeService.importConfigFromFile();
+      widget.configNotifier.value = loaded;
+      await StorageService.saveConfig(
+        loaded,
+        _keyController.text.trim(),
+      );
+
+      if (!mounted) return;
+      showStitchMessage(
+        context,
+        'Imported ${loaded.length} node(s) from phone storage.',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      showStitchMessage(context, 'Import failed: $e', isError: true);
+    } finally {
+      if (mounted) {
+        setState(() => _isImportingFile = false);
+      }
+    }
+  }
+
+  Future<void> _exportToFile() async {
+    if (_isExportingFile) return;
+    setState(() => _isExportingFile = true);
+
+    try {
+      await FileExchangeService.exportAndShareConfig(widget.configNotifier.value);
+      if (!mounted) return;
+      showStitchMessage(context, 'Config file prepared for sharing.');
+    } catch (e) {
+      if (!mounted) return;
+      showStitchMessage(context, 'Export failed: $e', isError: true);
+    } finally {
+      if (mounted) {
+        setState(() => _isExportingFile = false);
       }
     }
   }
@@ -204,24 +294,38 @@ class _ConfigScreenState extends State<ConfigScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const StitchSectionLabel('Add Node'),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedSensor,
-                    dropdownColor: StitchColors.surfaceHigh,
-                    decoration: const InputDecoration(
-                      labelText: 'Sensor Type',
-                      prefixIcon: Icon(Icons.sensors_outlined),
+                  Center(
+                    child: Container(
+                      width: 42,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: StitchColors.outlineVariant.withValues(alpha: 0.55),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
                     ),
-                    items: sensorRequirements.keys
-                        .map(
-                          (sensor) => DropdownMenuItem(
-                            value: sensor,
-                            child: Text(sensor),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) {
+                  ),
+                  const SizedBox(height: 16),
+                  const StitchSectionLabel('Add Node'),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Choose the sensor type first, then map it to a valid GPIO pin.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 16),
+                  _SelectionField<String>(
+                    label: 'Sensor Type',
+                    icon: Icons.sensors_outlined,
+                    valueLabel: selectedSensor,
+                    enabled: true,
+                    onTap: () async {
+                      final value = await _showPickerSheet<String>(
+                        context: ctx,
+                        title: 'Select Sensor Type',
+                        values: sensorRequirements.keys.toList(),
+                        selectedValue: selectedSensor,
+                        labelBuilder: (sensor) => sensor,
+                        iconBuilder: (sensor) => Icons.sensors_outlined,
+                      );
                       if (value == null) return;
                       setModalState(() {
                         selectedSensor = value;
@@ -230,33 +334,56 @@ class _ConfigScreenState extends State<ConfigScreen> {
                     },
                   ),
                   const SizedBox(height: 12),
-                  DropdownButtonFormField<int>(
-                    initialValue: selectedPin,
-                    dropdownColor: StitchColors.surfaceHigh,
-                    decoration: InputDecoration(
-                      labelText: 'GPIO Pin ($requiredType)',
-                      prefixIcon: const Icon(Icons.settings_input_component),
-                    ),
-                    items: availablePins
-                        .map(
-                          (pin) => DropdownMenuItem(
-                            value: pin,
-                            child: Text('GPIO $pin'),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) {
-                      setModalState(() {
-                        selectedPin = value;
-                      });
-                    },
+                  _SelectionField<int>(
+                    label: 'GPIO Pin ($requiredType)',
+                    icon: Icons.settings_input_component,
+                    valueLabel: selectedPin == null ? 'Select a GPIO pin' : 'GPIO $selectedPin',
+                    enabled: availablePins.isNotEmpty,
+                    onTap: availablePins.isEmpty
+                        ? null
+                        : () async {
+                            final value = await _showPickerSheet<int>(
+                              context: ctx,
+                              title: 'Select GPIO Pin',
+                              values: availablePins,
+                              selectedValue: selectedPin,
+                              labelBuilder: (pin) => 'GPIO $pin',
+                              iconBuilder: (pin) => Icons.memory_rounded,
+                            );
+                            if (value == null) return;
+                            setModalState(() {
+                              selectedPin = value;
+                            });
+                          },
                   ),
                   const SizedBox(height: 12),
-                  Text(
-                    availablePins.isEmpty
-                        ? 'No available pins left for $requiredType.'
-                        : 'Required signal type: $requiredType',
-                    style: Theme.of(context).textTheme.bodyMedium,
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: StitchColors.surfaceLow,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: availablePins.isEmpty
+                            ? StitchColors.error.withValues(alpha: 0.28)
+                            : StitchColors.outlineVariant.withValues(alpha: 0.28),
+                      ),
+                    ),
+                    child: Text(
+                      availablePins.isEmpty
+                          ? 'No available pins left for $requiredType.'
+                          : 'Required signal type: $requiredType  •  ${availablePins.length} pin(s) available',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: availablePins.isEmpty
+                                ? StitchColors.error
+                                : StitchColors.onSurfaceVariant,
+                          ),
+                    ),
                   ),
                   const SizedBox(height: 18),
                   Row(
@@ -340,7 +467,24 @@ class _ConfigScreenState extends State<ConfigScreen> {
       ),
       body: Column(
         children: [
-          const StitchTopBar(section: 'Architect'),
+          StitchTopBar(
+            section: 'Architect',
+            trailing: IconButton(
+              onPressed: _isRefreshingPage
+                  ? null
+                  : () => _refreshPage(showFeedback: true),
+              icon: _isRefreshingPage
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(
+                      Icons.refresh_rounded,
+                      color: StitchColors.primaryContainer,
+                    ),
+            ),
+          ),
           Expanded(
             child: ValueListenableBuilder<List<Map<String, dynamic>>>(
               valueListenable: widget.configNotifier,
@@ -350,6 +494,10 @@ class _ConfigScreenState extends State<ConfigScreen> {
                   color: StitchColors.secondaryContainer,
                   backgroundColor: StitchColors.surfaceHigh,
                   child: ListView(
+                    physics: const BouncingScrollPhysics(
+                      parent: AlwaysScrollableScrollPhysics(),
+                    ),
+                    cacheExtent: 700,
                     padding: const EdgeInsets.fromLTRB(20, 24, 20, 220),
                     children: [
                       Row(
@@ -384,49 +532,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
-Column(
-  children: [
-    SizedBox(
-      width: double.infinity,
-      child: StitchGhostButton(
-        onPressed: _isLoadingNode ? null : _loadFromNode,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (_isLoadingNode)
-              const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            else
-              const Icon(Icons.cloud_download_outlined, size: 18),
-            const SizedBox(width: 8),
-            Text(_isLoadingNode ? 'LOADING...' : 'LOAD FROM NODE'),
-          ],
-        ),
-      ),
-    ),
-    const SizedBox(height: 10),
-    SizedBox(
-      width: double.infinity,
-      child: StitchGhostButton(
-        onPressed: _showAddNodeSheet,
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.add_circle_outline_rounded, size: 18),
-            SizedBox(width: 8),
-            Text('ADD SENSOR NODE'),
-          ],
-        ),
-      ),
-    ),
-  ],
-),
-const SizedBox(height: 24),
-
+                      const SizedBox(height: 24),
                       StitchPanel(
                         color: StitchColors.surfaceContainer,
                         child: Column(
@@ -471,6 +577,7 @@ const SizedBox(height: 24),
                         ),
                       ),
                       const SizedBox(height: 16),
+
                       StitchPanel(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -499,24 +606,133 @@ const SizedBox(height: 24),
                             LayoutBuilder(
                               builder: (context, constraints) {
                                 final wide = constraints.maxWidth > 640;
-                                return GridView.count(
-                                  crossAxisCount: wide ? 4 : 2,
-                                  childAspectRatio: wide ? 2.0 : 1.3,
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  crossAxisSpacing: 10,
-                                  mainAxisSpacing: 10,
+                                final tileWidth = wide
+                                    ? (constraints.maxWidth - 30) / 4
+                                    : (constraints.maxWidth - 10) / 2;
+                                return Wrap(
+                                  spacing: 10,
+                                  runSpacing: 10,
                                   children: const [
                                     _InfoTile('ADC1 RANGE', '32, 33, 34, 35, 36, 39'),
                                     _InfoTile('DAC CHANNELS', '25, 26'),
                                     _InfoTile('DIGITAL OUT', '16, 17, 21, 22, 25, 26, 27, 32, 33'),
                                     _InfoTile('DIGITAL IN', '16, 17, 21, 22, 25, 26, 27, 32, 33, 34, 35, 36, 39'),
-                                  ],
+                                  ].map((tile) {
+                                    return SizedBox(
+                                      width: tileWidth,
+                                      child: tile,
+                                    );
+                                  }).toList(),
                                 );
                               },
                             ),
                           ],
                         ),
+                      ),
+                      const SizedBox(height: 20),
+                      Column(
+                        children: [
+                          SizedBox(
+                            width: double.infinity,
+                            child: StitchGhostButton(
+                              onPressed: _isLoadingNode ? null : _loadFromNode,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  if (_isLoadingNode)
+                                    const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    )
+                                  else
+                                    const Icon(Icons.cloud_download_outlined, size: 18),
+                                  const SizedBox(width: 8),
+                                  Text(_isLoadingNode ? 'LOADING...' : 'LOAD FROM NODE'),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: StitchGhostButton(
+                                  onPressed: _isImportingFile ? null : _importFromFile,
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      if (_isImportingFile)
+                                        const SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      else
+                                        const Icon(
+                                          Icons.file_open_rounded,
+                                          size: 18,
+                                        ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        _isImportingFile
+                                            ? 'IMPORTING...'
+                                            : 'IMPORT FILE',
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: StitchGhostButton(
+                                  onPressed: _isExportingFile ? null : _exportToFile,
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      if (_isExportingFile)
+                                        const SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      else
+                                        const Icon(
+                                          Icons.ios_share_rounded,
+                                          size: 18,
+                                        ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        _isExportingFile
+                                            ? 'EXPORTING...'
+                                            : 'EXPORT FILE',
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            width: double.infinity,
+                            child: StitchGhostButton(
+                              onPressed: _showAddNodeSheet,
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.add_circle_outline_rounded, size: 18),
+                                  SizedBox(width: 8),
+                                  Text('ADD SENSOR NODE'),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 20),
                       if (config.isEmpty)
@@ -533,19 +749,21 @@ const SizedBox(height: 24),
                         LayoutBuilder(
                           builder: (context, constraints) {
                             final wide = constraints.maxWidth > 720;
-                            return GridView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: config.length,
-                              gridDelegate:
-                                  SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: wide ? 2 : 1,
-                                mainAxisSpacing: 12,
-                                crossAxisSpacing: 12,
-                                childAspectRatio: wide ? 1.45 : 2.4,
+                            return RepaintBoundary(
+                              child: GridView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: config.length,
+                                gridDelegate:
+                                    SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: wide ? 2 : 1,
+                                  mainAxisSpacing: 12,
+                                  crossAxisSpacing: 12,
+                                  childAspectRatio: wide ? 1.7 : 2.9,
+                                ),
+                                itemBuilder: (context, index) =>
+                                    _buildBentoCard(context, config[index], index),
                               ),
-                              itemBuilder: (context, index) =>
-                                  _buildBentoCard(context, config[index], index),
                             );
                           },
                         ),
@@ -575,15 +793,14 @@ const SizedBox(height: 24),
 
     return StitchPanel(
       color: StitchColors.surfaceLow,
-      glow: true,
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: StitchColors.primaryContainer.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(8),
@@ -617,13 +834,15 @@ const SizedBox(height: 24),
           Text(
             (item['sensor']?.toString() ?? 'NODE').toUpperCase(),
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontSize: 18,
+                  fontSize: 16,
                 ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             'GPIO ${item['pin']}  -  ${item['type']}',
-            style: Theme.of(context).textTheme.bodyMedium,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontSize: 13,
+                ),
           ),
         ],
       ),
@@ -641,6 +860,7 @@ class _InfoTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14),
+      constraints: const BoxConstraints(minHeight: 104),
       decoration: BoxDecoration(
         color: StitchColors.surfaceContainer,
         borderRadius: BorderRadius.circular(16),
@@ -651,20 +871,199 @@ class _InfoTile extends StatelessWidget {
         children: [
           Text(label, style: Theme.of(context).textTheme.labelMedium),
           const SizedBox(height: 6),
-          Expanded(
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                value,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontSize: 13,
-                    ),
-              ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontSize: 13,
+                  ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+Future<T?> _showPickerSheet<T>({
+  required BuildContext context,
+  required String title,
+  required List<T> values,
+  required T? selectedValue,
+  required String Function(T value) labelBuilder,
+  required IconData Function(T value) iconBuilder,
+}) async {
+  return showModalBottomSheet<T>(
+    context: context,
+    backgroundColor: StitchColors.surfaceContainer,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (sheetContext) {
+      return SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: StitchColors.outlineVariant.withValues(alpha: 0.55),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                title,
+                style: Theme.of(sheetContext).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 12),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: values.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final value = values[index];
+                    final selected = value == selectedValue;
+                    return Material(
+                      color: selected
+                          ? StitchColors.primaryContainer.withValues(alpha: 0.10)
+                          : StitchColors.surfaceLow,
+                      borderRadius: BorderRadius.circular(16),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: () => Navigator.pop(sheetContext, value),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 14,
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                iconBuilder(value),
+                                color: selected
+                                    ? StitchColors.primaryContainer
+                                    : StitchColors.secondary,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  labelBuilder(value),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium
+                                      ?.copyWith(
+                                        color: StitchColors.primary,
+                                      ),
+                                ),
+                              ),
+                              if (selected)
+                                const Icon(
+                                  Icons.check_circle_rounded,
+                                  color: StitchColors.primaryContainer,
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _SelectionField<T> extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final String valueLabel;
+  final bool enabled;
+  final VoidCallback? onTap;
+
+  const _SelectionField({
+    required this.label,
+    required this.icon,
+    required this.valueLabel,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: enabled ? onTap : null,
+        child: Ink(
+          decoration: BoxDecoration(
+            color: enabled
+                ? StitchColors.surfaceLowest
+                : StitchColors.surfaceLowest.withValues(alpha: 0.65),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: StitchColors.outlineVariant.withValues(alpha: 0.24),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  color: enabled
+                      ? StitchColors.secondary
+                      : StitchColors.onSurfaceVariant,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: Theme.of(context).textTheme.labelMedium,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        valueLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: enabled
+                                  ? StitchColors.primary
+                                  : StitchColors.onSurfaceVariant,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: enabled
+                      ? StitchColors.secondary
+                      : StitchColors.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

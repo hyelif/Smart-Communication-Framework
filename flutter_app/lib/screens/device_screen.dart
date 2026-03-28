@@ -1,12 +1,13 @@
-import 'dart:convert';
 import 'dart:async';
+import 'dart:convert';
 
-import '../widgets/sensor_matrix.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../services/storage_service.dart';
 import '../widgets/app_theme.dart';
 import '../widgets/custom_ui.dart';
+import '../widgets/sensor_matrix.dart';
 
 class DeviceScreen extends StatefulWidget {
   final void Function(List<Map<String, dynamic>>) onLoadToConfig;
@@ -20,41 +21,67 @@ class DeviceScreen extends StatefulWidget {
 class _DeviceScreenState extends State<DeviceScreen> {
   List<Map<String, dynamic>> deviceConfig = [];
   bool loading = true;
-
-@override
-  void dispose() {
-    _refreshTimer?.cancel();
-    super.dispose();
-  }
+  bool _isRefreshing = false;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
-    _loadCurrentConfig();
+    _loadCurrentConfig(showLoader: true);
 
-    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (mounted) {
         _loadCurrentConfig();
       }
     });
   }
 
-  Timer? _refreshTimer;
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
 
-  Future<void> _loadCurrentConfig() async {
-    final data = await StorageService.loadConfig();
-    final raw = data['config'] as String?;
-    final parsed = raw == null
-        ? <Map<String, dynamic>>[]
-        : List<Map<String, dynamic>>.from(jsonDecode(raw));
-
-    if (!mounted) return;
-      if (jsonEncode(parsed) != jsonEncode(deviceConfig)) {
-        setState(() {
-        deviceConfig = parsed;
-        loading = false;
-      });
+  Future<void> _loadCurrentConfig({bool showLoader = false}) async {
+    if (_isRefreshing) return;
+    if (showLoader && mounted) {
+      setState(() => loading = true);
     }
+
+    _isRefreshing = true;
+    try {
+      final data = await StorageService.loadConfig();
+      final raw = data['config'] as String?;
+      final parsed = raw == null
+          ? <Map<String, dynamic>>[]
+          : List<Map<String, dynamic>>.from(jsonDecode(raw));
+
+      if (!mounted) return;
+      final changed = !_sameConfig(parsed, deviceConfig);
+      if (changed || loading) {
+        setState(() {
+          deviceConfig = parsed;
+          loading = false;
+        });
+      }
+    } finally {
+      _isRefreshing = false;
+      if (mounted && loading) {
+        setState(() => loading = false);
+      }
+    }
+  }
+
+  bool _sameConfig(
+    List<Map<String, dynamic>> left,
+    List<Map<String, dynamic>> right,
+  ) {
+    if (identical(left, right)) return true;
+    if (left.length != right.length) return false;
+    for (var i = 0; i < left.length; i++) {
+      if (!mapEquals(left[i], right[i])) return false;
+    }
+    return true;
   }
 
   Future<void> _saveCurrent() async {
@@ -89,9 +116,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                 Navigator.pop(ctx);
               }
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Live node saved to Vault.')),
-                );
+                showStitchMessage(context, 'Live node saved to Vault.');
               }
             },
             child: const Text(
@@ -138,7 +163,22 @@ class _DeviceScreenState extends State<DeviceScreen> {
             ),
       body: Column(
         children: [
-          const StitchTopBar(section: 'Live Node'),
+          StitchTopBar(
+            section: 'Live Node',
+            trailing: IconButton(
+              onPressed: _isRefreshing ? null : _loadCurrentConfig,
+              icon: _isRefreshing && !loading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(
+                      Icons.refresh_rounded,
+                      color: StitchColors.primaryContainer,
+                    ),
+            ),
+          ),
           Expanded(
             child: loading
                 ? const Center(
@@ -151,6 +191,10 @@ class _DeviceScreenState extends State<DeviceScreen> {
                     backgroundColor: StitchColors.surfaceHigh,
                     onRefresh: _loadCurrentConfig,
                     child: ListView(
+                      physics: const BouncingScrollPhysics(
+                        parent: AlwaysScrollableScrollPhysics(),
+                      ),
+                      cacheExtent: 600,
                       padding: const EdgeInsets.fromLTRB(20, 24, 20, 120),
                       children: [
                         LayoutBuilder(
@@ -178,8 +222,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                                 const SizedBox(height: 12),
                                 if (compact)
                                   Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       FittedBox(
                                         fit: BoxFit.scaleDown,
@@ -194,13 +237,11 @@ class _DeviceScreenState extends State<DeviceScreen> {
                                         ),
                                       ),
                                       const SizedBox(height: 8),
-                                      Text(
-                                        deviceConfig.isEmpty
-                                            ? 'No active live config loaded'
-                                            : 'Pinned sensors: ${deviceConfig.length}  -  Polling every 500ms',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodyMedium,
+                                        Text(
+                                          deviceConfig.isEmpty
+                                              ? 'No active live config loaded'
+                                            : 'Pinned sensors: ${deviceConfig.length}  -  Live layout ready',
+                                        style: Theme.of(context).textTheme.bodyMedium,
                                       ),
                                       const SizedBox(height: 16),
                                       Row(
@@ -209,37 +250,27 @@ class _DeviceScreenState extends State<DeviceScreen> {
                                               (item) => Expanded(
                                                 child: Padding(
                                                   padding: EdgeInsets.only(
-                                                    right: item == stats.first
-                                                        ? 10
-                                                        : 0,
+                                                    right: item == stats.first ? 10 : 0,
                                                   ),
                                                   child: StitchPanel(
-                                                    padding:
-                                                        const EdgeInsets.all(16),
+                                                    padding: const EdgeInsets.all(16),
                                                     child: Column(
                                                       crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .start,
+                                                          CrossAxisAlignment.start,
                                                       children: [
                                                         Text(
                                                           item['label']!,
-                                                          style:
-                                                              Theme.of(context)
-                                                                  .textTheme
-                                                                  .labelMedium,
+                                                          style: Theme.of(context)
+                                                              .textTheme
+                                                              .labelMedium,
                                                         ),
-                                                        const SizedBox(
-                                                            height: 8),
+                                                        const SizedBox(height: 8),
                                                         Text(
                                                           item['value']!,
-                                                          style:
-                                                              Theme.of(context)
-                                                                  .textTheme
-                                                                  .titleLarge
-                                                                  ?.copyWith(
-                                                                    fontSize:
-                                                                        20,
-                                                                  ),
+                                                          style: Theme.of(context)
+                                                              .textTheme
+                                                              .titleLarge
+                                                              ?.copyWith(fontSize: 20),
                                                         ),
                                                       ],
                                                     ),
@@ -253,8 +284,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                                   )
                                 else
                                   Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Expanded(
                                         child: Column(
@@ -277,7 +307,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                                             Text(
                                               deviceConfig.isEmpty
                                                   ? 'No active live config loaded'
-                                                  : 'Pinned sensors: ${deviceConfig.length}  -  Polling every 500ms',
+                                                  : 'Pinned sensors: ${deviceConfig.length}  -  Live layout ready',
                                               style: Theme.of(context)
                                                   .textTheme
                                                   .bodyMedium,
@@ -291,40 +321,29 @@ class _DeviceScreenState extends State<DeviceScreen> {
                                             .map(
                                               (item) => Padding(
                                                 padding: EdgeInsets.only(
-                                                  left: item == stats.first
-                                                      ? 0
-                                                      : 10,
+                                                  left: item == stats.first ? 0 : 10,
                                                 ),
                                                 child: SizedBox(
                                                   width: 118,
                                                   child: StitchPanel(
-                                                    padding:
-                                                        const EdgeInsets.all(
-                                                            16),
+                                                    padding: const EdgeInsets.all(16),
                                                     child: Column(
                                                       crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .start,
+                                                          CrossAxisAlignment.start,
                                                       children: [
                                                         Text(
                                                           item['label']!,
-                                                          style:
-                                                              Theme.of(context)
-                                                                  .textTheme
-                                                                  .labelMedium,
+                                                          style: Theme.of(context)
+                                                              .textTheme
+                                                              .labelMedium,
                                                         ),
-                                                        const SizedBox(
-                                                            height: 8),
+                                                        const SizedBox(height: 8),
                                                         Text(
                                                           item['value']!,
-                                                          style:
-                                                              Theme.of(context)
-                                                                  .textTheme
-                                                                  .titleLarge
-                                                                  ?.copyWith(
-                                                                    fontSize:
-                                                                        20,
-                                                                  ),
+                                                          style: Theme.of(context)
+                                                              .textTheme
+                                                              .titleLarge
+                                                              ?.copyWith(fontSize: 20),
                                                         ),
                                                       ],
                                                     ),
@@ -345,10 +364,12 @@ class _DeviceScreenState extends State<DeviceScreen> {
                         const SizedBox(height: 16),
                         _buildDiagnosticsPanel(context),
                         const SizedBox(height: 16),
-                        SensorMatrix(
-                          deviceConfig: deviceConfig,
-                          onLoad: widget.onLoadToConfig,
-                        )
+                        RepaintBoundary(
+                          child: SensorMatrix(
+                            deviceConfig: deviceConfig,
+                            onLoad: widget.onLoadToConfig,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -433,29 +454,5 @@ class _DeviceScreenState extends State<DeviceScreen> {
         ],
       ),
     );
-  }
-
-  IconData _iconForSensor(String sensor) {
-    final normalized = sensor.toLowerCase();
-    if (normalized.contains('temp')) return Icons.thermostat_rounded;
-    if (normalized.contains('humid')) return Icons.water_drop_rounded;
-    if (normalized.contains('light')) return Icons.light_mode_rounded;
-    if (normalized.contains('power') || normalized.contains('volt')) {
-      return Icons.bolt_rounded;
-    }
-    if (normalized.contains('ph')) return Icons.science_outlined;
-    return Icons.memory_rounded;
-  }
-
-  String _mockLiveValue(Map<String, dynamic> item) {
-    final normalized = (item['sensor']?.toString() ?? '').toLowerCase();
-    if (normalized.contains('temp')) return '24.8 C';
-    if (normalized.contains('humid')) return '58 %';
-    if (normalized.contains('light')) return '412 lx';
-    if (normalized.contains('power') || normalized.contains('volt')) {
-      return '3.29 V';
-    }
-    if (normalized.contains('ph')) return '6.7 pH';
-    return 'LIVE';
   }
 }

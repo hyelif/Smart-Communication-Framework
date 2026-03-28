@@ -20,7 +20,6 @@ class StitchColors {
   static const error = Color(0xFFFFB4AB);
   static const onSecondaryContainer = Color(0xFF002B4D);
 
-  static const cyanGlow = Color(0x1400FFFF);
 }
 
 class AppTheme {
@@ -42,6 +41,10 @@ class AppTheme {
       colorScheme: colorScheme,
       scaffoldBackgroundColor: StitchColors.background,
       canvasColor: StitchColors.background,
+      splashFactory: NoSplash.splashFactory,
+      highlightColor: Colors.transparent,
+      splashColor: Colors.transparent,
+      hoverColor: Colors.transparent,
       fontFamily: 'Inter',
       textTheme: const TextTheme(
         displayMedium: TextStyle(
@@ -109,6 +112,15 @@ class AppTheme {
           borderSide: const BorderSide(color: StitchColors.secondary, width: 1),
         ),
       ),
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.windows: FadeForwardsPageTransitionsBuilder(),
+          TargetPlatform.linux: FadeForwardsPageTransitionsBuilder(),
+        },
+      ),
     );
   }
 
@@ -118,11 +130,5 @@ class AppTheme {
         end: Alignment.bottomRight,
       );
 
-  static List<BoxShadow> get cyanGlowShadow => const [
-        BoxShadow(
-          color: StitchColors.cyanGlow,
-          blurRadius: 30,
-          offset: Offset(0, 16),
-        ),
-      ];
+  static List<BoxShadow> get cyanGlowShadow => const [];
 }

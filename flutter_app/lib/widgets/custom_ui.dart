@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 
 import 'app_theme.dart';
@@ -36,19 +34,19 @@ class StitchScaffold extends StatelessWidget {
         child: Stack(
           children: [
             Positioned(
-              top: -140,
+              top: -100,
               right: -60,
               child: _GlowOrb(
-                size: 280,
-                color: StitchColors.primaryContainer.withValues(alpha: 0.10),
+                size: 220,
+                color: StitchColors.primaryContainer.withValues(alpha: 0.06),
               ),
             ),
             Positioned(
-              top: 220,
-              left: -120,
+              top: 260,
+              left: -90,
               child: _GlowOrb(
-                size: 260,
-                color: StitchColors.secondaryContainer.withValues(alpha: 0.08),
+                size: 180,
+                color: StitchColors.secondaryContainer.withValues(alpha: 0.05),
               ),
             ),
             SafeArea(bottom: false, child: body),
@@ -64,56 +62,56 @@ class StitchScaffold extends StatelessWidget {
 
 class StitchTopBar extends StatelessWidget {
   final String section;
-  final IconData trailingIcon;
+  final IconData? trailingIcon;
+  final Widget? trailing;
 
   const StitchTopBar({
     super.key,
     required this.section,
     this.trailingIcon = Icons.battery_charging_full_rounded,
+    this.trailing,
   });
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          height: 64,
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          decoration: BoxDecoration(
-            color: StitchColors.surface.withValues(alpha: 0.64),
-            border: Border(
-              bottom: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-            ),
-            boxShadow: AppTheme.cyanGlowShadow,
+    return Container(
+      height: 64,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        color: StitchColors.surfaceHigh.withValues(alpha: 0.94),
+        border: Border(
+          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.memory_rounded,
+            color: StitchColors.primaryContainer,
           ),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.memory_rounded,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'ESP32 ARCHITECT',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.4,
+                  ),
+            ),
+          ),
+          Text(
+            section.toUpperCase(),
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: StitchColors.primaryContainer,
+                ),
+          ),
+          const SizedBox(width: 12),
+          trailing ??
+              Icon(
+                trailingIcon ?? Icons.battery_charging_full_rounded,
                 color: StitchColors.primaryContainer,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'ESP32 ARCHITECT',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.4,
-                      ),
-                ),
-              ),
-              Text(
-                section.toUpperCase(),
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: StitchColors.primaryContainer,
-                    ),
-              ),
-              const SizedBox(width: 12),
-              Icon(trailingIcon, color: StitchColors.primaryContainer),
-            ],
-          ),
-        ),
+        ],
       ),
     );
   }
@@ -138,66 +136,58 @@ class StitchBottomNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 18),
-          decoration: BoxDecoration(
-            color: StitchColors.surface.withValues(alpha: 0.72),
-            border: Border(
-              top: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
-            ),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: List.generate(_items.length, (index) {
-                final item = _items[index];
-                final selected = index == currentIndex;
-                return GestureDetector(
-                  onTap: () => onTap(index),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeOutCubic,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 18),
+      decoration: BoxDecoration(
+        color: StitchColors.surfaceHigh.withValues(alpha: 0.96),
+        border: Border(
+          top: BorderSide(color: Colors.white.withValues(alpha: 0.04)),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: List.generate(_items.length, (index) {
+            final item = _items[index];
+            final selected = index == currentIndex;
+            return GestureDetector(
+              onTap: () => onTap(index),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? StitchColors.primaryContainer.withValues(alpha: 0.10)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      item.icon,
                       color: selected
-                          ? StitchColors.primaryContainer.withValues(alpha: 0.10)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(14),
+                          ? StitchColors.primaryContainer
+                          : StitchColors.onSurfaceVariant,
+                      size: 22,
                     ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          item.icon,
-                          color: selected
-                              ? StitchColors.primaryContainer
-                              : StitchColors.onSurfaceVariant,
-                          size: 22,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          item.label,
-                          style:
-                              Theme.of(context).textTheme.labelMedium?.copyWith(
-                                    color: selected
-                                        ? StitchColors.primaryContainer
-                                        : StitchColors.onSurfaceVariant,
-                                  ),
-                        ),
-                      ],
+                    const SizedBox(height: 4),
+                    Text(
+                      item.label,
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                            color: selected
+                                ? StitchColors.primaryContainer
+                                : StitchColors.onSurfaceVariant,
+                          ),
                     ),
-                  ),
-                );
-              }),
-            ),
-          ),
+                  ],
+                ),
+              ),
+            );
+          }),
         ),
       ),
     );
@@ -325,6 +315,74 @@ class StitchGhostButton extends StatelessWidget {
   }
 }
 
+class StitchRefreshButton extends StatelessWidget {
+  final VoidCallback? onPressed;
+  final bool busy;
+  final String label;
+
+  const StitchRefreshButton({
+    super.key,
+    required this.onPressed,
+    this.busy = false,
+    this.label = 'REFRESH',
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: StitchGhostButton(
+        onPressed: busy ? null : onPressed,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (busy)
+              const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              const Icon(Icons.refresh_rounded, size: 18),
+            const SizedBox(width: 8),
+            Text(busy ? 'REFRESHING...' : label),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+void showStitchMessage(
+  BuildContext context,
+  String message, {
+  bool isError = false,
+}) {
+  final messenger = ScaffoldMessenger.of(context);
+  messenger
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: isError ? StitchColors.primary : StitchColors.onSurface,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(milliseconds: isError ? 1800 : 1200),
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        backgroundColor: isError
+            ? const Color(0xFF2A3038)
+            : StitchColors.surfaceHigh,
+      ),
+    );
+}
+
 class StitchStatusDot extends StatelessWidget {
   final Color color;
   final double size;
@@ -343,13 +401,6 @@ class StitchStatusDot extends StatelessWidget {
       decoration: BoxDecoration(
         color: color,
         shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.5),
-            blurRadius: 12,
-            spreadRadius: 2,
-          ),
-        ],
       ),
     );
   }

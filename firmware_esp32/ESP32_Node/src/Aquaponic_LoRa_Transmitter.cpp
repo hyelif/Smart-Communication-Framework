@@ -129,7 +129,7 @@ void handlePostConfig() {
   } else {
     server.send(400, "application/json", "{\"status\":\"missing config key\"}");
   }
-} // <--- Brackets fixed here to prevent "Expected a declaration"
+}
 
 // ================= LORA & ENCRYPTION =================
 
@@ -178,52 +178,70 @@ String encrypt(String plainText) {
 
 void setup() {
   Serial.begin(115200);
-  
+  delay(1000);
+  Serial.println();
+  Serial.println("BOOT OK");
+  Serial.println("Starting SmartPonic node...");
+
   for(int i=0; i<MAX_SENSORS; i++) {
     dhtSensors[i] = nullptr; oneWireSensors[i] = nullptr; tempSensors[i] = nullptr;
   }
+  Serial.println("Sensor slots initialized");
 
   WiFi.softAP(ssid, password);
+  Serial.print("Access Point ready: ");
+  Serial.println(ssid);
   
   prefs.begin("cfg", true);
   String savedJson = prefs.getString("json", "");
   prefs.end();
-  
+  Serial.print("Saved config bytes: ");
+  Serial.println(savedJson.length());
+
   if (savedJson != "") {
     DynamicJsonDocument doc(4096);
-    deserializeJson(doc, savedJson);
-    if(doc.containsKey("config")) {
+    DeserializationError error = deserializeJson(doc, savedJson);
+    if (error) {
+      Serial.print("Saved config parse failed: ");
+      Serial.println(error.f_str());
+    } else if(doc.containsKey("config")) {
         applyConfig(doc["config"]);
+        Serial.println("Saved config applied");
     }
   }
 
   server.on("/config", HTTP_POST, handlePostConfig);
   server.on("/config", HTTP_GET, handleGetConfig); 
   server.begin();
+  Serial.println("HTTP config server started");
 
   SPI.begin(LORA_SCK, LORA_MISO, LORA_MOSI, LORA_SS);
   LoRa.setPins(LORA_SS, LORA_RST, LORA_DIO0);
   if (LoRa.begin(433E6)) {
     LoRa.setSyncWord(LORA_SYNC_WORD);
-    Serial.println("✅ System Ready");
+    Serial.println("System Ready");
+  } else {
+    Serial.println("LoRa init failed");
   }
 }
 
 void loop() {
   server.handleClient();
-  
+
   static unsigned long lastSend = 0;
   if (millis() - lastSend > 15000) {
     String raw = buildPayload();
     String secure = encrypt(raw);
-    
+
     LoRa.beginPacket();
     LoRa.print(secure);
     LoRa.endPacket();
 
-    Serial.print("Raw: "); Serial.println(raw);
-    Serial.print("Encrypted HEX: "); Serial.println(secure);
-    
+    Serial.print("Raw: ");
+    Serial.println(raw);
+    Serial.print("Encrypted HEX: ");
+    Serial.println(secure);
+
     lastSend = millis();
   }
 }

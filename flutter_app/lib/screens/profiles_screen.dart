@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../services/storage_service.dart';
@@ -15,23 +17,38 @@ class ProfilesScreen extends StatefulWidget {
 
 class _ProfilesScreenState extends State<ProfilesScreen> {
   List<Map<String, dynamic>> profiles = [];
+  bool _isRefreshing = false;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     _refresh();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      if (mounted) {
+        _refresh();
+      }
+    });
   }
 
   @override
-    void didChangeDependencies() {
-      super.didChangeDependencies();
-      _refresh();
-}
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
 
   Future<void> _refresh() async {
-    final data = await StorageService.getProfiles();
-    if (!mounted) return;
-    setState(() => profiles = data);
+    if (_isRefreshing) return;
+    setState(() => _isRefreshing = true);
+    try {
+      final data = await StorageService.getProfiles();
+      if (!mounted) return;
+      setState(() => profiles = data);
+    } finally {
+      if (mounted) {
+        setState(() => _isRefreshing = false);
+      }
+    }
   }
 
   @override
@@ -39,7 +56,22 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
     return StitchScaffold(
       body: Column(
         children: [
-          const StitchTopBar(section: 'Vault'),
+          StitchTopBar(
+            section: 'Vault',
+            trailing: IconButton(
+              onPressed: _isRefreshing ? null : _refresh,
+              icon: _isRefreshing
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(
+                      Icons.refresh_rounded,
+                      color: StitchColors.primaryContainer,
+                    ),
+            ),
+          ),
           Expanded(
             child: RefreshIndicator(
               color: StitchColors.secondaryContainer,
@@ -91,13 +123,13 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                   const SizedBox(height: 22),
                   LayoutBuilder(
                     builder: (context, constraints) {
-                      final crossAxisCount = constraints.maxWidth > 760 ? 3 : 1;
+                      final crossAxisCount = 3;
                       return GridView.count(
                         crossAxisCount: crossAxisCount,
                         shrinkWrap: true,
-                        mainAxisSpacing: 12,
-                        crossAxisSpacing: 12,
-                        childAspectRatio: crossAxisCount == 1 ? 2.8 : 1.45,
+                        mainAxisSpacing: 10,
+                        crossAxisSpacing: 10,
+                        childAspectRatio: constraints.maxWidth > 760 ? 1.9 : 1.15,
                         physics: const NeverScrollableScrollPhysics(),
                         children: [
                           _buildStatTile(
@@ -231,38 +263,37 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
     bool showPulse = false,
   }) {
     return StitchPanel(
-      glow: true,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(label, style: Theme.of(context).textTheme.labelMedium),
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
           if (showPulse)
             const Row(
               children: [
-                StitchStatusDot(size: 8),
-                SizedBox(width: 8),
+                StitchStatusDot(size: 6),
+                SizedBox(width: 6),
                 Text(
                   'LIVE',
                   style: TextStyle(
                     color: StitchColors.primaryContainer,
-                    fontSize: 11,
+                    fontSize: 10,
                     fontWeight: FontWeight.w800,
-                    letterSpacing: 1.5,
+                    letterSpacing: 1.1,
                   ),
                 ),
               ],
             ),
-          if (showPulse) const SizedBox(height: 8),
+          if (showPulse) const SizedBox(height: 6),
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
             child: Text(
               value,
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontSize: 20,
+                    fontSize: 17,
                   ),
             ),
           ),
