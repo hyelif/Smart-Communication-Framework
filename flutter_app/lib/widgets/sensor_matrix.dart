@@ -20,6 +20,23 @@ class SensorMatrix extends StatelessWidget {
     required this.onLoad,
   });
 
+  String _displayName(Map<String, dynamic> item) {
+    final sensor = item['sensor']?.toString().trim() ?? 'Unknown Sensor';
+    final label = item['label']?.toString().trim() ?? '';
+    if (sensor == 'Relay' && label.isNotEmpty) {
+      return '$label Relay';
+    }
+    return sensor;
+  }
+
+  String _componentKey(Map<String, dynamic> item) {
+    final label = item['label']?.toString().trim() ?? '';
+    if (label.isNotEmpty) {
+      return label;
+    }
+    return item['sensor']?.toString() ?? '';
+  }
+
   @override
   Widget build(BuildContext context) {
     if (deviceConfig.isEmpty) {
@@ -83,7 +100,7 @@ class SensorMatrix extends StatelessWidget {
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Icon(
-                        _iconForSensor(item['sensor']?.toString() ?? ''),
+                        _iconForSensor(_componentKey(item)),
                         color: accent,
                       ),
                     ),
@@ -93,7 +110,7 @@ class SensorMatrix extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            item['sensor']?.toString() ?? 'Unknown Sensor',
+                            _displayName(item),
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                           const SizedBox(height: 4),
@@ -148,6 +165,9 @@ class SensorMatrix extends StatelessWidget {
 
   IconData _iconForSensor(String sensor) {
     final normalized = sensor.toLowerCase();
+    if (normalized.contains('pump')) return Icons.water_rounded;
+    if (normalized.contains('valve')) return Icons.tune_rounded;
+    if (normalized.contains('relay')) return Icons.toggle_on_rounded;
     if (normalized.contains('temp')) return Icons.thermostat_rounded;
     if (normalized.contains('humid')) return Icons.water_drop_rounded;
     if (normalized.contains('light')) return Icons.light_mode_rounded;
@@ -159,7 +179,10 @@ class SensorMatrix extends StatelessWidget {
   }
 
   String _mockLiveValue(Map<String, dynamic> item) {
-    final normalized = (item['sensor']?.toString() ?? '').toLowerCase();
+    final normalized = _componentKey(item).toLowerCase();
+    if (normalized.contains('pump')) return 'OFF';
+    if (normalized.contains('valve')) return 'CLOSED';
+    if (normalized.contains('relay')) return 'OFF';
     if (normalized.contains('temp')) return '24.8 C';
     if (normalized.contains('humid')) return '58 %';
     if (normalized.contains('light')) return '412 lx';

@@ -123,6 +123,58 @@ class _DeviceScreenState extends State<DeviceScreen> {
     return _nodeHealth?[key] == true;
   }
 
+  int? _healthInt(String key) {
+    final value = _nodeHealth?[key];
+    if (value is num) return value.toInt();
+    if (value == null) return null;
+    return int.tryParse(value.toString());
+  }
+
+  String get _nodeTitle {
+    return _healthString(
+      'board',
+      _healthString('chipModel', 'ESP32 Device'),
+    );
+  }
+
+  String get _nodeSubtitle {
+    if (_nodeOnline) {
+      final chip = _healthString('chipModel', 'ESP32');
+      final revision = _healthInt('chipRevision');
+      final ssid = _healthString('ssid', 'AQUA_NODE');
+      final chipLabel = revision == null ? chip : '$chip rev $revision';
+      return '$chipLabel  |  AP $ssid';
+    }
+
+    return deviceConfig.isEmpty
+        ? 'No active live config loaded'
+        : 'Pinned sensors: ${deviceConfig.length}  -  Live layout ready';
+  }
+
+  String get _nodeStatusLabel {
+    if (!_nodeOnline) {
+      return 'NODE OFFLINE';
+    }
+
+    return '${_nodeTitle.toUpperCase()} ONLINE';
+  }
+
+  String _formatUptime(int? totalSeconds) {
+    if (totalSeconds == null) return '--';
+
+    final hours = totalSeconds ~/ 3600;
+    final minutes = (totalSeconds % 3600) ~/ 60;
+    final seconds = totalSeconds % 60;
+
+    if (hours > 0) {
+      return '${hours}h ${minutes}m';
+    }
+    if (minutes > 0) {
+      return '${minutes}m ${seconds}s';
+    }
+    return '${seconds}s';
+  }
+
   bool _sameConfig(
     List<Map<String, dynamic>> left,
     List<Map<String, dynamic>> right,
@@ -188,14 +240,12 @@ class _DeviceScreenState extends State<DeviceScreen> {
   Widget build(BuildContext context) {
     final stats = [
       {
-        'label': 'CPU TEMP',
-        'value': deviceConfig.isEmpty ? '--' : '${38 + deviceConfig.length} C',
+        'label': 'HEAP',
+        'value': _nodeOnline ? '${_healthString('heapKb', '--')} KB' : '--',
       },
       {
-        'label': 'HEAP',
-        'value': deviceConfig.isEmpty
-            ? '--'
-            : '${160 + (deviceConfig.length * 6)} KB',
+        'label': 'UPTIME',
+        'value': _nodeOnline ? _formatUptime(_healthInt('uptimeSec')) : '--',
       },
     ];
 
@@ -268,7 +318,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                                     ),
                                     const SizedBox(width: 8),
                                     Text(
-                                      _nodeOnline ? 'SYSTEM ONLINE' : 'NODE OFFLINE',
+                                      _nodeStatusLabel,
                                       style: TextStyle(
                                         color: _nodeOnline
                                             ? StitchColors.primaryContainer
@@ -289,7 +339,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                                         fit: BoxFit.scaleDown,
                                         alignment: Alignment.centerLeft,
                                         child: Text(
-                                          'ESP32-S3-WROOM-1',
+                                          _nodeTitle,
                                           maxLines: 1,
                                           style: Theme.of(context)
                                               .textTheme
@@ -299,9 +349,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                                       ),
                                       const SizedBox(height: 8),
                                       Text(
-                                        deviceConfig.isEmpty
-                                            ? 'No active live config loaded'
-                                            : 'Pinned sensors: ${deviceConfig.length}  -  Live layout ready',
+                                        _nodeSubtitle,
                                         style: Theme.of(context).textTheme.bodyMedium,
                                       ),
                                       const SizedBox(height: 16),
@@ -356,7 +404,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                                               fit: BoxFit.scaleDown,
                                               alignment: Alignment.centerLeft,
                                               child: Text(
-                                                'ESP32-S3-WROOM-1',
+                                                _nodeTitle,
                                                 maxLines: 1,
                                                 style: Theme.of(context)
                                                     .textTheme
@@ -366,9 +414,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                                             ),
                                             const SizedBox(height: 8),
                                             Text(
-                                              deviceConfig.isEmpty
-                                                  ? 'No active live config loaded'
-                                                  : 'Pinned sensors: ${deviceConfig.length}  -  Live layout ready',
+                                              _nodeSubtitle,
                                               style: Theme.of(context)
                                                   .textTheme
                                                   .bodyMedium,
@@ -456,12 +502,15 @@ class _DeviceScreenState extends State<DeviceScreen> {
           const StitchSectionLabel('Connectivity', icon: Icons.wifi_rounded),
           const SizedBox(height: 18),
           _metaRow('Node Status', _nodeOnline ? 'ONLINE' : 'OFFLINE'),
+          _metaRow('Board', _healthString('board', '--')),
+          _metaRow('Chip', _healthString('chipModel', '--')),
           _metaRow('SSID', ssid),
           _metaRow('AP IP', accessPointIp),
           _metaRow('Clients', clients),
           _metaRow('Saved Nodes', configCount),
           _metaRow('Security', lockStatus),
-          if (_healthMessage != null) _metaRow('Note', _healthMessage!),
+          if (_healthMessage != null)
+            _metaRow('Note', _healthMessage!, multiline: true),
         ],
       ),
     );
@@ -506,22 +555,36 @@ class _DeviceScreenState extends State<DeviceScreen> {
     );
   }
 
-  Widget _metaRow(String label, String value) {
+  Widget _metaRow(
+    String label,
+    String value, {
+    bool multiline = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Row(
+        crossAxisAlignment:
+            multiline ? CrossAxisAlignment.start : CrossAxisAlignment.center,
         children: [
-          Expanded(
+          SizedBox(
+            width: 96,
             child: Text(
               label,
               style: const TextStyle(color: StitchColors.onSurfaceVariant),
             ),
           ),
-          Text(
-            value,
-            style: const TextStyle(
-              color: StitchColors.primary,
-              fontWeight: FontWeight.w600,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              softWrap: multiline,
+              maxLines: multiline ? null : 1,
+              overflow: multiline ? TextOverflow.visible : TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: StitchColors.primary,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],

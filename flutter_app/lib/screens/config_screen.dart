@@ -37,8 +37,8 @@ class _ConfigScreenState extends State<ConfigScreen> {
   static const Map<String, List<int>> pinGroups = {
     'AI': [32, 33, 34, 35, 36, 39],
     'AO': [25, 26],
-    'DO': [16, 17, 21, 22, 25, 26, 27, 32, 33],
-    'DI': [16, 17, 21, 22, 25, 26, 27, 32, 33, 34, 35, 36, 39],
+    'DO': [4, 13, 16, 17, 21, 22, 25, 26, 27, 32, 33],
+    'DI': [4, 13, 16, 17, 21, 22, 25, 26, 27, 32, 33],
   };
 
   static const Map<String, String> sensorRequirements = {
@@ -47,6 +47,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
     'Turbidity': 'AI',
     'DHT22': 'DI',
     'WaterTemp': 'DI',
+    'Relay': 'DO',
   };
 
   @override
@@ -189,6 +190,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
       return;
     }
 
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() => _isDeploying = true);
 
     try {
@@ -278,183 +280,45 @@ class _ConfigScreenState extends State<ConfigScreen> {
     widget.configNotifier.value = updated;
   }
 
-  Future<void> _showAddNodeSheet() async {
-    String selectedSensor = 'pH';
-    int? selectedPin;
+  IconData _componentIcon(String component) {
+    final normalized = component.toLowerCase();
+    if (normalized.contains('pump')) return Icons.water_rounded;
+    if (normalized.contains('valve')) return Icons.tune_rounded;
+    if (normalized.contains('relay')) return Icons.toggle_on_rounded;
+    if (normalized.contains('temp')) return Icons.thermostat_rounded;
+    if (normalized.contains('ph')) return Icons.science_outlined;
+    if (normalized.contains('tds')) return Icons.opacity_rounded;
+    if (normalized.contains('turbidity')) return Icons.water_drop_outlined;
+    return Icons.sensors_outlined;
+  }
 
-    await showModalBottomSheet<void>(
+  String _componentDisplayName(Map<String, dynamic> item) {
+    final sensor = item['sensor']?.toString().trim() ?? 'Node';
+    final label = item['label']?.toString().trim() ?? '';
+    if (sensor == 'Relay' && label.isNotEmpty) {
+      return '$label Relay';
+    }
+    return sensor;
+  }
+
+  Future<void> _showAddNodeSheet() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    final item = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
       backgroundColor: StitchColors.surfaceContainer,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            final requiredType = sensorRequirements[selectedSensor]!;
-            final usedPins = widget.configNotifier.value
-                .map((e) => e['pin'] as int)
-                .toSet();
-
-            final availablePins = pinGroups[requiredType]!
-                .where((pin) => !usedPins.contains(pin))
-                .toList();
-
-            if (selectedPin == null || !availablePins.contains(selectedPin)) {
-              selectedPin = availablePins.isNotEmpty ? availablePins.first : null;
-            }
-
-            return Padding(
-              padding: EdgeInsets.fromLTRB(
-                20,
-                20,
-                20,
-                20 + MediaQuery.of(context).viewInsets.bottom,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 42,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: StitchColors.outlineVariant.withValues(alpha: 0.55),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const StitchSectionLabel('Add Node'),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Choose the sensor type first, then map it to a valid GPIO pin.',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 16),
-                  _SelectionField<String>(
-                    label: 'Sensor Type',
-                    icon: Icons.sensors_outlined,
-                    valueLabel: selectedSensor,
-                    enabled: true,
-                    onTap: () async {
-                      final value = await _showPickerSheet<String>(
-                        context: ctx,
-                        title: 'Select Sensor Type',
-                        values: sensorRequirements.keys.toList(),
-                        selectedValue: selectedSensor,
-                        labelBuilder: (sensor) => sensor,
-                        iconBuilder: (sensor) => Icons.sensors_outlined,
-                      );
-                      if (value == null) return;
-                      setModalState(() {
-                        selectedSensor = value;
-                        selectedPin = null;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  _SelectionField<int>(
-                    label: 'GPIO Pin ($requiredType)',
-                    icon: Icons.settings_input_component,
-                    valueLabel: selectedPin == null ? 'Select a GPIO pin' : 'GPIO $selectedPin',
-                    enabled: availablePins.isNotEmpty,
-                    onTap: availablePins.isEmpty
-                        ? null
-                        : () async {
-                            final value = await _showPickerSheet<int>(
-                              context: ctx,
-                              title: 'Select GPIO Pin',
-                              values: availablePins,
-                              selectedValue: selectedPin,
-                              labelBuilder: (pin) => 'GPIO $pin',
-                              iconBuilder: (pin) => Icons.memory_rounded,
-                            );
-                            if (value == null) return;
-                            setModalState(() {
-                              selectedPin = value;
-                            });
-                          },
-                  ),
-                  const SizedBox(height: 12),
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeOutCubic,
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: StitchColors.surfaceLow,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: availablePins.isEmpty
-                            ? StitchColors.error.withValues(alpha: 0.28)
-                            : StitchColors.outlineVariant.withValues(alpha: 0.28),
-                      ),
-                    ),
-                    child: Text(
-                      availablePins.isEmpty
-                          ? 'No available pins left for $requiredType.'
-                          : 'Required signal type: $requiredType  •  ${availablePins.length} pin(s) available',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: availablePins.isEmpty
-                                ? StitchColors.error
-                                : StitchColors.onSurfaceVariant,
-                          ),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: StitchGhostButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          child: const Text('CANCEL'),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: StitchPrimaryButton(
-                          onPressed: selectedPin == null
-                              ? null
-                              : () {
-                                  final updated = List<Map<String, dynamic>>.from(
-                                    widget.configNotifier.value,
-                                  );
-
-                                  updated.add({
-                                    'pin': selectedPin,
-                                    'sensor': selectedSensor,
-                                    'type': requiredType,
-                                  });
-
-                                  widget.configNotifier.value = updated;
-                                  Navigator.pop(ctx);
-                                },
-                          child: const Center(
-                            child: Text(
-                              'ADD NODE',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w900,
-                                color: StitchColors.onSecondaryContainer,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+      builder: (_) => _AddNodeSheet(existingConfig: widget.configNotifier.value),
     );
+
+    if (!mounted || item == null) return;
+
+    final updated = List<Map<String, dynamic>>.from(
+      widget.configNotifier.value,
+    )..add(item);
+    widget.configNotifier.value = updated;
   }
 
   Widget _buildConfigListSection() {
@@ -671,10 +535,10 @@ class _ConfigScreenState extends State<ConfigScreen> {
                               spacing: 10,
                               runSpacing: 10,
                               children: const [
-                                _InfoTile('ADC1 RANGE', '32, 33, 34, 35, 36, 39'),
+                                _InfoTile('ADC1 SAFE', '32, 33, 34, 35, 36, 39'),
                                 _InfoTile('DAC CHANNELS', '25, 26'),
-                                _InfoTile('DIGITAL OUT', '16, 17, 21, 22, 25, 26, 27, 32, 33'),
-                                _InfoTile('DIGITAL IN', '16, 17, 21, 22, 25, 26, 27, 32, 33, 34, 35, 36, 39'),
+                                _InfoTile('DIGITAL I/O', '4, 13, 16, 17, 21, 22, 25, 26, 27, 32, 33'),
+                                _InfoTile('INPUT ONLY', '34, 35, 36, 39'),
                               ].map((tile) {
                                 return SizedBox(
                                   width: tileWidth,
@@ -808,14 +672,6 @@ class _ConfigScreenState extends State<ConfigScreen> {
     Map<String, dynamic> item,
     int index,
   ) {
-    final icons = [
-      Icons.science_outlined,
-      Icons.water_drop_outlined,
-      Icons.opacity_outlined,
-      Icons.thermostat_rounded,
-      Icons.device_thermostat_outlined,
-    ];
-
     return StitchPanel(
       color: StitchColors.surfaceLow,
       padding: const EdgeInsets.all(14),
@@ -837,7 +693,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
               ),
               const Spacer(),
               Icon(
-                icons[index % icons.length],
+                _componentIcon(_componentDisplayName(item)),
                 color: StitchColors.onSurfaceVariant,
               ),
               const SizedBox(width: 6),
@@ -857,7 +713,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
           ),
           const Spacer(),
           Text(
-            (item['sensor']?.toString() ?? 'NODE').toUpperCase(),
+            _componentDisplayName(item).toUpperCase(),
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontSize: 16,
                 ),
@@ -872,6 +728,55 @@ class _ConfigScreenState extends State<ConfigScreen> {
         ],
       ),
     );
+  }
+}
+
+class _AddNodeSheet extends StatefulWidget {
+  final List<Map<String, dynamic>> existingConfig;
+
+  const _AddNodeSheet({required this.existingConfig});
+
+  @override
+  State<_AddNodeSheet> createState() => _AddNodeSheetState();
+}
+
+class _AddNodeSheetState extends State<_AddNodeSheet> {
+  final TextEditingController _relayLabelController = TextEditingController();
+  String _selectedSensor = 'pH';
+  int? _selectedPin;
+
+  @override
+  void dispose() {
+    _relayLabelController.dispose();
+    super.dispose();
+  }
+
+  String get _requiredType {
+    return _ConfigScreenState.sensorRequirements[_selectedSensor]!;
+  }
+
+  bool get _isRelay => _selectedSensor == 'Relay';
+
+  List<int> get _availablePins {
+    final usedPins = widget.existingConfig
+        .map((e) => e['pin'] as int)
+        .toSet();
+
+    return _ConfigScreenState.pinGroups[_requiredType]!
+        .where((pin) => !usedPins.contains(pin))
+        .toList();
+  }
+
+  IconData _componentIcon(String component) {
+    final normalized = component.toLowerCase();
+    if (normalized.contains('pump')) return Icons.water_rounded;
+    if (normalized.contains('valve')) return Icons.tune_rounded;
+    if (normalized.contains('relay')) return Icons.toggle_on_rounded;
+    if (normalized.contains('temp')) return Icons.thermostat_rounded;
+    if (normalized.contains('ph')) return Icons.science_outlined;
+    if (normalized.contains('tds')) return Icons.opacity_rounded;
+    if (normalized.contains('turbidity')) return Icons.water_drop_outlined;
+    return Icons.sensors_outlined;
   }
 
   Future<T?> _showPickerSheet<T>({
@@ -972,6 +877,192 @@ class _ConfigScreenState extends State<ConfigScreen> {
           ),
         );
       },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final availablePins = _availablePins;
+    final selectedPin = availablePins.contains(_selectedPin)
+        ? _selectedPin
+        : (availablePins.isNotEmpty ? availablePins.first : null);
+    final relayLabel = _relayLabelController.text.trim();
+
+    return SafeArea(
+      top: false,
+      child: SingleChildScrollView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        padding: EdgeInsets.fromLTRB(
+          20,
+          20,
+          20,
+          20 + MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 42,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: StitchColors.outlineVariant.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const StitchSectionLabel('Add Node'),
+            const SizedBox(height: 6),
+            Text(
+              'Choose the component type first, then map it to a valid GPIO pin.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            _SelectionField<String>(
+              label: 'Component Type',
+              icon: _componentIcon(_selectedSensor),
+              valueLabel: _selectedSensor,
+              enabled: true,
+              onTap: () async {
+                final value = await _showPickerSheet<String>(
+                  context: context,
+                  title: 'Select Component Type',
+                  values: _ConfigScreenState.sensorRequirements.keys.toList(),
+                  selectedValue: _selectedSensor,
+                  labelBuilder: (sensor) => sensor,
+                  iconBuilder: _componentIcon,
+                );
+                if (value == null || !mounted) return;
+                setState(() {
+                  _selectedSensor = value;
+                  _selectedPin = null;
+                  if (_selectedSensor != 'Relay') {
+                    _relayLabelController.clear();
+                  }
+                });
+              },
+            ),
+            const SizedBox(height: 12),
+            _SelectionField<int>(
+              label: 'GPIO Pin ($_requiredType)',
+              icon: Icons.settings_input_component,
+              valueLabel: selectedPin == null ? 'Select a GPIO pin' : 'GPIO $selectedPin',
+              enabled: availablePins.isNotEmpty,
+              onTap: availablePins.isEmpty
+                  ? null
+                  : () async {
+                      final value = await _showPickerSheet<int>(
+                        context: context,
+                        title: 'Select GPIO Pin',
+                        values: availablePins,
+                        selectedValue: selectedPin,
+                        labelBuilder: (pin) => 'GPIO $pin',
+                        iconBuilder: (pin) => Icons.memory_rounded,
+                      );
+                      if (value == null || !mounted) return;
+                      setState(() {
+                        _selectedPin = value;
+                      });
+                    },
+            ),
+            if (_isRelay) ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: _relayLabelController,
+                onChanged: (_) {
+                  if (mounted) {
+                    setState(() {});
+                  }
+                },
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.done,
+                decoration: const InputDecoration(
+                  labelText: 'Relay Role',
+                  hintText: 'Valve, Water Pump, Aerator...',
+                  prefixIcon: Icon(Icons.label_outline_rounded),
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 12,
+              ),
+              decoration: BoxDecoration(
+                color: StitchColors.surfaceLow,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: availablePins.isEmpty
+                      ? StitchColors.error.withValues(alpha: 0.28)
+                      : StitchColors.outlineVariant.withValues(alpha: 0.28),
+                ),
+              ),
+              child: Text(
+                availablePins.isEmpty
+                    ? 'No available pins left for $_requiredType.'
+                    : _isRelay
+                        ? 'Required signal type: $_requiredType  |  Name this relay so the node knows what it controls.'
+                        : 'Required signal type: $_requiredType  |  ${availablePins.length} pin(s) available',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: availablePins.isEmpty
+                          ? StitchColors.error
+                          : StitchColors.onSurfaceVariant,
+                    ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: StitchGhostButton(
+                    onPressed: () {
+                      FocusManager.instance.primaryFocus?.unfocus();
+                      Navigator.pop(context);
+                    },
+                    child: const Text('CANCEL'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: StitchPrimaryButton(
+                    onPressed: selectedPin == null || (_isRelay && relayLabel.isEmpty)
+                        ? null
+                        : () {
+                            final item = <String, dynamic>{
+                              'pin': selectedPin,
+                              'sensor': _selectedSensor,
+                              'type': _requiredType,
+                            };
+
+                            if (_isRelay) {
+                              item['label'] = relayLabel;
+                            }
+
+                            FocusManager.instance.primaryFocus?.unfocus();
+                            Navigator.pop(context, item);
+                          },
+                    child: const Center(
+                      child: Text(
+                        'ADD NODE',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          color: StitchColors.onSecondaryContainer,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

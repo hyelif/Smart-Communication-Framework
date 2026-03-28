@@ -38,25 +38,43 @@ struct GPIOConfig {
   int pin;
   String type;
   String sensor;
+  String label;
 };
 
 std::vector<GPIOConfig> configList;
-#define MAX_SENSORS 10
+#define MAX_SENSORS 15
 
 // Sensor Pointers
 DHT *dhtSensors[MAX_SENSORS];
 OneWire *oneWireSensors[MAX_SENSORS];
 DallasTemperature *tempSensors[MAX_SENSORS];
 
-const int safePins[] = {25, 26, 27, 32, 33, 34, 35};
+const int safePins[] = {
+    4,  13, 16, 17, 21, 22, 25, 26,
+    27, 32, 33, 34, 35, 36, 39,
+};
 
 bool isSafePin(int pin) {
-  for (int i = 0; i < 7; i++) {
+  for (size_t i = 0; i < sizeof(safePins) / sizeof(safePins[0]); i++) {
     if (safePins[i] == pin) {
       return true;
     }
   }
   return false;
+}
+
+String boardName() {
+#if defined(CONFIG_IDF_TARGET_ESP32S3)
+  return "ESP32-S3 Dev Module";
+#elif defined(CONFIG_IDF_TARGET_ESP32S2)
+  return "ESP32-S2 Dev Module";
+#elif defined(CONFIG_IDF_TARGET_ESP32C3)
+  return "ESP32-C3 Dev Module";
+#elif defined(CONFIG_IDF_TARGET_ESP32)
+  return "ESP32 Dev Module";
+#else
+  return "ESP32";
+#endif
 }
 
 void addCommonHeaders() {
@@ -161,12 +179,14 @@ void applyConfig(JsonArray arr) {
     int pin = obj["pin"] | -1;
     String sensor = obj["sensor"] | "";
     String type = obj["type"] | "";
+    String label = obj["label"] | "";
+    label.trim();
 
     if (!isSafePin(pin)) {
       continue;
     }
 
-    configList.push_back({pin, type, sensor});
+    configList.push_back({pin, type, sensor, label});
 
     if (sensor == "DHT22") {
       dhtSensors[idx] = new DHT(pin, DHT22);
@@ -182,6 +202,18 @@ void applyConfig(JsonArray arr) {
     } else {
       pinMode(pin, INPUT);
     }
+
+    Serial.print("Configured GPIO ");
+    Serial.print(pin);
+    Serial.print(" as ");
+    if (!label.isEmpty()) {
+      Serial.print(label);
+      Serial.print(" ");
+    }
+    Serial.print(sensor);
+    Serial.print(" [");
+    Serial.print(type);
+    Serial.println("]");
 
     idx++;
   }
@@ -233,12 +265,20 @@ void handleHealth() {
   Serial.println("HTTP GET /health");
   addCommonHeaders();
 
+  const uint32_t freeHeapKb = ESP.getFreeHeap() / 1024;
+  const uint32_t uptimeSec = millis() / 1000;
   String body = "{\"status\":\"ok\",\"ssid\":\"" + String(ssid) +
                 "\",\"ip\":\"" + WiFi.softAPIP().toString() +
-                "\",\"locked\":" +
+                "\",\"board\":\"" + boardName() +
+                "\",\"chipModel\":\"" + String(ESP.getChipModel()) +
+                "\",\"chipRevision\":" + String(ESP.getChipRevision()) +
+                ",\"heapKb\":" + String(freeHeapKb) +
+                ",\"uptimeSec\":" + String(uptimeSec) +
+                ",\"locked\":" +
                 String(loadNodeSecurityKey().isEmpty() ? "false" : "true") +
                 ",\"clients\":" + String(WiFi.softAPgetStationNum()) +
-                ",\"configCount\":" + String(configList.size()) + "}";
+                ",\"configCount\":" + String(configList.size()) +
+                ",\"maxConfig\":" + String(MAX_SENSORS) + "}";
 
   server.send(200, "application/json", body);
 }
