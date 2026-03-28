@@ -19,39 +19,14 @@ class StitchScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              StitchColors.surfaceLowest,
-              StitchColors.background,
-              StitchColors.surface,
-            ],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          const _ScaffoldBackdrop(),
+          RepaintBoundary(
+            child: SafeArea(bottom: false, child: body),
           ),
-        ),
-        child: Stack(
-          children: [
-            Positioned(
-              top: -100,
-              right: -60,
-              child: _GlowOrb(
-                size: 220,
-                color: StitchColors.primaryContainer.withValues(alpha: 0.06),
-              ),
-            ),
-            Positioned(
-              top: 260,
-              left: -90,
-              child: _GlowOrb(
-                size: 180,
-                color: StitchColors.secondaryContainer.withValues(alpha: 0.05),
-              ),
-            ),
-            SafeArea(bottom: false, child: body),
-          ],
-        ),
+        ],
       ),
       floatingActionButton: floatingActionButton,
       floatingActionButtonLocation: floatingActionButtonLocation,
@@ -74,44 +49,89 @@ class StitchTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 64,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: BoxDecoration(
-        color: StitchColors.surfaceHigh.withValues(alpha: 0.94),
-        border: Border(
-          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
-        ),
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.memory_rounded,
-            color: StitchColors.primaryContainer,
+    return RepaintBoundary(
+      child: Container(
+        height: 64,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        decoration: BoxDecoration(
+          color: StitchColors.surfaceHigh.withValues(alpha: 0.94),
+          border: Border(
+            bottom: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'ESP32 ARCHITECT',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.4,
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.memory_rounded,
+              color: StitchColors.primaryContainer,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'ESP32 ARCHITECT',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.4,
+                    ),
+              ),
+            ),
+            Text(
+              section.toUpperCase(),
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: StitchColors.primaryContainer,
                   ),
             ),
-          ),
-          Text(
-            section.toUpperCase(),
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            const SizedBox(width: 12),
+            trailing ??
+                Icon(
+                  trailingIcon ?? Icons.battery_charging_full_rounded,
                   color: StitchColors.primaryContainer,
                 ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ScaffoldBackdrop extends StatelessWidget {
+  const _ScaffoldBackdrop();
+
+  @override
+  Widget build(BuildContext context) {
+    return const RepaintBoundary(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              StitchColors.surfaceLowest,
+              StitchColors.background,
+              StitchColors.surface,
+            ],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
           ),
-          const SizedBox(width: 12),
-          trailing ??
-              Icon(
-                trailingIcon ?? Icons.battery_charging_full_rounded,
-                color: StitchColors.primaryContainer,
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              top: -100,
+              right: -60,
+              child: _GlowOrb(
+                size: 220,
+                color: Color(0x0F00FBFB),
               ),
-        ],
+            ),
+            Positioned(
+              top: 260,
+              left: -90,
+              child: _GlowOrb(
+                size: 180,
+                color: Color(0x0D1E95F2),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -136,58 +156,60 @@ class StitchBottomNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 18),
-      decoration: BoxDecoration(
-        color: StitchColors.surfaceHigh.withValues(alpha: 0.96),
-        border: Border(
-          top: BorderSide(color: Colors.white.withValues(alpha: 0.04)),
+    return RepaintBoundary(
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 18),
+        decoration: BoxDecoration(
+          color: StitchColors.surfaceHigh.withValues(alpha: 0.96),
+          border: Border(
+            top: BorderSide(color: Colors.white.withValues(alpha: 0.04)),
+          ),
         ),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: List.generate(_items.length, (index) {
-            final item = _items[index];
-            final selected = index == currentIndex;
-            return GestureDetector(
-              onTap: () => onTap(index),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
+        child: SafeArea(
+          top: false,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: List.generate(_items.length, (index) {
+              final item = _items[index];
+              final selected = index == currentIndex;
+              return GestureDetector(
+                onTap: () => onTap(index),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? StitchColors.primaryContainer.withValues(alpha: 0.10)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        item.icon,
+                        color: selected
+                            ? StitchColors.primaryContainer
+                            : StitchColors.onSurfaceVariant,
+                        size: 22,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        item.label,
+                        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                              color: selected
+                                  ? StitchColors.primaryContainer
+                                  : StitchColors.onSurfaceVariant,
+                            ),
+                      ),
+                    ],
+                  ),
                 ),
-                decoration: BoxDecoration(
-                  color: selected
-                      ? StitchColors.primaryContainer.withValues(alpha: 0.10)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      item.icon,
-                      color: selected
-                          ? StitchColors.primaryContainer
-                          : StitchColors.onSurfaceVariant,
-                      size: 22,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      item.label,
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                            color: selected
-                                ? StitchColors.primaryContainer
-                                : StitchColors.onSurfaceVariant,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }),
+              );
+            }),
+          ),
         ),
       ),
     );

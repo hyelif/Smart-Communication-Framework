@@ -5,24 +5,63 @@ class StorageService {
   static const String _configKey = 'esp_config_data';
   static const String _profilesKey = 'esp_profiles_list';
   static const String _aesKey = 'esp_aes_key';
+  static Future<SharedPreferences>? _prefsFuture;
+  static bool _configLoaded = false;
+  static bool _profilesLoaded = false;
+  static bool _keyLoaded = false;
+  static String? _cachedConfigJson;
+  static String? _cachedProfilesJson;
+  static String? _cachedKey;
+
+  static Future<SharedPreferences> _prefs() {
+    return _prefsFuture ??= SharedPreferences.getInstance();
+  }
+
+  static Future<void> _ensureConfigCache() async {
+    if (_configLoaded) return;
+    final prefs = await _prefs();
+    _cachedConfigJson = prefs.getString(_configKey);
+    _configLoaded = true;
+  }
+
+  static Future<void> _ensureProfilesCache() async {
+    if (_profilesLoaded) return;
+    final prefs = await _prefs();
+    _cachedProfilesJson = prefs.getString(_profilesKey);
+    _profilesLoaded = true;
+  }
+
+  static Future<void> _ensureKeyCache() async {
+    if (_keyLoaded) return;
+    final prefs = await _prefs();
+    _cachedKey = prefs.getString(_aesKey);
+    _keyLoaded = true;
+  }
 
   static Future<void> saveConfig(List<Map<String, dynamic>> config, String key) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_configKey, jsonEncode(config));
+    final prefs = await _prefs();
+    _cachedConfigJson = jsonEncode(config);
+    _cachedKey = key;
+    _configLoaded = true;
+    _keyLoaded = true;
+    await prefs.setString(_configKey, _cachedConfigJson!);
     await prefs.setString(_aesKey, key);
   }
 
   static Future<Map<String, dynamic>> loadConfig() async {
-    final prefs = await SharedPreferences.getInstance();
+    await Future.wait([
+      _ensureConfigCache(),
+      _ensureKeyCache(),
+    ]);
     return {
-      'config': prefs.getString(_configKey),
-      'key': prefs.getString(_aesKey),
+      'config': _cachedConfigJson,
+      'key': _cachedKey,
     };
   }
 
   static Future<List<Map<String, dynamic>>> getProfiles() async {
-    final prefs = await SharedPreferences.getInstance();
-    final data = prefs.getString(_profilesKey);
+    await _ensureProfilesCache();
+    final data = _cachedProfilesJson;
     if (data == null) return [];
     return List<Map<String, dynamic>>.from(jsonDecode(data));
   }
@@ -31,14 +70,16 @@ class StorageService {
     String name,
     List<Map<String, dynamic>> config,
   ) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await _prefs();
     final profiles = await getProfiles();
     profiles.insert(0, {
       'name': name,
       'time': DateTime.now().toIso8601String(),
       'config': config,
     });
-    await prefs.setString(_profilesKey, jsonEncode(profiles));
+    _cachedProfilesJson = jsonEncode(profiles);
+    _profilesLoaded = true;
+    await prefs.setString(_profilesKey, _cachedProfilesJson!);
   }
 
   static Future<void> saveProfile(
@@ -49,11 +90,13 @@ class StorageService {
   }
 
   static Future<void> deleteProfile(int index) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await _prefs();
     final profiles = await getProfiles();
     if (index >= 0 && index < profiles.length) {
       profiles.removeAt(index);
-      await prefs.setString(_profilesKey, jsonEncode(profiles));
+      _cachedProfilesJson = jsonEncode(profiles);
+      _profilesLoaded = true;
+      await prefs.setString(_profilesKey, _cachedProfilesJson!);
     }
   }
 }

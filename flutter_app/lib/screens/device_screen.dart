@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -11,8 +10,15 @@ import '../widgets/sensor_matrix.dart';
 
 class DeviceScreen extends StatefulWidget {
   final void Function(List<Map<String, dynamic>>) onLoadToConfig;
+  final ValueListenable<int> activeTabListenable;
+  final int tabIndex;
 
-  const DeviceScreen({super.key, required this.onLoadToConfig});
+  const DeviceScreen({
+    super.key,
+    required this.onLoadToConfig,
+    required this.activeTabListenable,
+    required this.tabIndex,
+  });
 
   @override
   State<DeviceScreen> createState() => _DeviceScreenState();
@@ -22,24 +28,29 @@ class _DeviceScreenState extends State<DeviceScreen> {
   List<Map<String, dynamic>> deviceConfig = [];
   bool loading = true;
   bool _isRefreshing = false;
-  Timer? _refreshTimer;
+  bool _hasLoadedOnce = false;
 
   @override
   void initState() {
     super.initState();
-    _loadCurrentConfig(showLoader: true);
-
-    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (mounted) {
-        _loadCurrentConfig();
-      }
-    });
+    widget.activeTabListenable.addListener(_handleActiveTabChanged);
+    if (widget.activeTabListenable.value == widget.tabIndex) {
+      _loadCurrentConfig(showLoader: true);
+    } else {
+      loading = false;
+    }
   }
 
   @override
   void dispose() {
-    _refreshTimer?.cancel();
+    widget.activeTabListenable.removeListener(_handleActiveTabChanged);
     super.dispose();
+  }
+
+  void _handleActiveTabChanged() {
+    if (widget.activeTabListenable.value == widget.tabIndex) {
+      _loadCurrentConfig(showLoader: !_hasLoadedOnce);
+    }
   }
 
   Future<void> _loadCurrentConfig({bool showLoader = false}) async {
@@ -64,6 +75,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
           loading = false;
         });
       }
+      _hasLoadedOnce = true;
     } finally {
       _isRefreshing = false;
       if (mounted && loading) {
@@ -88,45 +100,49 @@ class _DeviceScreenState extends State<DeviceScreen> {
     if (deviceConfig.isEmpty) return;
 
     final nameCtrl = TextEditingController();
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: StitchColors.surfaceContainer,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Text('Save Live Profile'),
-        content: TextField(
-          controller: nameCtrl,
-          decoration: const InputDecoration(
-            labelText: 'Profile Name',
-            prefixIcon: Icon(Icons.bookmark_add_outlined),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('CANCEL'),
-          ),
-          StitchPrimaryButton(
-            onPressed: () async {
-              final name = nameCtrl.text.trim().isEmpty
-                  ? 'Live Node Snapshot'
-                  : nameCtrl.text.trim();
-              await StorageService.saveProfile(name, deviceConfig);
-              if (ctx.mounted) {
-                Navigator.pop(ctx);
-              }
-              if (mounted) {
-                showStitchMessage(context, 'Live node saved to Vault.');
-              }
-            },
-            child: const Text(
-              'SAVE',
-              style: TextStyle(fontWeight: FontWeight.w900),
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: StitchColors.surfaceContainer,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: const Text('Save Live Profile'),
+          content: TextField(
+            controller: nameCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Profile Name',
+              prefixIcon: Icon(Icons.bookmark_add_outlined),
             ),
           ),
-        ],
-      ),
-    );
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('CANCEL'),
+            ),
+            StitchPrimaryButton(
+              onPressed: () async {
+                final name = nameCtrl.text.trim().isEmpty
+                    ? 'Live Node Snapshot'
+                    : nameCtrl.text.trim();
+                await StorageService.saveProfile(name, deviceConfig);
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                }
+                if (mounted) {
+                  showStitchMessage(context, 'Live node saved to Vault.');
+                }
+              },
+              child: const Text(
+                'SAVE',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      nameCtrl.dispose();
+    }
   }
 
   @override

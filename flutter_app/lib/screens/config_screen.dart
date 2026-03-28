@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -12,8 +11,15 @@ import '../widgets/custom_ui.dart';
 
 class ConfigScreen extends StatefulWidget {
   final ValueNotifier<List<Map<String, dynamic>>> configNotifier;
+  final ValueListenable<int> activeTabListenable;
+  final int tabIndex;
 
-  const ConfigScreen({super.key, required this.configNotifier});
+  const ConfigScreen({
+    super.key,
+    required this.configNotifier,
+    required this.activeTabListenable,
+    required this.tabIndex,
+  });
 
   @override
   State<ConfigScreen> createState() => _ConfigScreenState();
@@ -27,7 +33,6 @@ class _ConfigScreenState extends State<ConfigScreen> {
   bool _isRefreshingPage = false;
   bool _isImportingFile = false;
   bool _isExportingFile = false;
-  Timer? _refreshTimer;
 
   static const Map<String, List<int>> pinGroups = {
     'AI': [32, 33, 34, 35, 36, 39],
@@ -48,16 +53,10 @@ class _ConfigScreenState extends State<ConfigScreen> {
   void initState() {
     super.initState();
     _refreshPage();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (mounted) {
-        _refreshPage();
-      }
-    });
   }
 
   @override
   void dispose() {
-    _refreshTimer?.cancel();
     _keyController.dispose();
     super.dispose();
   }
@@ -115,10 +114,20 @@ class _ConfigScreenState extends State<ConfigScreen> {
   }
 
   Future<void> _loadFromNode() async {
+    final securityKey = _keyController.text.trim();
+    if (securityKey.isEmpty) {
+      showStitchMessage(
+        context,
+        'Enter the node security key before loading config.',
+        isError: true,
+      );
+      return;
+    }
+
     setState(() => _isLoadingNode = true);
 
     try {
-      final result = await ApiService.fetchConfig();
+      final result = await ApiService.fetchConfig(securityKey);
 
       if (!mounted) return;
 
@@ -142,7 +151,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
       } else {
         showStitchMessage(
           context,
-          'ESP32 not connected. Join the node Wi-Fi and try again.',
+          ApiService.friendlyApiMessage(result),
           isError: true,
         );
       }
@@ -170,15 +179,28 @@ class _ConfigScreenState extends State<ConfigScreen> {
       return;
     }
 
+    final securityKey = _keyController.text.trim();
+    if (securityKey.isEmpty) {
+      showStitchMessage(
+        context,
+        'Enter the node security key before deploying config.',
+        isError: true,
+      );
+      return;
+    }
+
     setState(() => _isDeploying = true);
 
     try {
       await StorageService.saveConfig(
         widget.configNotifier.value,
-        _keyController.text.trim(),
+        securityKey,
       );
 
-      final result = await ApiService.sendConfig(widget.configNotifier.value);
+      final result = await ApiService.sendConfig(
+        widget.configNotifier.value,
+        securityKey,
+      );
 
       if (!mounted) return;
 
@@ -187,7 +209,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
       } else {
         showStitchMessage(
           context,
-          'ESP32 not connected. Join the node Wi-Fi and try again.',
+          ApiService.friendlyApiMessage(result),
           isError: true,
         );
       }
@@ -435,6 +457,46 @@ class _ConfigScreenState extends State<ConfigScreen> {
     );
   }
 
+  Widget _buildConfigListSection() {
+    return ValueListenableBuilder<List<Map<String, dynamic>>>(
+      valueListenable: widget.configNotifier,
+      builder: (context, config, _) {
+        if (config.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: StitchEmptyState(
+              title: 'No Nodes Defined',
+              subtitle:
+                  'Tap "Add Sensor Node" or "Load From Node" to start building your ESP32 configuration.',
+              icon: Icons.hub_outlined,
+            ),
+          );
+        }
+
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final wide = constraints.maxWidth > 720;
+            return RepaintBoundary(
+              child: GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: config.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: wide ? 2 : 1,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: wide ? 1.7 : 2.9,
+                ),
+                itemBuilder: (context, index) =>
+                    _buildBentoCard(context, config[index], index),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return StitchScaffold(
@@ -486,291 +548,254 @@ class _ConfigScreenState extends State<ConfigScreen> {
             ),
           ),
           Expanded(
-            child: ValueListenableBuilder<List<Map<String, dynamic>>>(
-              valueListenable: widget.configNotifier,
-              builder: (context, config, _) {
-                return RefreshIndicator(
-                  onRefresh: _loadFromNode,
-                  color: StitchColors.secondaryContainer,
-                  backgroundColor: StitchColors.surfaceHigh,
-                  child: ListView(
-                    physics: const BouncingScrollPhysics(
-                      parent: AlwaysScrollableScrollPhysics(),
-                    ),
-                    cacheExtent: 700,
-                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 220),
+            child: RefreshIndicator(
+              onRefresh: _loadFromNode,
+              color: StitchColors.secondaryContainer,
+              backgroundColor: StitchColors.surfaceHigh,
+              child: ListView(
+                physics: const BouncingScrollPhysics(
+                  parent: AlwaysScrollableScrollPhysics(),
+                ),
+                cacheExtent: 700,
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 220),
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  alignment: Alignment.centerLeft,
-                                  child: Text(
-                                    'Architect',
-                                    style: Theme.of(context).textTheme.displayMedium,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Build and deploy your node layout directly from this panel.',
-                                  style: Theme.of(context).textTheme.bodyMedium,
-                                ),
-                              ],
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                'Architect',
+                                style: Theme.of(context).textTheme.displayMedium,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Build and deploy your node layout directly from this panel.',
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: _saveSnapshot,
+                        icon: const Icon(
+                          Icons.bookmark_add_outlined,
+                          color: StitchColors.primaryContainer,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  StitchPanel(
+                    color: StitchColors.surfaceContainer,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const StitchSectionLabel('Security Key'),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: _keyController,
+                          obscureText: !_isKeyVisible,
+                          style: const TextStyle(
+                            color: StitchColors.primary,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.2,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: 'Enter secure node key',
+                            prefixIcon: const Icon(
+                              Icons.lock_outline_rounded,
+                              color: StitchColors.secondary,
+                            ),
+                            suffixIcon: IconButton(
+                              onPressed: () => setState(
+                                () => _isKeyVisible = !_isKeyVisible,
+                              ),
+                              icon: Icon(
+                                _isKeyVisible
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                              ),
                             ),
                           ),
-                          IconButton(
-                            onPressed: _saveSnapshot,
-                            icon: const Icon(
-                              Icons.bookmark_add_outlined,
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'Required for node load/deploy. The ESP32 now checks this key before exposing config access.',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                fontSize: 12,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  StitchPanel(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(
+                              Icons.settings_input_component_outlined,
                               color: StitchColors.primaryContainer,
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      StitchPanel(
-                        color: StitchColors.surfaceContainer,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const StitchSectionLabel('Security Key'),
-                            const SizedBox(height: 16),
-                            TextField(
-                              controller: _keyController,
-                              obscureText: !_isKeyVisible,
-                              style: const TextStyle(
-                                color: StitchColors.primary,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 1.2,
-                              ),
-                              decoration: InputDecoration(
-                                hintText: 'Enter secure node key',
-                                prefixIcon: const Icon(
-                                  Icons.lock_outline_rounded,
-                                  color: StitchColors.secondary,
-                                ),
-                                suffixIcon: IconButton(
-                                  onPressed: () => setState(
-                                    () => _isKeyVisible = !_isKeyVisible,
-                                  ),
-                                  icon: Icon(
-                                    _isKeyVisible
-                                        ? Icons.visibility_outlined
-                                        : Icons.visibility_off_outlined,
-                                  ),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'PIN CONFIGURATION',
+                                style: TextStyle(
+                                  color: StitchColors.primary,
+                                  fontFamily: 'SpaceGrotesk',
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.4,
                                 ),
                               ),
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              'Stored with your local draft. ESP32 deploy sends config JSON to 192.168.4.1.',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    fontSize: 12,
-                                  ),
                             ),
                           ],
                         ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      StitchPanel(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Row(
-                              children: [
-                                Icon(
-                                  Icons.settings_input_component_outlined,
-                                  color: StitchColors.primaryContainer,
-                                ),
-                                SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'PIN CONFIGURATION',
-                                    style: TextStyle(
-                                      color: StitchColors.primary,
-                                      fontFamily: 'SpaceGrotesk',
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 0.4,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 18),
-                            LayoutBuilder(
-                              builder: (context, constraints) {
-                                final wide = constraints.maxWidth > 640;
-                                final tileWidth = wide
-                                    ? (constraints.maxWidth - 30) / 4
-                                    : (constraints.maxWidth - 10) / 2;
-                                return Wrap(
-                                  spacing: 10,
-                                  runSpacing: 10,
-                                  children: const [
-                                    _InfoTile('ADC1 RANGE', '32, 33, 34, 35, 36, 39'),
-                                    _InfoTile('DAC CHANNELS', '25, 26'),
-                                    _InfoTile('DIGITAL OUT', '16, 17, 21, 22, 25, 26, 27, 32, 33'),
-                                    _InfoTile('DIGITAL IN', '16, 17, 21, 22, 25, 26, 27, 32, 33, 34, 35, 36, 39'),
-                                  ].map((tile) {
-                                    return SizedBox(
-                                      width: tileWidth,
-                                      child: tile,
-                                    );
-                                  }).toList(),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Column(
-                        children: [
-                          SizedBox(
-                            width: double.infinity,
-                            child: StitchGhostButton(
-                              onPressed: _isLoadingNode ? null : _loadFromNode,
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  if (_isLoadingNode)
-                                    const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(strokeWidth: 2),
-                                    )
-                                  else
-                                    const Icon(Icons.cloud_download_outlined, size: 18),
-                                  const SizedBox(width: 8),
-                                  Text(_isLoadingNode ? 'LOADING...' : 'LOAD FROM NODE'),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: StitchGhostButton(
-                                  onPressed: _isImportingFile ? null : _importFromFile,
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      if (_isImportingFile)
-                                        const SizedBox(
-                                          width: 16,
-                                          height: 16,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                          ),
-                                        )
-                                      else
-                                        const Icon(
-                                          Icons.file_open_rounded,
-                                          size: 18,
-                                        ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        _isImportingFile
-                                            ? 'IMPORTING...'
-                                            : 'IMPORT FILE',
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: StitchGhostButton(
-                                  onPressed: _isExportingFile ? null : _exportToFile,
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      if (_isExportingFile)
-                                        const SizedBox(
-                                          width: 16,
-                                          height: 16,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                          ),
-                                        )
-                                      else
-                                        const Icon(
-                                          Icons.ios_share_rounded,
-                                          size: 18,
-                                        ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        _isExportingFile
-                                            ? 'EXPORTING...'
-                                            : 'EXPORT FILE',
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          SizedBox(
-                            width: double.infinity,
-                            child: StitchGhostButton(
-                              onPressed: _showAddNodeSheet,
-                              child: const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.add_circle_outline_rounded, size: 18),
-                                  SizedBox(width: 8),
-                                  Text('ADD SENSOR NODE'),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      if (config.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 8),
-                          child: StitchEmptyState(
-                            title: 'No Nodes Defined',
-                            subtitle:
-                                'Tap "Add Sensor Node" or "Load From Node" to start building your ESP32 configuration.',
-                            icon: Icons.hub_outlined,
-                          ),
-                        )
-                      else
+                        const SizedBox(height: 18),
                         LayoutBuilder(
                           builder: (context, constraints) {
-                            final wide = constraints.maxWidth > 720;
-                            return RepaintBoundary(
-                              child: GridView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                itemCount: config.length,
-                                gridDelegate:
-                                    SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: wide ? 2 : 1,
-                                  mainAxisSpacing: 12,
-                                  crossAxisSpacing: 12,
-                                  childAspectRatio: wide ? 1.7 : 2.9,
-                                ),
-                                itemBuilder: (context, index) =>
-                                    _buildBentoCard(context, config[index], index),
-                              ),
+                            final wide = constraints.maxWidth > 640;
+                            final tileWidth = wide
+                                ? (constraints.maxWidth - 30) / 4
+                                : (constraints.maxWidth - 10) / 2;
+                            return Wrap(
+                              spacing: 10,
+                              runSpacing: 10,
+                              children: const [
+                                _InfoTile('ADC1 RANGE', '32, 33, 34, 35, 36, 39'),
+                                _InfoTile('DAC CHANNELS', '25, 26'),
+                                _InfoTile('DIGITAL OUT', '16, 17, 21, 22, 25, 26, 27, 32, 33'),
+                                _InfoTile('DIGITAL IN', '16, 17, 21, 22, 25, 26, 27, 32, 33, 34, 35, 36, 39'),
+                              ].map((tile) {
+                                return SizedBox(
+                                  width: tileWidth,
+                                  child: tile,
+                                );
+                              }).toList(),
                             );
                           },
                         ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Column(
+                    children: [
+                      SizedBox(
+                        width: double.infinity,
+                        child: StitchGhostButton(
+                          onPressed: _isLoadingNode ? null : _loadFromNode,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              if (_isLoadingNode)
+                                const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              else
+                                const Icon(Icons.cloud_download_outlined, size: 18),
+                              const SizedBox(width: 8),
+                              Text(_isLoadingNode ? 'LOADING...' : 'LOAD FROM NODE'),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: StitchGhostButton(
+                              onPressed: _isImportingFile ? null : _importFromFile,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  if (_isImportingFile)
+                                    const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  else
+                                    const Icon(
+                                      Icons.file_open_rounded,
+                                      size: 18,
+                                    ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    _isImportingFile
+                                        ? 'IMPORTING...'
+                                        : 'IMPORT FILE',
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: StitchGhostButton(
+                              onPressed: _isExportingFile ? null : _exportToFile,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  if (_isExportingFile)
+                                    const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  else
+                                    const Icon(
+                                      Icons.ios_share_rounded,
+                                      size: 18,
+                                    ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    _isExportingFile
+                                        ? 'EXPORTING...'
+                                        : 'EXPORT FILE',
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: StitchGhostButton(
+                          onPressed: _showAddNodeSheet,
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.add_circle_outline_rounded, size: 18),
+                              SizedBox(width: 8),
+                              Text('ADD SENSOR NODE'),
+                            ],
+                          ),
+                        ),
+                      ),
                     ],
                   ),
-                );
-              },
+                  const SizedBox(height: 20),
+                  _buildConfigListSection(),
+                ],
+              ),
             ),
           ),
         ],
@@ -848,6 +873,107 @@ class _ConfigScreenState extends State<ConfigScreen> {
       ),
     );
   }
+
+  Future<T?> _showPickerSheet<T>({
+    required BuildContext context,
+    required String title,
+    required List<T> values,
+    required T? selectedValue,
+    required String Function(T value) labelBuilder,
+    required IconData Function(T value) iconBuilder,
+  }) async {
+    return showModalBottomSheet<T>(
+      context: context,
+      backgroundColor: StitchColors.surfaceContainer,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: StitchColors.outlineVariant.withValues(alpha: 0.55),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  title,
+                  style: Theme.of(sheetContext).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 12),
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: values.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 8),
+                    itemBuilder: (context, index) {
+                      final value = values[index];
+                      final selected = value == selectedValue;
+                      return Material(
+                        color: selected
+                            ? StitchColors.primaryContainer.withValues(alpha: 0.10)
+                            : StitchColors.surfaceLow,
+                        borderRadius: BorderRadius.circular(16),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () => Navigator.pop(sheetContext, value),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 14,
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  iconBuilder(value),
+                                  color: selected
+                                      ? StitchColors.primaryContainer
+                                      : StitchColors.secondary,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    labelBuilder(value),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(
+                                          color: StitchColors.primary,
+                                        ),
+                                  ),
+                                ),
+                                if (selected)
+                                  const Icon(
+                                    Icons.check_circle_rounded,
+                                    color: StitchColors.primaryContainer,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _InfoTile extends StatelessWidget {
@@ -886,107 +1012,6 @@ class _InfoTile extends StatelessWidget {
       ),
     );
   }
-}
-
-Future<T?> _showPickerSheet<T>({
-  required BuildContext context,
-  required String title,
-  required List<T> values,
-  required T? selectedValue,
-  required String Function(T value) labelBuilder,
-  required IconData Function(T value) iconBuilder,
-}) async {
-  return showModalBottomSheet<T>(
-    context: context,
-    backgroundColor: StitchColors.surfaceContainer,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-    ),
-    builder: (sheetContext) {
-      return SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 42,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: StitchColors.outlineVariant.withValues(alpha: 0.55),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                title,
-                style: Theme.of(sheetContext).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 12),
-              Flexible(
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: values.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 8),
-                  itemBuilder: (context, index) {
-                    final value = values[index];
-                    final selected = value == selectedValue;
-                    return Material(
-                      color: selected
-                          ? StitchColors.primaryContainer.withValues(alpha: 0.10)
-                          : StitchColors.surfaceLow,
-                      borderRadius: BorderRadius.circular(16),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(16),
-                        onTap: () => Navigator.pop(sheetContext, value),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 14,
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                iconBuilder(value),
-                                color: selected
-                                    ? StitchColors.primaryContainer
-                                    : StitchColors.secondary,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  labelBuilder(value),
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleMedium
-                                      ?.copyWith(
-                                        color: StitchColors.primary,
-                                      ),
-                                ),
-                              ),
-                              if (selected)
-                                const Icon(
-                                  Icons.check_circle_rounded,
-                                  color: StitchColors.primaryContainer,
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    },
-  );
 }
 
 class _SelectionField<T> extends StatelessWidget {

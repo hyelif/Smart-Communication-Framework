@@ -1,5 +1,4 @@
-import 'dart:async';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../services/storage_service.dart';
@@ -8,8 +7,15 @@ import '../widgets/custom_ui.dart';
 
 class ProfilesScreen extends StatefulWidget {
   final Function(List<Map<String, dynamic>>) onSelectProfile;
+  final ValueListenable<int> activeTabListenable;
+  final int tabIndex;
 
-  const ProfilesScreen({super.key, required this.onSelectProfile});
+  const ProfilesScreen({
+    super.key,
+    required this.onSelectProfile,
+    required this.activeTabListenable,
+    required this.tabIndex,
+  });
 
   @override
   State<ProfilesScreen> createState() => _ProfilesScreenState();
@@ -18,23 +24,38 @@ class ProfilesScreen extends StatefulWidget {
 class _ProfilesScreenState extends State<ProfilesScreen> {
   List<Map<String, dynamic>> profiles = [];
   bool _isRefreshing = false;
-  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
-    _refresh();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 20), (_) {
-      if (mounted) {
-        _refresh();
-      }
-    });
+    widget.activeTabListenable.addListener(_handleActiveTabChanged);
+    if (widget.activeTabListenable.value == widget.tabIndex) {
+      _refresh();
+    }
   }
 
   @override
   void dispose() {
-    _refreshTimer?.cancel();
+    widget.activeTabListenable.removeListener(_handleActiveTabChanged);
     super.dispose();
+  }
+
+  void _handleActiveTabChanged() {
+    if (widget.activeTabListenable.value == widget.tabIndex) {
+      _refresh();
+    }
+  }
+
+  bool _sameProfiles(
+    List<Map<String, dynamic>> left,
+    List<Map<String, dynamic>> right,
+  ) {
+    if (identical(left, right)) return true;
+    if (left.length != right.length) return false;
+    for (var i = 0; i < left.length; i++) {
+      if (!mapEquals(left[i], right[i])) return false;
+    }
+    return true;
   }
 
   Future<void> _refresh() async {
@@ -43,7 +64,9 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
     try {
       final data = await StorageService.getProfiles();
       if (!mounted) return;
-      setState(() => profiles = data);
+      if (!_sameProfiles(data, profiles)) {
+        setState(() => profiles = data);
+      }
     } finally {
       if (mounted) {
         setState(() => _isRefreshing = false);
@@ -78,6 +101,7 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
               backgroundColor: StitchColors.surfaceHigh,
               onRefresh: _refresh,
               child: ListView(
+                cacheExtent: 500,
                 padding: const EdgeInsets.fromLTRB(20, 24, 20, 120),
                 children: [
                   Wrap(
@@ -234,8 +258,11 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                               const SizedBox(width: 8),
                               IconButton(
                                 onPressed: () async {
+                                  final updated = List<Map<String, dynamic>>.from(
+                                    profiles,
+                                  )..removeAt(index);
+                                  setState(() => profiles = updated);
                                   await StorageService.deleteProfile(index);
-                                  _refresh();
                                 },
                                 icon: const Icon(
                                   Icons.delete_outline_rounded,

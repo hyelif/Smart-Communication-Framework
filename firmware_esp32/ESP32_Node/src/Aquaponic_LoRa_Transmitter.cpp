@@ -12,20 +12,25 @@
 #include <mbedtls/aes.h>
 
 // ================= SETTINGS =================
-const char *key = "SmartPonic123456"; // Changed to const to fix ISO warning
-const char* ssid = "AQUA_NODE";
-const char* password = "12345678";
+const char *key = "SmartPonic123456";
+const char *ssid = "AQUA_NODE";
+const char *password = "12345678";
 
 WebServer server(80);
 Preferences prefs;
+bool loraReady = false;
+const char *nodeKeyHeader = "X-Node-Key";
+const char *configNamespace = "cfg";
+const char *configJsonPrefKey = "json";
+const char *nodeSecurityPrefKey = "node_key";
 
 // LoRa Pins
-#define LORA_SCK    18
-#define LORA_MISO   19
-#define LORA_MOSI   23
-#define LORA_SS      5
-#define LORA_RST    14
-#define LORA_DIO0   -1
+#define LORA_SCK 18
+#define LORA_MISO 19
+#define LORA_MOSI 23
+#define LORA_SS 5
+#define LORA_RST 14
+#define LORA_DIO0 -1
 #define LORA_SYNC_WORD 0xB4
 const String SECRET_KEY = "AQUA77";
 
@@ -39,37 +44,127 @@ std::vector<GPIOConfig> configList;
 #define MAX_SENSORS 10
 
 // Sensor Pointers
-DHT* dhtSensors[MAX_SENSORS];
-OneWire* oneWireSensors[MAX_SENSORS];
-DallasTemperature* tempSensors[MAX_SENSORS];
+DHT *dhtSensors[MAX_SENSORS];
+OneWire *oneWireSensors[MAX_SENSORS];
+DallasTemperature *tempSensors[MAX_SENSORS];
 
 const int safePins[] = {25, 26, 27, 32, 33, 34, 35};
 
 bool isSafePin(int pin) {
-  for (int i = 0; i < 7; i++) if (safePins[i] == pin) return true;
+  for (int i = 0; i < 7; i++) {
+    if (safePins[i] == pin) {
+      return true;
+    }
+  }
   return false;
+}
+
+void addCommonHeaders() {
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  server.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  server.sendHeader("Access-Control-Allow-Headers", "Content-Type, X-Node-Key");
+  server.sendHeader("Cache-Control", "no-store");
+}
+
+String loadNodeSecurityKey() {
+  prefs.begin(configNamespace, true);
+  String value = prefs.getString(nodeSecurityPrefKey, "");
+  prefs.end();
+  return value;
+}
+
+void saveNodeSecurityKey(const String &value) {
+  prefs.begin(configNamespace, false);
+  prefs.putString(nodeSecurityPrefKey, value);
+  prefs.end();
+}
+
+String readRequestSecurityKey() {
+  String requestKey;
+
+  if (server.hasHeader(nodeKeyHeader)) {
+    requestKey = server.header(nodeKeyHeader);
+  }
+
+  if (requestKey.isEmpty() && server.hasArg("key")) {
+    requestKey = server.arg("key");
+  }
+
+  requestKey.trim();
+  return requestKey;
+}
+
+bool requireAuthorizedNodeKey(bool allowBootstrap) {
+  String requestKey = readRequestSecurityKey();
+  String nodeKey = loadNodeSecurityKey();
+
+  if (requestKey.isEmpty()) {
+    addCommonHeaders();
+    server.send(
+        401,
+        "application/json",
+        "{\"status\":\"missing_key\",\"message\":\"Security key required\"}");
+    return false;
+  }
+
+  if (nodeKey.isEmpty()) {
+    if (allowBootstrap) {
+      return true;
+    }
+
+    addCommonHeaders();
+    server.send(
+        403,
+        "application/json",
+        "{\"status\":\"key_not_configured\",\"message\":\"Set a key with a deploy request first\"}");
+    return false;
+  }
+
+  if (requestKey != nodeKey) {
+    addCommonHeaders();
+    server.send(
+        403,
+        "application/json",
+        "{\"status\":\"invalid_key\",\"message\":\"Security key mismatch\"}");
+    return false;
+  }
+
+  return true;
 }
 
 // ================= CONFIG LOGIC =================
 
 void applyConfig(JsonArray arr) {
   for (int i = 0; i < MAX_SENSORS; i++) {
-    if (dhtSensors[i]) { delete dhtSensors[i]; dhtSensors[i] = nullptr; }
-    if (tempSensors[i]) { delete tempSensors[i]; tempSensors[i] = nullptr; }
-    if (oneWireSensors[i]) { delete oneWireSensors[i]; oneWireSensors[i] = nullptr; }
+    if (dhtSensors[i]) {
+      delete dhtSensors[i];
+      dhtSensors[i] = nullptr;
+    }
+    if (tempSensors[i]) {
+      delete tempSensors[i];
+      tempSensors[i] = nullptr;
+    }
+    if (oneWireSensors[i]) {
+      delete oneWireSensors[i];
+      oneWireSensors[i] = nullptr;
+    }
   }
 
   configList.clear();
   int idx = 0;
 
   for (JsonObject obj : arr) {
-    if (idx >= MAX_SENSORS) break;
+    if (idx >= MAX_SENSORS) {
+      break;
+    }
 
-    int pin = obj["pin"];
-    String sensor = obj["sensor"];
-    String type = obj["type"];
+    int pin = obj["pin"] | -1;
+    String sensor = obj["sensor"] | "";
+    String type = obj["type"] | "";
 
-    if (!isSafePin(pin)) continue;
+    if (!isSafePin(pin)) {
+      continue;
+    }
 
     configList.push_back({pin, type, sensor});
 
@@ -82,97 +177,208 @@ void applyConfig(JsonArray arr) {
       tempSensors[idx]->begin();
     }
 
-    if (type == "DO") pinMode(pin, OUTPUT);
-    else pinMode(pin, INPUT);
+    if (type == "DO") {
+      pinMode(pin, OUTPUT);
+    } else {
+      pinMode(pin, INPUT);
+    }
 
     idx++;
   }
 }
 
+void handleRoot() {
+  Serial.println("HTTP GET /");
+  addCommonHeaders();
+
+  String html =
+      "<!doctype html><html><head><meta name='viewport' "
+      "content='width=device-width,initial-scale=1'>"
+      "<title>SmartPonic Node</title>"
+      "<style>"
+      "body{font-family:Arial,sans-serif;background:#f5f8f5;color:#17312a;"
+      "padding:24px;line-height:1.5;}"
+      ".card{max-width:560px;background:#ffffff;border-radius:20px;"
+      "padding:20px;box-shadow:0 14px 30px rgba(23,49,42,0.10);}"
+      "code{background:#eef4ef;padding:2px 6px;border-radius:8px;}"
+      "a{color:#0d7a49;text-decoration:none;font-weight:600;}"
+      "h1{margin:0 0 10px;font-size:28px;}"
+      "p{margin:8px 0;}"
+      "ul{padding-left:18px;}"
+      "</style></head><body><div class='card'>"
+      "<h1>SmartPonic Node</h1>"
+      "<p>Wi-Fi AP is running and the local web server is alive.</p>"
+      "<p><strong>SSID:</strong> <code>" +
+      String(ssid) +
+      "</code></p>"
+      "<p><strong>IP:</strong> <code>" +
+      WiFi.softAPIP().toString() +
+      "</code></p>"
+      "<p><strong>Locked:</strong> <code>" +
+      String(loadNodeSecurityKey().isEmpty() ? "no" : "yes") +
+      "</code></p>"
+      "<p><strong>Clients:</strong> <code>" +
+      String(WiFi.softAPgetStationNum()) +
+      "</code></p>"
+      "<ul>"
+      "<li><a href='/health'>/health</a> for quick JSON status</li>"
+      "<li><a href='/config'>/config</a> for saved config JSON</li>"
+      "</ul>"
+      "</div></body></html>";
+
+  server.send(200, "text/html", html);
+}
+
+void handleHealth() {
+  Serial.println("HTTP GET /health");
+  addCommonHeaders();
+
+  String body = "{\"status\":\"ok\",\"ssid\":\"" + String(ssid) +
+                "\",\"ip\":\"" + WiFi.softAPIP().toString() +
+                "\",\"locked\":" +
+                String(loadNodeSecurityKey().isEmpty() ? "false" : "true") +
+                ",\"clients\":" + String(WiFi.softAPgetStationNum()) +
+                ",\"configCount\":" + String(configList.size()) + "}";
+
+  server.send(200, "application/json", body);
+}
+
+void handleOptions() {
+  Serial.println("HTTP OPTIONS /config");
+  addCommonHeaders();
+  server.send(200, "text/plain", "");
+}
+
 void handleGetConfig() {
-  prefs.begin("cfg", true);
-  String json = prefs.getString("json", "{\"config\":[]}");
+  Serial.println("HTTP GET /config");
+  if (!requireAuthorizedNodeKey(false)) {
+    return;
+  }
+
+  prefs.begin(configNamespace, true);
+  String json = prefs.getString(configJsonPrefKey, "{\"config\":[]}");
   prefs.end();
+
+  addCommonHeaders();
   server.send(200, "application/json", json);
 }
 
 void handlePostConfig() {
-  if (server.hasArg("plain") == false) {
+  Serial.println("HTTP POST /config");
+  if (!requireAuthorizedNodeKey(true)) {
+    return;
+  }
+
+  addCommonHeaders();
+
+  if (!server.hasArg("plain")) {
     server.send(400, "application/json", "{\"status\":\"no body\"}");
     return;
   }
 
   String body = server.arg("plain");
-  Serial.println("📥 Received New Config from App:");
-  Serial.println(body); 
+  Serial.println("Received new config from app:");
+  Serial.println(body);
 
   DynamicJsonDocument doc(4096);
   DeserializationError error = deserializeJson(doc, body);
 
   if (error) {
-    Serial.print("❌ JSON Parse Failed: ");
+    Serial.print("JSON parse failed: ");
     Serial.println(error.f_str());
     server.send(400, "application/json", "{\"status\":\"parse error\"}");
     return;
   }
 
-  if (doc.containsKey("config")) {
-    JsonArray arr = doc["config"];
-    applyConfig(arr);
-
-    prefs.begin("cfg", false);
-    prefs.putString("json", body);
-    prefs.end();
-
-    Serial.println("✅ Config Applied and Saved to Flash!");
-    server.send(200, "application/json", "{\"status\":\"ok\"}");
-  } else {
+  if (!doc.containsKey("config")) {
     server.send(400, "application/json", "{\"status\":\"missing config key\"}");
+    return;
   }
+
+  JsonArray arr = doc["config"];
+  applyConfig(arr);
+
+  prefs.begin(configNamespace, false);
+  prefs.putString(configJsonPrefKey, body);
+  prefs.end();
+
+  String nodeKey = loadNodeSecurityKey();
+  if (nodeKey.isEmpty()) {
+    saveNodeSecurityKey(readRequestSecurityKey());
+    Serial.println("Security key saved to node.");
+  }
+
+  Serial.println("Config applied and saved to flash.");
+  server.send(200, "application/json", "{\"status\":\"ok\"}");
+}
+
+void handleNotFound() {
+  Serial.print("HTTP 404: ");
+  Serial.println(server.uri());
+  addCommonHeaders();
+  server.send(
+      404,
+      "application/json",
+      "{\"status\":\"not found\",\"hint\":\"use /, /health or /config\"}");
 }
 
 // ================= LORA & ENCRYPTION =================
 
 String buildPayload() {
-  String payload = "auth=" + SECRET_KEY + "&"; 
+  String payload = "auth=" + SECRET_KEY + "&";
+
   for (size_t i = 0; i < configList.size(); i++) {
     auto c = configList[i];
     String prefix = String(c.pin) + "=" + c.sensor;
 
     if (c.sensor == "DHT22" && dhtSensors[i]) {
-      payload += prefix + "_T=" + String(dhtSensors[i]->readTemperature(), 1) + "&";
-      payload += prefix + "_H=" + String(dhtSensors[i]->readHumidity(), 1) + "&";
+      payload += prefix + "_T=" + String(dhtSensors[i]->readTemperature(), 1) +
+                 "&";
+      payload += prefix + "_H=" + String(dhtSensors[i]->readHumidity(), 1) +
+                 "&";
     } else if (c.sensor == "WaterTemp" && tempSensors[i]) {
       tempSensors[i]->requestTemperatures();
-      payload += prefix + "=" + String(tempSensors[i]->getTempCByIndex(0), 1) + "&";
-    } else if (c.sensor == "pH" || c.sensor == "TDS" || c.sensor == "Turbidity") {
+      payload += prefix + "=" + String(tempSensors[i]->getTempCByIndex(0), 1) +
+                 "&";
+    } else if (c.sensor == "pH" || c.sensor == "TDS" ||
+               c.sensor == "Turbidity") {
       payload += prefix + "=" + String(analogRead(c.pin)) + "&";
     }
   }
+
   payload += "node=1";
   return payload;
 }
 
 String encrypt(String plainText) {
   int paddedLen = ((plainText.length() / 16) + 1) * 16;
-  unsigned char input[paddedLen];
-  unsigned char output[paddedLen];
-  memset(input, 0, paddedLen);
-  memcpy(input, plainText.c_str(), plainText.length());
+  std::vector<unsigned char> input(paddedLen, 0);
+  std::vector<unsigned char> output(paddedLen, 0);
+
+  memcpy(input.data(), plainText.c_str(), plainText.length());
 
   mbedtls_aes_context aes;
   mbedtls_aes_init(&aes);
-  mbedtls_aes_setkey_enc(&aes, (const unsigned char*) key, 128);
+  mbedtls_aes_setkey_enc(&aes, reinterpret_cast<const unsigned char *>(key), 128);
+
   for (int i = 0; i < paddedLen; i += 16) {
-    mbedtls_aes_crypt_ecb(&aes, MBEDTLS_AES_ENCRYPT, input + i, output + i);
+    mbedtls_aes_crypt_ecb(
+        &aes,
+        MBEDTLS_AES_ENCRYPT,
+        input.data() + i,
+        output.data() + i);
   }
+
   mbedtls_aes_free(&aes);
 
-  String hexStr = "";
+  String hexStr;
   for (int i = 0; i < paddedLen; i++) {
-    if (output[i] < 0x10) hexStr += "0";
+    if (output[i] < 0x10) {
+      hexStr += "0";
+    }
     hexStr += String(output[i], HEX);
   }
+
   return hexStr;
 }
 
@@ -183,20 +389,38 @@ void setup() {
   Serial.println("BOOT OK");
   Serial.println("Starting SmartPonic node...");
 
-  for(int i=0; i<MAX_SENSORS; i++) {
-    dhtSensors[i] = nullptr; oneWireSensors[i] = nullptr; tempSensors[i] = nullptr;
+  for (int i = 0; i < MAX_SENSORS; i++) {
+    dhtSensors[i] = nullptr;
+    oneWireSensors[i] = nullptr;
+    tempSensors[i] = nullptr;
   }
   Serial.println("Sensor slots initialized");
 
-  WiFi.softAP(ssid, password);
-  Serial.print("Access Point ready: ");
+  IPAddress localIp(192, 168, 4, 1);
+  IPAddress gateway(192, 168, 4, 1);
+  IPAddress subnet(255, 255, 255, 0);
+  const char *headerKeys[] = {nodeKeyHeader};
+
+  WiFi.mode(WIFI_AP);
+  if (!WiFi.softAPConfig(localIp, gateway, subnet)) {
+    Serial.println("AP IP config failed");
+  }
+
+  bool apReady = WiFi.softAP(ssid, password);
+  Serial.print("Access Point status: ");
+  Serial.println(apReady ? "ready" : "failed");
+  Serial.print("Access Point SSID: ");
   Serial.println(ssid);
-  
-  prefs.begin("cfg", true);
-  String savedJson = prefs.getString("json", "");
+  Serial.print("Access Point IP: ");
+  Serial.println(WiFi.softAPIP());
+
+  prefs.begin(configNamespace, true);
+  String savedJson = prefs.getString(configJsonPrefKey, "");
   prefs.end();
   Serial.print("Saved config bytes: ");
   Serial.println(savedJson.length());
+  Serial.print("Node security key configured: ");
+  Serial.println(loadNodeSecurityKey().isEmpty() ? "no" : "yes");
 
   if (savedJson != "") {
     DynamicJsonDocument doc(4096);
@@ -204,20 +428,27 @@ void setup() {
     if (error) {
       Serial.print("Saved config parse failed: ");
       Serial.println(error.f_str());
-    } else if(doc.containsKey("config")) {
-        applyConfig(doc["config"]);
-        Serial.println("Saved config applied");
+    } else if (doc.containsKey("config")) {
+      applyConfig(doc["config"]);
+      Serial.println("Saved config applied");
     }
   }
 
+  server.on("/", HTTP_GET, handleRoot);
+  server.on("/health", HTTP_GET, handleHealth);
+  server.collectHeaders(headerKeys, 1);
+  server.on("/config", HTTP_OPTIONS, handleOptions);
   server.on("/config", HTTP_POST, handlePostConfig);
-  server.on("/config", HTTP_GET, handleGetConfig); 
+  server.on("/config", HTTP_GET, handleGetConfig);
+  server.onNotFound(handleNotFound);
   server.begin();
   Serial.println("HTTP config server started");
+  Serial.println("Open http://192.168.4.1/ in your browser");
 
   SPI.begin(LORA_SCK, LORA_MISO, LORA_MOSI, LORA_SS);
   LoRa.setPins(LORA_SS, LORA_RST, LORA_DIO0);
-  if (LoRa.begin(433E6)) {
+  loraReady = LoRa.begin(433E6);
+  if (loraReady) {
     LoRa.setSyncWord(LORA_SYNC_WORD);
     Serial.println("System Ready");
   } else {
@@ -227,9 +458,22 @@ void setup() {
 
 void loop() {
   server.handleClient();
+  delay(2);
 
   static unsigned long lastSend = 0;
   if (millis() - lastSend > 15000) {
+    lastSend = millis();
+
+    if (!loraReady) {
+      Serial.println("Skipping LoRa send because radio is not ready");
+      return;
+    }
+
+    if (WiFi.softAPgetStationNum() > 0) {
+      Serial.println("Skipping LoRa send while AP clients are connected");
+      return;
+    }
+
     String raw = buildPayload();
     String secure = encrypt(raw);
 
@@ -241,7 +485,5 @@ void loop() {
     Serial.println(raw);
     Serial.print("Encrypted HEX: ");
     Serial.println(secure);
-
-    lastSend = millis();
   }
 }
