@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/file_exchange_service.dart';
 import '../services/storage_service.dart';
+import '../services/location_service.dart';
 import '../widgets/app_theme.dart';
 import '../widgets/custom_ui.dart';
 
@@ -27,12 +28,21 @@ class ConfigScreen extends StatefulWidget {
 
 class _ConfigScreenState extends State<ConfigScreen> {
   final TextEditingController _keyController = TextEditingController();
+  final TextEditingController _nodeIdController = TextEditingController(text: '1');
+  final TextEditingController _latitudeController = TextEditingController();
+  final TextEditingController _longitudeController = TextEditingController();
+  final TextEditingController _distanceController = TextEditingController();
+
   bool _isKeyVisible = false;
   bool _isDeploying = false;
   bool _isLoadingNode = false;
   bool _isRefreshingPage = false;
   bool _isImportingFile = false;
   bool _isExportingFile = false;
+  bool _isFetchingLocation = false;
+
+  // Node metadata (stored separately, sent with config)
+  Map<String, dynamic> _nodeMetadata = {};
 
   static const Map<String, List<int>> pinGroups = {
     'AI': [32, 33, 34, 35, 36, 39],
@@ -47,6 +57,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
     'Turbidity': 'AI',
     'DHT22': 'DI',
     'WaterTemp': 'DI',
+    'Rain': 'DI',
     'Relay': 'DO',
   };
 
@@ -109,9 +120,126 @@ class _ConfigScreenState extends State<ConfigScreen> {
     await StorageService.saveConfig(
       widget.configNotifier.value,
       _keyController.text.trim(),
+      nodeId: int.tryParse(_nodeIdController.text) ?? 1,
+      latitude: double.tryParse(_latitudeController.text) ?? 0.0,
+      longitude: double.tryParse(_longitudeController.text) ?? 0.0,
+      distance: double.tryParse(_distanceController.text) ?? 0.0,
     );
     if (!mounted) return;
     showStitchMessage(context, 'Architect draft saved locally.');
+  }
+
+  Future<void> _fetchCurrentLocation() async {
+    setState(() => _isFetchingLocation = true);
+    try {
+      final hasPerm = await LocationService.hasPermission();
+      if (!hasPerm) {
+        final status = await LocationService.requestPermission();
+        if (status != PermissionStatus.granted) {
+          showStitchMessage(context, 'Location permission denied', isError: true);
+          return;
+        }
+      }
+
+      final position = await LocationService.getCurrentLocation();
+      if (!mounted) return;
+
+      if (position != null) {
+        setState(() {
+          _latitudeController.text = position.latitude.toStringAsFixed(6);
+          _longitudeController.text = position.longitude.toStringAsFixed(6);
+        });
+        showStitchMessage(context, 'GPS location captured');
+      } else {
+        showStitchMessage(context, 'Failed to get GPS location', isError: true);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      showStitchMessage(context, 'Location error: $e', isError: true);
+    } finally {
+      if (mounted) {
+        setState(() => _isFetchingLocation = false);
+      }
+    }
+  }
+
+  Future<void> _deployToNode() async {
+    final securityKey = _keyController.text.trim();
+    if (securityKey.isEmpty) {
+      showStitchMessage(
+        context,
+        'Enter the node security key before deploying config.',
+        isError: true,
+      );
+      return;
+    }
+
+    // Validate metadata
+    final nodeId = int.tryParse(_nodeIdController.text);
+    if (nodeId == null || nodeId < 1) {
+      showStitchMessage(context, 'Node ID must be >= 1', isError: true);
+      return;
+    }
+
+    final latitude = double.tryParse(_latitudeController.text);
+    final longitude = double.tryParse(_longitudeController.text);
+    final distance = double.tryParse(_distanceController.text);
+
+    if (latitude == null || longitude == null) {
+      showStitchMessage(context, 'Invalid GPS coordinates', isError: true);
+      return;
+    }
+
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() => _isDeploying = true);
+
+    try {
+      await StorageService.saveConfig(
+        widget.configNotifier.value,
+        securityKey,
+        nodeId: nodeId,
+        latitude: latitude,
+        longitude: longitude,
+        distance: distance ?? 0.0,
+      );
+
+      // Build config with metadata
+      final configWithMetadata = {
+        'config': widget.configNotifier.value,
+        'nodeId': nodeId,
+        'latitude': latitude,
+        'longitude': longitude,
+        'distance': distance ?? 0.0,
+      };
+
+      final result = await ApiService.sendConfigWithMetadata(
+        configWithMetadata,
+        securityKey,
+      );
+
+      if (!mounted) return;
+
+      if (result['ok'] == true) {
+        showStitchMessage(context, 'Config + GPS deployed to ESP32 successfully.');
+      } else {
+        showStitchMessage(
+          context,
+          ApiService.friendlyApiMessage(result),
+          isError: true,
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      showStitchMessage(
+        context,
+        ApiService.friendlyConnectionMessage(e),
+        isError: true,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isDeploying = false);
+      }
+    }
   }
 
   Future<void> _loadFromNode() async {
@@ -171,15 +299,6 @@ class _ConfigScreenState extends State<ConfigScreen> {
   }
 
   Future<void> _deployToNode() async {
-    if (widget.configNotifier.value.isEmpty) {
-      showStitchMessage(
-        context,
-        'Add at least one sensor node first.',
-        isError: true,
-      );
-      return;
-    }
-
     final securityKey = _keyController.text.trim();
     if (securityKey.isEmpty) {
       showStitchMessage(
@@ -495,6 +614,117 @@ class _ConfigScreenState extends State<ConfigScreen> {
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                 fontSize: 12,
                               ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  StitchPanel(
+                    color: StitchColors.surfaceContainer,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(
+                              Icons.pin_drop_outlined,
+                              color: StitchColors.primaryContainer,
+                            ),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'NODE LOCATION (GPS)',
+                                style: TextStyle(
+                                  color: StitchColors.primary,
+                                  fontFamily: 'SpaceGrotesk',
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                        Text(
+                          'Capture your phone GPS location. Node sends this to HQ when config is deployed.',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _latitudeController,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                                decoration: const InputDecoration(
+                                  labelText: 'Latitude',
+                                  prefixIcon: Icon(Icons.location_on_outlined, size: 20),
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextField(
+                                controller: _longitudeController,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                                decoration: const InputDecoration(
+                                  labelText: 'Longitude',
+                                  prefixIcon: Icon(Icons.location_on_outlined, size: 20),
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _nodeIdController,
+                                keyboardType: const TextInputType.number,
+                                decoration: const InputDecoration(
+                                  labelText: 'Node ID',
+                                  prefixIcon: Icon(Icons.tag_outlined, size: 20),
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextField(
+                                controller: _distanceController,
+                                keyboardType: const TextInputType.number,
+                                decoration: const InputDecoration(
+                                  labelText: 'Distance (m)',
+                                  prefixIcon: Icon(Icons.straighten_outlined, size: 20),
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: StitchPrimaryButton(
+                            onPressed: _isFetchingLocation ? null : _fetchCurrentLocation,
+                            child: _isFetchingLocation
+                                ? const SizedBox(
+                                    height: 16,
+                                    width: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.my_location, size: 18),
+                                      SizedBox(width: 8),
+                                      Text('CAPTURE GPS LOCATION'),
+                                    ],
+                                  ),
+                          ),
                         ),
                       ],
                     ),

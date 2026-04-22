@@ -1,0 +1,506 @@
+================================================================================
+SMARTPONIC - Smart Communication Framework for Aquaponic System
+================================================================================
+
+PROJECT OVERVIEW
+--------------------------------------------------------------------------------
+SmartPonic is an IoT-based aquaponic monitoring system that uses LoRa
+(Long Range) communication to transmit sensor data from distributed
+sensor nodes to a central HQ receiver. The HQ receiver forwards the data
+to a PHP API and MySQL database, where it is visualized through a web
+dashboard and supported by a Flutter mobile app.
+
+The system implements a Smart Communication Framework with:
+- Adaptive reporting intervals based on data priority
+- Priority-based data handling (LOW/MEDIUM/HIGH)
+- Store-and-forward reliability with retry mechanisms
+- Secure AES-CTR encryption with integrity validation
+
+
+ARCHITECTURE
+--------------------------------------------------------------------------------
++-------------------+      LoRa (433MHz)       +-------------------+
+|   ESP32 NODE      | -----------------------> |   ESP32 HQ        |
+|  (Sensor Site)    |  Encrypted Binary        |   (Receiver)      |
+|                   |  Structured Packet       |                   |
+|  - DHT22          |  [HEADER|NONCE|PAYLOAD|  |  - WiFi Client    |
+|  - DS18B20        |   CHECKSUM]             |  - LoRa Receiver  |
+|  - pH Sensor      |                         |  - SD/SPIFFS      |
+|  - TDS Sensor     |  Priority: LOW/MED/HIGH |  - HTTP Forward   |
+|  - Turbidity      |  Report: Normal/Abn/Crit|+-------------------+
+|  - Rain Sensor    |                         |
+|  - Relay Control  |  Adaptive intervals:    |
++-------------------+  1min/5min/15min        |
+                                           | HTTP POST + Signature
+                                           v
+                                    +---------------+
+                                    |   PHP API     |
+                                    | (XAMPP)       |
+                                    +---------------+
+                                           |
+                                           v
+                                    +---------------+
+                                    |   MySQL DB    |
+                                    +---------------+
+                                           |
+                    +--------------------+--------------------+
+                    |                                           |
+                    v                                           v
+           +-------------------+                      +-------------------+
+           | Web Dashboard     |                      | Flutter App       |
+           | - Overview        |                      | - Config          |
+           | - Trends          |                      | - Monitor         |
+           | - Activity        |                      +-------------------+
+           | - Health          |
+           | - Controls        |
+           +-------------------+
+
+
+================================================================================
+SMART COMMUNICATION FRAMEWORK
+================================================================================
+
+ADAPTIVE COMMUNICATION STRATEGY
+--------------------------------
+Sensor Sampling: Every 5 seconds (SAMPLE_INTERVAL_MS = 5000)
+
+Dynamic Reporting Intervals:
+- NORMAL mode:   15 minutes (REPORT_INTERVAL_NORMAL_MS)
+- ABNORMAL mode:  5 minutes (REPORT_INTERVAL_ABNORMAL_MS)
+- CRITICAL mode:  1 minute  (REPORT_INTERVAL_CRITICAL_MS)
+
+Critical Condition Behavior:
+- Bypasses interval check
+- Sends immediately via LoRa
+- Sets criticalDispatchPending flag
+
+
+DATA PRIORITIZATION
+--------------------------------
+Priority Levels:
+- LOW:    Normal readings within threshold
+- MEDIUM: Readings slightly out of range
+- HIGH:   Critical (sensor error or severely out of range)
+
+HIGH Priority Behavior:
+- Inserts at front of retry queue (bypasses FIFO)
+- Triggers immediate transmission
+- Sets currentReportMode to CRITICAL
+
+
+PRIORITY THRESHOLDS (Node-side classification)
+--------------------------------
+Sensor      | LOW (normal) | MEDIUM (abnormal) | HIGH (critical)
+------------|--------------|-------------------|------------------
+Temperature | 22-32°C      | <22 or >32°C      | <18 or >35°C
+Humidity    | 40-80%       | <40 or >80%       | <30 or >90%
+WaterTemp   | 20-30°C      | <20 or >30°C      | <15 or >32°C
+pH          | 6.0-8.0      | <6.0 or >8.0      | <5.5 or >8.5
+TDS         | <800ppm      | >800ppm           | >1200ppm
+Turbidity   | <300NTU      | >300NTU           | >1000NTU
+Rain        | 0 (dry)      | 1 (wet)           | -
+DHT22 nan   | -            | -                 | YES
+DS18B20 -127| -            | -                 | YES
+
+
+STORE-AND-FORWARD (RELIABILITY)
+--------------------------------
+NODE SIDE:
+- FIFO retry queue: MAX_PENDING_PACKETS = 12
+- On LoRa send failure: enqueue packet with priority/sequence
+- Retry interval: 30 seconds (RETRY_INTERVAL_MS)
+- HIGH priority packets insert at front of queue
+
+HQ SIDE:
+- On HTTP failure: queue to SD/SPIFFS storage
+- Queue file: /pending_http_queue.ndjson
+- Retry interval: 30 seconds (HTTP_RETRY_INTERVAL_MS)
+- Process one queued item per interval to prevent flooding
+
+
+SECURITY IMPLEMENTATION (STAGED UPGRADE)
+--------------------------------
+STAGE 1: REMOVE HEX ENCODING
+- Stopped using HEX strings for packet transmission
+- Now sends raw binary using: LoRa.write(buffer, length)
+- HQ receives using: LoRa.readBytes(buffer, size)
+- Result: ~50% payload size reduction
+
+STAGE 2: ADD PACKET STRUCTURE
+- Current format: [HEADER | NONCE | PAYLOAD | CHECKSUM]
+  +------------------+-------------------+--------------------+------------------+
+  | HEADER (14 bytes)| NONCE (16 bytes)  | ENCRYPTED PAYLOAD  | CRC32 (4 bytes)  |
+  +------------------+-------------------+--------------------+------------------+
+
+Header Structure (14 bytes):
+  - magic (4 bytes): 0x31504653 ("SPF1")
+  - version (1 byte): 1
+  - nodeId (1 byte): Node identifier
+  - priority (1 byte): LOW/MEDIUM/HIGH
+  - reportMode (1 byte): NORMAL/ABNORMAL/CRITICAL
+  - payloadLength (2 bytes): Encrypted payload size
+  - sequence (4 bytes): Packet sequence number
+
+STAGE 3: INTEGRITY VALIDATION FIRST
+- IMPORTANT: Validate → Decrypt (not decrypt then trust)
+- CRC32 checksum computed over: HEADER + NONCE + ENCRYPTED_PAYLOAD
+- HQ validates checksum BEFORE attempting decryption
+- Invalid packets are discarded immediately
+
+STAGE 4: AES-CTR ENCRYPTION
+- Algorithm: AES-128-CTR (Counter mode)
+- Nonce: 16 bytes unique per packet (IV)
+- No padding required (CTR mode produces exact-size output)
+- Key: Same 128-bit key on both Node and HQ
+- Nonce composition: sequence + millis() + esp_random() + nodeId
+
+
+DATA FLOW & COMMUNICATION PROTOCOL
+================================================================================
+
+1. SENSOR DATA COLLECTION (Node)
+   --------------------------------
+   ESP32 Node reads sensors every 5 seconds:
+   - DHT22 (Temperature + Humidity) → 2 values
+   - DS18B20 (Water Temperature) → 1 value
+   - pH Sensor → 1 value (analog)
+   - TDS Sensor → 1 value (analog)
+   - Turbidity Sensor → 1 value (analog)
+   - Rain Sensor → 1 value (digital)
+
+   Relay control pins configured as OUTPUT (not sampled)
+
+
+2. PRIORITY CLASSIFICATION (Node)
+   --------------------------------
+   Each sensor reading classified based on thresholds:
+   - HIGH: sensor error (nan, -127) or severely out of range
+   - MEDIUM: slightly out of range
+   - LOW: within normal range
+
+   Overall packet priority = highest individual sensor priority
+
+
+3. PAYLOAD BUILDING (Node)
+   --------------------------------
+   Plaintext format:
+   auth=AQUA77&pin=sensor=value&...&node=1&seq=X&priority=Y&mode=Z&sample_ms=5000&report_ms=900000
+
+   Example (3 sensors):
+   auth=AQUA77&4=Temperature=28.5&4=Humidity=75.2&21=WaterTemp=25.3&node=1&seq=156&priority=LOW&mode=NORMAL&sample_ms=5000&report_ms=900000
+
+   Location sync packet (separate):
+   auth=AQUA77&meta=location&node=1&seq=157&lat=3.123456&lon=101.123456&distance=150.5
+
+
+4. PACKET STRUCTURE BUILDING (Node)
+   --------------------------------
+   1. Generate 16-byte nonce (sequence + millis + esp_random + nodeId)
+   2. Encrypt plaintext using AES-CTR with nonce as IV
+   3. Build header (magic, version, nodeId, priority, reportMode, length, seq)
+   4. Append: HEADER + NONCE + ENCRYPTED_PAYLOAD
+   5. Compute CRC32 over appended data
+   6. Append CRC32 checksum
+
+   Total packet: 14 + 16 + encrypted_size + 4 bytes
+
+
+5. LORA TRANSMISSION (Node)
+   --------------------------------
+   - Frequency: 433MHz
+   - Sync Word: 0xB4
+   - Uses: LoRa.beginPacket() → LoRa.write(bytes) → LoRa.endPacket()
+   - Binary transmission (not HEX encoded)
+
+
+6. PACKET RECEPTION (HQ)
+   --------------------------------
+   1. LoRa.parsePacket() detects incoming packet
+   2. Read all bytes: LoRa.readBytes(buffer, size)
+   3. Parse header to get payloadLength, priority, sequence
+   4. Validate total packet size matches expected
+   5. Compute CRC32 over (header + nonce + encryptedPayload)
+   6. Compare with received CRC32 → discard if mismatch
+   7. Extract nonce, decrypt encryptedPayload using AES-CTR
+   8. Parse plaintext to extract sensor readings
+
+
+7. SEQUENCE VALIDATION (HQ)
+   --------------------------------
+   - Track last accepted sequence number (lastSeq)
+   - Accept packet only if sequence > lastSeq
+   - Duplicate/replay packets are rejected
+   - Handle sequence reset after node reboot
+
+
+8. FORWARD TO DATABASE (HQ → PHP → DB)
+   --------------------------------
+   HTTP POST with JSON body, signed with HMAC-SHA256:
+
+   {
+     "node_id": 1,
+     "rssi": -45,
+     "snr": 10.5,
+     "priority": "LOW",
+     "report_mode": "NORMAL",
+     "sequence": 156,
+     "event_type": "telemetry",
+     "latitude": 3.123456,
+     "longitude": 101.123456,
+     "distance": 150.5,
+     "sensors": [
+       {"pin": 4, "sensor": "Temperature", "value": "28.5"},
+       {"pin": 4, "sensor": "Humidity", "value": "75.2"},
+       {"pin": 21, "sensor": "WaterTemp", "value": "25.3"}
+     ]
+   }
+
+   Location update event:
+   {
+     "node_id": 1,
+     "rssi": -45,
+     "snr": 10.5,
+     "priority": "LOW",
+     "report_mode": "NORMAL",
+     "sequence": 157,
+     "event_type": "location_update",
+     "latitude": 3.123456,
+     "longitude": 101.123456,
+     "distance": 150.5,
+     "sensors": []
+   }
+
+
+================================================================================
+DATABASE DESIGN
+================================================================================
+
+Main reading record: sensor_readings
+- id (PRIMARY KEY, AUTO_INCREMENT)
+- node_id (INT, FOREIGN KEY)
+- rssi (INT) - LoRa signal strength
+- snr (FLOAT) - Signal-to-noise ratio
+- priority_level (VARCHAR) - LOW/MEDIUM/HIGH
+- report_mode (VARCHAR) - NORMAL/ABNORMAL/CRITICAL
+- sequence_number (INT) - Packet sequence
+- latitude (DECIMAL 10,6) - Node GPS latitude
+- longitude (DECIMAL 10,6) - Node GPS longitude
+- distance_m (DECIMAL 10,2) - Distance from mobile app
+- created_at (TIMESTAMP)
+
+Dedicated per-sensor tables:
+- temperature_data (reading_id, node_id, pin_number, value)
+- humidity_data (reading_id, node_id, pin_number, value)
+- water_temp_data (reading_id, node_id, pin_number, value)
+- ph_data (reading_id, node_id, pin_number, value)
+- tds_data (reading_id, node_id, pin_number, value)
+- turbidity_data (reading_id, node_id, pin_number, value)
+- rain_data (reading_id, node_id, pin_number, value)
+
+Supporting tables:
+- nodes (id, name, location)
+- invalid_sensor_data (node_id, reading_id, sensor_name, pin_number, raw_value, reason)
+- dashboard_settings (setting_key, setting_value)
+- sensor_profiles (node_id, sensor_key, threshold_min, threshold_max, calibration_a/b/c)
+
+
+================================================================================
+WEB DASHBOARD FEATURES
+================================================================================
+
+Tab: Overview
+- Hero panel: Node name, location, configured sensors, RSSI, SNR
+- Snapshot: Latest reading time, signal quality, retention, active alerts
+- Sensor overview cards: Per-sensor status, latest value, configured indicator
+- Communication overview: Priority, report mode, sequence, distance
+- Location metadata: Coordinates, location sync status
+- Communication analytics: Critical events, priority percentages (HIGH/MEDIUM/LOW)
+
+Tab: Trends
+- Time range selector: 1h, 6h, 24h, 7d, 30d
+- Trend chart: Canvas-based with hover tooltip
+- Trend tables: Per-sensor history in 3-column grid
+
+Tab: Activity
+- Recent activity: Timeline of sensor readings
+- Signal trace: RSSI/SNR history
+
+Tab: Health
+- Node health: Status (online/delayed/stale/offline), freshness
+- Signal quality: Good/warn/critical based on RSSI/SNR thresholds
+- Threshold alerts: Per-sensor warnings and critical alerts
+
+Tab: Controls
+- Retention setting: Keep forever / 30 days / 90 days / 1 year
+- Export: CSV or Excel, filtered by node/sensor/date
+- Config snapshot: Export/Import dashboard settings + profiles
+- Calibration profiles: threshold_min/max, calibration_a/b/c
+
+
+================================================================================
+SECURITY FEATURES
+================================================================================
+
+1. LoRa Payload Encryption
+- Algorithm: AES-128-CTR
+- Nonce: 16 bytes unique per packet
+- Key: Shared between Node and HQ
+
+2. Integrity Validation
+- CRC32 checksum computed before encryption
+- Validated BEFORE decryption (validate → decrypt)
+- Invalid packets discarded immediately
+
+3. Sequence Counter
+- Incrementing sequence number per packet
+- HQ rejects duplicate/replay packets
+- Handles node reboot sequence reset
+
+4. Node Authentication Token
+- AUTH_TOKEN: "AQUA77" embedded in payload
+- Basic payload authenticity check at HQ
+
+5. HQ → PHP Request Signing
+- Headers: X-API-Key, X-Timestamp, X-Signature
+- Signature: HMAC-SHA256(timestamp + "\n" + jsonBody)
+- Timestamp validation: prevents replay (max age check)
+
+6. Endpoint Hardening
+- Strict request method validation
+- JSON structure validation
+- Positive node_id requirement
+- Maximum sensor count limit (32)
+- Valid pin format (numeric)
+- Supported sensor whitelist
+- Generic error messages (no internal exposure)
+
+7. Node Config Security
+- X-Node-Key header protection
+- Unauthorized requests rejected with 401/403
+
+
+================================================================================
+HARDWARE COMPONENTS
+================================================================================
+
+ESP32 NODE (Sensor Site):
+- Board: ESP32-based (ESP32 Dev Module)
+- GPIO Configuration: Up to 15 sensors
+- Supported sensors: DHT22, DS18B20, pH, TDS, Turbidity, Rain
+- Relay control: Configurable as digital output
+- LoRa: SX1278 @ 433MHz, Sync Word 0xB4
+- WiFi: AP mode (192.168.4.1)
+- Security: X-Node-Key protected config endpoint
+
+ESP32 HQ (Receiver/Gateway):
+- Board: ESP32-S2 Mini (Lolin S2)
+- LoRa: SX1278 @ 433MHz, Sync Word 0xB4
+- WiFi: Station mode for internet access
+- Storage: SD card + SPIFFS fallback
+- Security: HMAC-signed API requests
+
+
+================================================================================
+PACKET SIZE CALCULATION
+================================================================================
+
+Example: 12 GPIO sensors (4 DHT22 + 4 DS18B20 + 2 pH + 2 Turbidity)
+- 4 DHT22 → 8 segments (temp + humidity each)
+- 4 DS18B20 → 4 segments
+- 2 pH → 2 segments
+- 2 Turbidity → 2 segments
+- Total: 16 segments + metadata
+
+Packet breakdown:
++-------------------------+------------------------+----------------------+------------+
+| HEADER (14 bytes)      | NONCE (16 bytes)       | ENCRYPTED PAYLOAD    | CRC32 (4B) |
++-------------------------+------------------------+----------------------+------------+
+| magic(4)+ver(1)+node(1) | sequence(4)+          | ~320 bytes           | checksum   |
+| priority(1)+mode(1)+   | millis(4)+random(4)+   | (auth + segments +   |            |
+| length(2)+seq(4)       | nodeId(4)              | metadata)            |            |
++-------------------------+------------------------+----------------------+------------+
+= ~354 bytes total (vs ~700+ bytes if HEX encoded)
+
+
+================================================================================
+KEY FILES
+================================================================================
+
+Firmware:
+- Node: C:\Users\HAKIMIE\Documents\PlatformIO\Projects\260325-164159-esp32dev\src\Aquaponic_LoRa_Transmitter.cpp
+- HQ: C:\Users\HAKIMIE\Documents\PlatformIO\Projects\ESP32_HQ_Site\src\main.cpp
+- SmartPacket.h: include\SmartPacket.h (shared packet definition)
+
+PHP:
+- php/receive_data.php - API endpoint (validates + stores data)
+- php/dashboard_data.php - Dashboard backend API
+- php/dashboard.php - Dashboard frontend
+- php/dashboard_app.js - Dashboard JavaScript
+- php/dashboard.css - Dashboard styles
+- php/init.sql - Database schema
+- php/db.php - Database connection
+- php/security_config.php - Security settings
+- php/export_excel.php - Excel export
+- php/export_data.php - CSV export
+
+Flutter:
+- flutter_app/ - Mobile application
+
+
+================================================================================
+CURRENT SYSTEM STATUS
+================================================================================
+
+✓ Smart Communication Framework: FULLY IMPLEMENTED
+✓ Adaptive intervals: 1min / 5min / 15min based on priority
+✓ Data prioritization: LOW / MEDIUM / HIGH
+✓ Store-and-forward: Node FIFO queue + HQ SD/SPIFFS queue
+✓ Security stages: HEX removed → packet structure → integrity first → AES-CTR
+✓ Binary transmission: ~50% size reduction vs HEX
+✓ Integrity validation: CRC32 before decryption
+✓ Communication analytics: critical count, priority %, min/max/avg
+✓ Location metadata: lat/lon/distance stored and displayed
+✓ Signal quality: RSSI/SNR captured and visible in dashboard
+
+Working data flow:
+Node (5s sample) → classify priority → build payload → encrypt (AES-CTR) →
+build structured packet (header+nonce+encrypted+CRC) → LoRa TX →
+HQ (binary RX) → validate CRC → decrypt → parse →
+HTTP POST (signed) → PHP API → MySQL → Dashboard
+
+
+================================================================================
+POTENTIAL FUTURE ENHANCEMENTS
+================================================================================
+
+1. Communication Health Panel
+   - Packet delivery status
+   - Freshness monitoring
+   - Retry success rate
+
+2. Alert Center Improvements
+   - Acknowledge button
+   - Resolved state tracking
+   - Alert history log
+
+3. Analytics Enhancements
+   - Anomaly detection
+   - Threshold bands on charts
+   - Predictive alerts
+
+4. Multi-Node Support
+   - Per-node dashboards
+   - Node comparison view
+   - Node grouping
+
+5. Notifications
+   - Telegram bot
+   - Email alerts
+   - WhatsApp integration
+
+6. Flutter App Expansion
+   - Calibration control
+   - Profile editing
+   - Mirrored dashboard controls
+
+================================================================================

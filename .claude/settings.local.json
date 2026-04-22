@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/HAKIMIE/Documents/PlatformIO/Projects/ESP32_HQ_Site/**)",
+      "Bash(pio lib:*)"
+    ]
+  },
+  "prefersReducedMotion": false,
+  "spinnerTipsEnabled": false
+}
