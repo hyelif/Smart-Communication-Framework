@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'package:permission_handler/permission_handler.dart';
+
 import '../services/api_service.dart';
 import '../services/file_exchange_service.dart';
 import '../services/storage_service.dart';
@@ -45,19 +47,29 @@ class _ConfigScreenState extends State<ConfigScreen> {
   Map<String, dynamic> _nodeMetadata = {};
 
   static const Map<String, List<int>> pinGroups = {
-    'AI': [32, 33, 34, 35, 36, 39],
-    'AO': [25, 26],
-    'DO': [4, 13, 16, 17, 21, 22, 25, 26, 27, 32, 33],
-    'DI': [4, 13, 16, 17, 21, 22, 25, 26, 27, 32, 33],
+    'AI': [34, 35, 36, 39],
+    'DI': [32, 33, 39],
+    'DO': [16, 17],
+    'Extra': [4, 21, 22, 25, 26, 27],
+  };
+
+  static const Map<String, int> defaultSensorPins = {
+    'Turbidity': 36,
+    'Rain': 39,
+    'TDS': 34,
+    'pH': 35,
+    'DHT22': 32,
+    'WaterTemp': 33,
+    'Relay': 16,
   };
 
   static const Map<String, String> sensorRequirements = {
     'pH': 'AI',
     'TDS': 'AI',
     'Turbidity': 'AI',
+    'Rain': 'AI',
     'DHT22': 'DI',
     'WaterTemp': 'DI',
-    'Rain': 'DI',
     'Relay': 'DO',
   };
 
@@ -120,10 +132,6 @@ class _ConfigScreenState extends State<ConfigScreen> {
     await StorageService.saveConfig(
       widget.configNotifier.value,
       _keyController.text.trim(),
-      nodeId: int.tryParse(_nodeIdController.text) ?? 1,
-      latitude: double.tryParse(_latitudeController.text) ?? 0.0,
-      longitude: double.tryParse(_longitudeController.text) ?? 0.0,
-      distance: double.tryParse(_distanceController.text) ?? 0.0,
     );
     if (!mounted) return;
     showStitchMessage(context, 'Architect draft saved locally.');
@@ -197,10 +205,6 @@ class _ConfigScreenState extends State<ConfigScreen> {
       await StorageService.saveConfig(
         widget.configNotifier.value,
         securityKey,
-        nodeId: nodeId,
-        latitude: latitude,
-        longitude: longitude,
-        distance: distance ?? 0.0,
       );
 
       // Build config with metadata
@@ -294,56 +298,6 @@ class _ConfigScreenState extends State<ConfigScreen> {
     } finally {
       if (mounted) {
         setState(() => _isLoadingNode = false);
-      }
-    }
-  }
-
-  Future<void> _deployToNode() async {
-    final securityKey = _keyController.text.trim();
-    if (securityKey.isEmpty) {
-      showStitchMessage(
-        context,
-        'Enter the node security key before deploying config.',
-        isError: true,
-      );
-      return;
-    }
-
-    FocusManager.instance.primaryFocus?.unfocus();
-    setState(() => _isDeploying = true);
-
-    try {
-      await StorageService.saveConfig(
-        widget.configNotifier.value,
-        securityKey,
-      );
-
-      final result = await ApiService.sendConfig(
-        widget.configNotifier.value,
-        securityKey,
-      );
-
-      if (!mounted) return;
-
-      if (result['ok'] == true) {
-        showStitchMessage(context, 'Config deployed to ESP32 successfully.');
-      } else {
-        showStitchMessage(
-          context,
-          ApiService.friendlyApiMessage(result),
-          isError: true,
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      showStitchMessage(
-        context,
-        ApiService.friendlyConnectionMessage(e),
-        isError: true,
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isDeploying = false);
       }
     }
   }
@@ -683,7 +637,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
                             Expanded(
                               child: TextField(
                                 controller: _nodeIdController,
-                                keyboardType: const TextInputType.number,
+                                keyboardType: TextInputType.number,
                                 decoration: const InputDecoration(
                                   labelText: 'Node ID',
                                   prefixIcon: Icon(Icons.tag_outlined, size: 20),
@@ -695,7 +649,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
                             Expanded(
                               child: TextField(
                                 controller: _distanceController,
-                                keyboardType: const TextInputType.number,
+                                keyboardType: TextInputType.number,
                                 decoration: const InputDecoration(
                                   labelText: 'Distance (m)',
                                   prefixIcon: Icon(Icons.straighten_outlined, size: 20),
@@ -1165,9 +1119,10 @@ class _AddNodeSheetState extends State<_AddNodeSheet> {
                   iconBuilder: _componentIcon,
                 );
                 if (value == null || !mounted) return;
+                final defaultPin = _ConfigScreenState.defaultSensorPins[value];
                 setState(() {
                   _selectedSensor = value;
-                  _selectedPin = null;
+                  _selectedPin = defaultPin;
                   if (_selectedSensor != 'Relay') {
                     _relayLabelController.clear();
                   }

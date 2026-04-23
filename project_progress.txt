@@ -1,5 +1,5 @@
 SmartPonic Project Progress Update
-Date: 2026-04-22
+Date: 2026-04-23
 
 Completed Work
 
@@ -104,10 +104,10 @@ Main Files (PHP)
 - php/init.sql
 
 Remaining / Possible Next Work
-- Communication health panel with delivery status
-- Packet freshness / delivery visibility
-- RSSI/SNR trend improvements
-- Threshold bands on trend charts
-- Alert acknowledge/resolved states
-- Telegram/Email/WhatsApp notifications
-- Flutter-side calibration management
+- Communication health panel with delivery status ✅ (PHP dashboard + Flutter DeviceScreen)
+- Packet freshness / delivery visibility ✅ (PHP analytics)
+- RSSI/SNR trend improvements ✅ (Signal stats panel in dashboard)
+- Threshold bands on trend charts ⚠️ (API data ready, chart rendering not implemented)
+- Alert acknowledge/resolved states ✅ (alerts table + dashboard_manage.php actions)
+- Flutter calibration management ✅ (CalibrationScreen tab with GPS location capture + threshold/calibration sync to PHP dashboard)
+- Flutter app calibration sync to ESP32 Node ⚠️ (Flutter↔PHP done, ESP32 sync not implemented)

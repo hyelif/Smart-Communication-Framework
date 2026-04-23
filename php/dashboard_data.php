@@ -175,7 +175,7 @@ try {
         LIMIT 1
     ");
     $nodeStmt->execute([':node_id' => $nodeId]);
-    $node = $nodeStmt->fetch() ?: ['id' => $nodeId, 'name' => 'Node ' . $nodeId, 'location' => 'Unknown'];
+    $node = $nodeStmt->fetch() ?: ['id' => $nodeId, 'name' => 'Node ' . $nodeId, 'location' => 'Unknown', 'latitude' => null, 'longitude' => null, 'distance_m' => null];
 
     $profiles = getSensorProfiles($pdo, $nodeId);
 
@@ -371,7 +371,14 @@ try {
             'configured' => $configured,
             'status' => $status,
             'latest' => $latestPayload,
-            'history' => $history
+            'history' => $history,
+            'threshold_min' => $profile['threshold_min'],
+            'threshold_max' => $profile['threshold_max'],
+            'calibration' => [
+                'a' => $profile['calibration_a'],
+                'b' => $profile['calibration_b'],
+                'c' => $profile['calibration_c'],
+            ],
         ];
     }
 
@@ -380,6 +387,34 @@ try {
         $latestReading ? (int) $latestReading['rssi'] : null,
         $latestReading ? (float) $latestReading['snr'] : null
     );
+
+    // Load persisted alert records from DB
+    $persistedAlertsStmt = $pdo->prepare("
+        SELECT sensor_key, status, acknowledged_at, resolved_at
+        FROM alerts
+        WHERE node_id = :node_id
+          AND status IN ('active', 'acknowledged', 'resolved')
+        ORDER BY created_at DESC
+    ");
+    $persistedAlertsStmt->execute([':node_id' => $nodeId]);
+    $persistedAlertsMap = [];
+    foreach ($persistedAlertsStmt->fetchAll() as $row) {
+        $persistedAlertsMap[$row['sensor_key']] = [
+            'status' => $row['status'],
+            'acknowledged_at' => $row['acknowledged_at'],
+            'resolved_at' => $row['resolved_at'],
+        ];
+    }
+
+    // Merge persisted state into live alerts
+    foreach ($alerts as &$alert) {
+        if (isset($persistedAlertsMap[$alert['sensor_key']])) {
+            $alert['db_status'] = $persistedAlertsMap[$alert['sensor_key']]['status'];
+            $alert['acknowledged_at'] = $persistedAlertsMap[$alert['sensor_key']]['acknowledged_at'];
+            $alert['resolved_at'] = $persistedAlertsMap[$alert['sensor_key']]['resolved_at'];
+        }
+    }
+    unset($alert);
 
     if ($nodeStatus['state'] !== 'online') {
         $alerts[] = [
@@ -416,6 +451,36 @@ try {
             $priorityTotal += (int) $row['total'];
         }
     }
+
+    // RSSI / SNR trend analytics
+    $signalAnalyticsStmt = $pdo->prepare("
+        SELECT
+            MIN(rssi) AS min_rssi,
+            MAX(rssi) AS max_rssi,
+            AVG(rssi) AS avg_rssi,
+            MIN(snr) AS min_snr,
+            MAX(snr) AS max_snr,
+            AVG(snr) AS avg_snr,
+            COUNT(*) AS packet_count
+        FROM sensor_readings
+        WHERE node_id = :node_id
+          AND created_at >= :range_start
+          AND rssi IS NOT NULL
+    ");
+    $signalAnalyticsStmt->execute([
+        ':node_id' => $nodeId,
+        ':range_start' => $rangeStart,
+    ]);
+    $signalStats = $signalAnalyticsStmt->fetch() ?: null;
+    $signalAnalytics = [
+        'min_rssi'  => $signalStats && $signalStats['min_rssi']  !== null ? (int)   $signalStats['min_rssi']  : null,
+        'max_rssi'  => $signalStats && $signalStats['max_rssi']  !== null ? (int)   $signalStats['max_rssi']  : null,
+        'avg_rssi'  => $signalStats && $signalStats['avg_rssi']  !== null ? round((float) $signalStats['avg_rssi'], 1) : null,
+        'min_snr'   => $signalStats && $signalStats['min_snr']   !== null ? round((float) $signalStats['min_snr'], 1) : null,
+        'max_snr'   => $signalStats && $signalStats['max_snr']   !== null ? round((float) $signalStats['max_snr'], 1) : null,
+        'avg_snr'   => $signalStats && $signalStats['avg_snr']   !== null ? round((float) $signalStats['avg_snr'], 1) : null,
+        'packet_count' => $signalStats ? (int) $signalStats['packet_count'] : 0,
+    ];
 
     $sensorAnalytics = [];
     foreach ($sensorConfig as $sensorKey => $sensor) {
@@ -475,10 +540,13 @@ try {
                 'HIGH' => $priorityTotal > 0 ? round(($priorityCounts['HIGH'] / $priorityTotal) * 100, 2) : 0,
             ],
             'sensor_stats' => $sensorAnalytics,
+            'signal_stats' => $signalAnalytics,
         ],
         'configured_sensors' => $configuredSensors,
         'profiles' => $profiles,
         'alerts' => $alerts,
+        'alert_history' => getActiveAlerts($pdo, $nodeId),
+        'communication_health' => computeCommunicationHealth($pdo, $nodeId, $rangeStart),
         'signal_history' => array_map(static function ($row) {
             return [
                 'id' => (int) $row['id'],
@@ -494,7 +562,8 @@ try {
             ];
         }, $signalHistory),
         'sensors' => $sensors,
-        'recent_activity' => $recentActivity
+        'recent_activity' => $recentActivity,
+        'signal_stats' => $signalAnalytics,
     ]);
 } catch (Exception $e) {
     http_response_code(500);

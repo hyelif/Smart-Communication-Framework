@@ -108,15 +108,13 @@ header('Expires: 0');
                     </article>
 
                     <article class="panel compact-panel">
-                        <p class="eyebrow">Communication Analytics</p>
+                        <p class="eyebrow">Signal Stats</p>
                         <div class="summary compact-summary">
-                            <div class="mini">Critical Events<strong id="analyticsCritical">0</strong></div>
-                            <div class="mini">High Priority<strong id="analyticsHigh">0%</strong></div>
-                            <div class="mini">Medium Priority<strong id="analyticsMedium">0%</strong></div>
-                            <div class="mini">Low Priority<strong id="analyticsLow">0%</strong></div>
-                            <div class="mini">Min<strong id="analyticsMin">--</strong></div>
-                            <div class="mini">Max<strong id="analyticsMax">--</strong></div>
-                            <div class="mini">Avg<strong id="analyticsAvg">--</strong></div>
+                            <div class="mini">Avg RSSI<strong id="analyticsAvgRssi">--</strong></div>
+                            <div class="mini">Avg SNR<strong id="analyticsAvgSnr">--</strong></div>
+                            <div class="mini">Min RSSI<strong id="analyticsMinRssi">--</strong></div>
+                            <div class="mini">Max RSSI<strong id="analyticsMaxRssi">--</strong></div>
+                            <div class="mini">Packets<strong id="analyticsPktCount">--</strong></div>
                             <div class="mini">Report Interval<strong id="analyticsInterval">--</strong></div>
                         </div>
                     </article>
@@ -232,6 +230,23 @@ header('Expires: 0');
                         </div>
                     </div>
                 </div>
+
+                <div class="panel">
+                    <div class="head">
+                        <div>
+                            <p class="eyebrow">Communication Health</p>
+                            <h2>Delivery &amp; Connectivity</h2>
+                            <p class="copy">Packet delivery rate, sequence gaps, and link freshness.</p>
+                        </div>
+                    </div>
+                    <div class="summary">
+                        <div class="mini">Delivery Rate<strong id="commHealthRate">--</strong></div>
+                        <div class="mini">Packets Received<strong id="commHealthReceived">--</strong></div>
+                        <div class="mini">Sequence Gaps<strong id="commHealthGaps">--</strong></div>
+                        <div class="mini">Last Packet<strong id="commHealthFresh">--</strong></div>
+                    </div>
+                </div>
+
                 <div class="panel">
                     <div class="head">
                         <div>

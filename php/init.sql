@@ -10,6 +10,9 @@ CREATE TABLE IF NOT EXISTS nodes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     location VARCHAR(255),
+    latitude DECIMAL(10,6) NULL,
+    longitude DECIMAL(10,6) NULL,
+    distance_m DECIMAL(10,2) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -147,6 +150,32 @@ CREATE TABLE IF NOT EXISTS invalid_sensor_data (
     reason VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_invalid_node_created (node_id, created_at)
+);
+
+-- Communication health tracking
+CREATE TABLE IF NOT EXISTS communication_health (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    node_id INT NOT NULL,
+    metric_key VARCHAR(50) NOT NULL,
+    metric_value VARCHAR(255) NOT NULL,
+    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_comm_health_node_recorded (node_id, recorded_at)
+);
+
+-- Alerts acknowledge/resolve tracking
+CREATE TABLE IF NOT EXISTS alerts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    node_id INT NOT NULL,
+    sensor_key VARCHAR(50) NOT NULL,
+    label VARCHAR(100) NOT NULL,
+    message TEXT NOT NULL,
+    severity VARCHAR(20) NOT NULL DEFAULT 'warning',
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    acknowledged_at TIMESTAMP NULL,
+    resolved_at TIMESTAMP NULL,
+    INDEX idx_alerts_node_created (node_id, created_at),
+    INDEX idx_alerts_status (status)
 );
 
 -- Remove old generic tables if they still exist

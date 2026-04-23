@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../widgets/custom_ui.dart';
+import 'calibration_screen.dart';
 import 'config_screen.dart';
 import 'device_screen.dart';
 import 'profiles_screen.dart';
@@ -52,6 +53,11 @@ class _MainNavigationState extends State<MainNavigation> {
             globalConfig.value = cfg;
             _setIndex(1);
           },
+        );
+      case 3:
+        return CalibrationScreen(
+          activeTabListenable: activeTab,
+          tabIndex: 3,
         );
       default:
         return const StitchEmptyState(

@@ -471,6 +471,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
                         const SizedBox(height: 16),
                         _buildDiagnosticsPanel(context),
                         const SizedBox(height: 16),
+                        _buildSmartCommPanel(context),
+                        const SizedBox(height: 16),
                         RepaintBoundary(
                           child: SensorMatrix(
                             deviceConfig: deviceConfig,
@@ -509,6 +511,49 @@ class _DeviceScreenState extends State<DeviceScreen> {
           _metaRow('Clients', clients),
           _metaRow('Saved Nodes', configCount),
           _metaRow('Security', lockStatus),
+          if (_healthMessage != null)
+            _metaRow('Note', _healthMessage!, multiline: true),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSmartCommPanel(BuildContext context) {
+    final priority = _healthString('priority', '--');
+    final reportMode = _healthString('reportMode', '--');
+    final pendingQueue = _healthString('pendingQueue', '0');
+    final nodeId = _healthString('nodeId', '1');
+    final distance = _healthString('distance', '--');
+
+    Color priorityColor;
+    switch (priority.toUpperCase()) {
+      case 'HIGH':
+        priorityColor = StitchColors.error;
+        break;
+      case 'MEDIUM':
+        priorityColor = const Color(0xFFFFA94D);
+        break;
+      default:
+        priorityColor = StitchColors.primaryContainer;
+    }
+
+    return StitchPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const StitchSectionLabel('Smart Communication', icon: Icons.radar_rounded),
+          const SizedBox(height: 18),
+          _metaRow('Node ID', nodeId),
+          _metaRow('Distance', distance != '--' ? '$distance m' : '--'),
+          _metaRow(
+            'Priority',
+            priority != '--'
+                ? priority.toUpperCase()
+                : '--',
+            valueColor: priority != '--' ? priorityColor : null,
+          ),
+          _metaRow('Report Mode', reportMode != '--' ? reportMode.toUpperCase() : '--'),
+          _metaRow('Retry Queue', '$pendingQueue / 12'),
           if (_healthMessage != null)
             _metaRow('Note', _healthMessage!, multiline: true),
         ],
@@ -559,6 +604,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
     String label,
     String value, {
     bool multiline = false,
+    Color? valueColor,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -581,8 +627,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
               softWrap: multiline,
               maxLines: multiline ? null : 1,
               overflow: multiline ? TextOverflow.visible : TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: StitchColors.primary,
+              style: TextStyle(
+                color: valueColor ?? StitchColors.primary,
                 fontWeight: FontWeight.w600,
               ),
             ),

@@ -445,6 +445,7 @@ PHP:
 
 Flutter:
 - flutter_app/ - Mobile application
+- Calibration screen: sync threshold + A/B/C profiles with PHP dashboard
 
 
 ================================================================================

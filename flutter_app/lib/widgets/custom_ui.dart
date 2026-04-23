@@ -151,7 +151,7 @@ class StitchBottomNavigation extends StatelessWidget {
     _NavItem(Icons.flash_on_rounded, 'DEVICE'),
     _NavItem(Icons.architecture_rounded, 'ARCHITECT'),
     _NavItem(Icons.inventory_2_outlined, 'VAULT'),
-    _NavItem(Icons.insights_outlined, 'DATA'),
+    _NavItem(Icons.tune_rounded, 'CALIBRATE'),
   ];
 
   @override

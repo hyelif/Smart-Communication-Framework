@@ -281,6 +281,28 @@ function importConfigSnapshot(PDO $pdo, int $nodeId, array $snapshot): array
     return exportConfigSnapshot($pdo, $nodeId);
 }
 
+function saveNodeLocation(PDO $pdo, int $nodeId, ?float $latitude, ?float $longitude, ?float $distance): array
+{
+    $stmt = $pdo->prepare("
+        UPDATE nodes
+        SET latitude = :latitude,
+            longitude = :longitude,
+            distance_m = :distance,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = :node_id
+    ");
+    $stmt->execute([
+        ':node_id' => $nodeId,
+        ':latitude' => $latitude,
+        ':longitude' => $longitude,
+        ':distance' => $distance,
+    ]);
+
+    $fetchStmt = $pdo->prepare("SELECT id, name, location, latitude, longitude, distance_m FROM nodes WHERE id = :node_id");
+    $fetchStmt->execute([':node_id' => $nodeId]);
+    return $fetchStmt->fetch() ?: ['id' => $nodeId];
+}
+
 function normalizeNumber($value): float
 {
     return (float) (is_numeric($value) ? $value : 0);
@@ -298,4 +320,214 @@ function normalizeNullableNumber($value): ?float
 function nullableFloat($value): ?float
 {
     return $value === null ? null : (float) $value;
+}
+
+function ensureAlertsTable(PDO $pdo): void
+{
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS alerts (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            node_id INT NOT NULL,
+            sensor_key VARCHAR(50) NOT NULL,
+            label VARCHAR(100) NOT NULL,
+            message TEXT NOT NULL,
+            severity VARCHAR(20) NOT NULL DEFAULT 'warning',
+            status VARCHAR(20) NOT NULL DEFAULT 'active',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            acknowledged_at TIMESTAMP NULL,
+            resolved_at TIMESTAMP NULL,
+            INDEX idx_alerts_node_created (node_id, created_at),
+            INDEX idx_alerts_status (status)
+        )
+    ");
+}
+
+function getActiveAlerts(PDO $pdo, int $nodeId): array
+{
+    ensureAlertsTable($pdo);
+    $stmt = $pdo->prepare("
+        SELECT id, sensor_key, label, message, severity, status,
+               created_at, acknowledged_at, resolved_at
+        FROM alerts
+        WHERE node_id = :node_id
+        ORDER BY
+            CASE status
+                WHEN 'active'   THEN 1
+                WHEN 'acknowledged' THEN 2
+                WHEN 'resolved'    THEN 3
+            END,
+            severity DESC,
+            created_at DESC
+    ");
+    $stmt->execute([':node_id' => $nodeId]);
+    return $stmt->fetchAll();
+}
+
+function acknowledgeAlert(PDO $pdo, int $nodeId, string $sensorKey): array
+{
+    ensureAlertsTable($pdo);
+    $stmt = $pdo->prepare("
+        UPDATE alerts
+        SET status = 'acknowledged', acknowledged_at = CURRENT_TIMESTAMP
+        WHERE node_id = :node_id
+          AND sensor_key = :sensor_key
+          AND status = 'active'
+        ORDER BY created_at DESC
+        LIMIT 1
+    ");
+    $stmt->execute([
+        ':node_id' => $nodeId,
+        ':sensor_key' => $sensorKey,
+    ]);
+    return ['affected' => $stmt->rowCount()];
+}
+
+function resolveAlert(PDO $pdo, int $nodeId, string $sensorKey): array
+{
+    ensureAlertsTable($pdo);
+    $stmt = $pdo->prepare("
+        UPDATE alerts
+        SET status = 'resolved', resolved_at = CURRENT_TIMESTAMP
+        WHERE node_id = :node_id
+          AND sensor_key = :sensor_key
+          AND status IN ('active', 'acknowledged')
+        ORDER BY created_at DESC
+        LIMIT 1
+    ");
+    $stmt->execute([
+        ':node_id' => $nodeId,
+        ':sensor_key' => $sensorKey,
+    ]);
+    return ['affected' => $stmt->rowCount()];
+}
+
+function syncAlertsFromReadings(PDO $pdo, int $nodeId, array $alerts, array $profiles): int
+{
+    ensureAlertsTable($pdo);
+
+    $insertStmt = $pdo->prepare("
+        INSERT INTO alerts (node_id, sensor_key, label, message, severity)
+        VALUES (:node_id, :sensor_key, :label, :message, :severity)
+    ");
+
+    $count = 0;
+    foreach ($alerts as $alert) {
+        // Only insert critical / warning that isn't already active
+        if ($alert['severity'] === 'critical' || $alert['severity'] === 'warning') {
+            $check = $pdo->prepare("
+                SELECT 1 FROM alerts
+                WHERE node_id = :node_id
+                  AND sensor_key = :sensor_key
+                  AND status IN ('active', 'acknowledged')
+                LIMIT 1
+            ");
+            $check->execute([
+                ':node_id' => $nodeId,
+                ':sensor_key' => $alert['sensor_key'],
+            ]);
+            if (!$check->fetchColumn()) {
+                $insertStmt->execute([
+                    ':node_id' => $nodeId,
+                    ':sensor_key' => $alert['sensor_key'],
+                    ':label' => $alert['label'],
+                    ':message' => $alert['message'],
+                    ':severity' => $alert['severity'],
+                ]);
+                $count++;
+            }
+        }
+    }
+    return $count;
+}
+
+function ensureCommunicationHealthTable(PDO $pdo): void
+{
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS communication_health (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            node_id INT NOT NULL,
+            metric_key VARCHAR(50) NOT NULL,
+            metric_value VARCHAR(255) NOT NULL,
+            recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_comm_health_node_recorded (node_id, recorded_at)
+        )
+    ");
+}
+
+function getCommunicationHealth(PDO $pdo, int $nodeId): array
+{
+    ensureCommunicationHealthTable($pdo);
+    $stmt = $pdo->prepare("
+        SELECT metric_key, metric_value, recorded_at
+        FROM communication_health
+        WHERE node_id = :node_id
+        ORDER BY recorded_at DESC
+        LIMIT 50
+    ");
+    $stmt->execute([':node_id' => $nodeId]);
+    return $stmt->fetchAll();
+}
+
+function computeCommunicationHealth(PDO $pdo, int $nodeId, string $rangeStart): array
+{
+    $health = [
+        'delivery_rate' => null,
+        'total_expected' => 0,
+        'total_received' => 0,
+        'sequence_gaps' => 0,
+        'freshness_seconds' => null,
+    ];
+
+    $rangeEnd = time();
+    $rangeSeconds = $rangeEnd - strtotime($rangeStart);
+
+    $receivedStmt = $pdo->prepare("
+        SELECT COUNT(*) AS total,
+               MIN(created_at) AS first_at,
+               MAX(created_at) AS last_at,
+               MIN(sequence_number) AS min_seq,
+               MAX(sequence_number) AS max_seq
+        FROM sensor_readings
+        WHERE node_id = :node_id
+          AND created_at >= :range_start
+    ");
+    $receivedStmt->execute([
+        ':node_id' => $nodeId,
+        ':range_start' => $rangeStart,
+    ]);
+    $received = $receivedStmt->fetch();
+
+    $totalReceived = (int) ($received['total'] ?? 0);
+    $health['total_received'] = $totalReceived;
+
+    $criticalStmt = $pdo->prepare("
+        SELECT COUNT(*) FROM sensor_readings
+        WHERE node_id = :node_id
+          AND created_at >= :range_start
+          AND priority_level = 'HIGH'
+    ");
+    $criticalStmt->execute([
+        ':node_id' => $nodeId,
+        ':range_start' => $rangeStart,
+    ]);
+    $criticalCount = (int) $criticalStmt->fetchColumn();
+
+    $totalExpected = $criticalCount + max(1, (int) ceil(($rangeSeconds - ($criticalCount * 60)) / 900));
+    $health['total_expected'] = $totalExpected;
+
+    if ($totalExpected > 0) {
+        $health['delivery_rate'] = round(($totalReceived / $totalExpected) * 100, 1);
+    }
+
+    if ($received['min_seq'] !== null && $received['max_seq'] !== null) {
+        $expectedSeqCount = (int) $received['max_seq'] - (int) $received['min_seq'] + 1;
+        $actualSeqCount = (int) $received['total'];
+        $health['sequence_gaps'] = max(0, $expectedSeqCount - $actualSeqCount);
+    }
+
+    if ($received['last_at'] !== null) {
+        $health['freshness_seconds'] = (int) (time() - strtotime($received['last_at']));
+    }
+
+    return $health;
 }

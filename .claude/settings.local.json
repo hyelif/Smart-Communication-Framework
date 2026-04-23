@@ -2,9 +2,11 @@
   "permissions": {
     "allow": [
       "Read(//c/Users/HAKIMIE/Documents/PlatformIO/Projects/ESP32_HQ_Site/**)",
-      "Bash(pio lib:*)"
+      "Bash(pio lib:*)",
+      "Bash(flutter analyze *)",
+      "mcp__ide__executeCode"
     ]
   },
-  "prefersReducedMotion": false,
-  "spinnerTipsEnabled": false
+  "spinnerTipsEnabled": false,
+  "prefersReducedMotion": false
 }
