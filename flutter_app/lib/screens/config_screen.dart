@@ -43,9 +43,6 @@ class _ConfigScreenState extends State<ConfigScreen> {
   bool _isExportingFile = false;
   bool _isFetchingLocation = false;
 
-  // Node metadata (stored separately, sent with config)
-  Map<String, dynamic> _nodeMetadata = {};
-
   static const Map<String, List<int>> pinGroups = {
     'AI': [34, 35, 36, 39],
     'DI': [32, 33, 39],
@@ -143,6 +140,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
       final hasPerm = await LocationService.hasPermission();
       if (!hasPerm) {
         final status = await LocationService.requestPermission();
+        if (!mounted) return;
         if (status != PermissionStatus.granted) {
           showStitchMessage(context, 'Location permission denied', isError: true);
           return;
@@ -208,13 +206,24 @@ class _ConfigScreenState extends State<ConfigScreen> {
       );
 
       // Build config with metadata
-      final configWithMetadata = {
+      final configWithMetadata = <String, dynamic>{
         'config': widget.configNotifier.value,
         'nodeId': nodeId,
         'latitude': latitude,
         'longitude': longitude,
         'distance': distance ?? 0.0,
       };
+
+      // Load calibration profiles from local app storage and include in deploy.
+      // This avoids relying on the PHP dashboard/SQL backend for calibration management.
+      try {
+        final profiles = await StorageService.loadCalibrationProfiles();
+        if (profiles.isNotEmpty) {
+          configWithMetadata['calibration'] = profiles;
+        }
+      } catch (_) {
+        // Non-fatal: deploy without calibration if local load fails
+      }
 
       final result = await ApiService.sendConfigWithMetadata(
         configWithMetadata,
@@ -224,7 +233,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
       if (!mounted) return;
 
       if (result['ok'] == true) {
-        showStitchMessage(context, 'Config + GPS deployed to ESP32 successfully.');
+        showStitchMessage(context, 'Config + GPS + calibration deployed to ESP32 successfully.');
       } else {
         showStitchMessage(
           context,

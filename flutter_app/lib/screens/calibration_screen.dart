@@ -2,8 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-import '../services/api_service.dart';
 import '../services/location_service.dart';
+import '../services/storage_service.dart';
 import '../widgets/app_theme.dart';
 import '../widgets/custom_ui.dart';
 
@@ -58,10 +58,12 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
   void initState() {
     super.initState();
     widget.activeTabListenable.addListener(_handleActiveTabChanged);
+    // Important: allow the initial load to run even though we start in a "loading" state.
+    // Previously `_loadProfiles()` would early-return because `_isLoading` was true,
+    // leaving the page stuck on the spinner.
+    _isLoading = false;
     if (widget.activeTabListenable.value == widget.tabIndex) {
       _loadProfiles(showLoader: true);
-    } else {
-      _isLoading = false;
     }
   }
 
@@ -78,25 +80,21 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
   }
 
   Future<void> _loadProfiles({bool showLoader = false}) async {
-    if (_isLoading) return;
+    if (_isLoading && !showLoader) return;
     if (showLoader) setState(() => _isLoading = true);
 
     try {
-      final result = await ApiService.fetchCalibrationProfiles();
+      final result = await StorageService.loadCalibrationProfiles();
       if (!mounted) return;
 
-      if (result['ok'] == true && result['profiles'] is Map) {
-        setState(() {
-          _profiles = Map<String, dynamic>.from(result['profiles'] as Map);
-          _errorMessage = null;
-          _hasLoadedOnce = true;
-        });
-      } else {
-        setState(() => _errorMessage = 'Failed to load profiles from dashboard');
-      }
+      setState(() {
+        _profiles = Map<String, dynamic>.from(result);
+        _errorMessage = null;
+        _hasLoadedOnce = true;
+      });
     } catch (e) {
       if (mounted) {
-        setState(() => _errorMessage = 'Connection error: $e');
+        setState(() => _errorMessage = 'Failed to load local calibration: $e');
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -109,6 +107,7 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
       final hasPerm = await LocationService.hasPermission();
       if (!hasPerm) {
         final status = await LocationService.requestPermission();
+        if (!mounted) return;
         if (status != PermissionStatus.granted) {
           showStitchMessage(context, 'Location permission denied', isError: true);
           return;
@@ -135,29 +134,10 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
   Future<void> _saveAll() async {
     setState(() => _isSaving = true);
     try {
-      // Save location if we have coordinates
-      if (_latitude != null && _longitude != null) {
-        final locResult = await ApiService.saveNodeLocation(
-          latitude: _latitude!,
-          longitude: _longitude!,
-          distance: _distanceM,
-        );
-        if (!mounted) return;
-        if (locResult['ok'] != true) {
-          showStitchMessage(context, 'Failed to save location', isError: true);
-          return;
-        }
-      }
-
-      // Save calibration profiles
-      final profilesResult = await ApiService.saveCalibrationProfiles(_profiles);
+      await StorageService.saveCalibrationProfiles(_profiles);
       if (!mounted) return;
 
-      if (profilesResult['ok'] == true) {
-        showStitchMessage(context, 'Location + calibration synced to dashboard.');
-      } else {
-        showStitchMessage(context, 'Failed to save calibration profiles', isError: true);
-      }
+      showStitchMessage(context, 'Calibration saved locally on this device.');
     } catch (e) {
       if (mounted) {
         showStitchMessage(context, 'Save error: $e', isError: true);
@@ -186,8 +166,6 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final hasLocation = _latitude != null && _longitude != null;
-
     return StitchScaffold(
       floatingActionButton: !_isLoading && _profiles.isNotEmpty
           ? Padding(
@@ -202,7 +180,7 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
                   onPressed: _isSaving ? null : _saveAll,
                   backgroundColor: Colors.transparent,
                   elevation: 0,
-                  label: Text(_isSaving ? 'SYNCING...' : 'SYNC TO DASHBOARD'),
+                  label: Text(_isSaving ? 'SAVING...' : 'SAVE CALIBRATION'),
                   icon: _isSaving
                       ? const SizedBox(
                           width: 18,
@@ -553,7 +531,7 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
                     ),
                     SizedBox(height: 6),
                     Text(
-                      'Threshold ranges and calibration coefficients sync with the PHP dashboard.',
+                      'Threshold ranges and calibration coefficients are saved locally and deployed to the node when you deploy config.',
                       style: TextStyle(
                         color: StitchColors.onSurfaceVariant,
                         fontSize: 13,

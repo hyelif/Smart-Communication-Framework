@@ -9,7 +9,7 @@ header('Expires: 0');
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SmartPonic Dashboard</title>
-    <link rel="stylesheet" href="dashboard.css">
+    <link rel="stylesheet" href="dashboard.css?v=20260423">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
@@ -313,7 +313,7 @@ header('Expires: 0');
                 <section class="panel control-panel">
                     <p class="eyebrow">Snapshot</p>
                     <h3>Config Snapshot</h3>
-                    <p class="copy">Export or import dashboard settings and sensor profiles as JSON.</p>
+                    <p class="copy">Export or import dashboard settings as JSON.</p>
                     <div class="row control-action-row">
                         <button class="btn alt" id="exportConfigButton" type="button">Export Config JSON</button>
                         <button class="btn alt" id="importConfigButton" type="button">Import Config JSON</button>
@@ -325,32 +325,15 @@ header('Expires: 0');
             <section class="section panel calibration-panel">
                 <div class="head">
                     <div>
-                        <p class="eyebrow">Calibration Management</p>
-                        <h2>Sensor Thresholds and Calibration</h2>
-                        <p class="copy">Set warning ranges and keep calibration coefficients ready for later Flutter sync.</p>
+                        <p class="eyebrow">Calibration</p>
+                        <h2>Calibration Is Managed In The Mobile App</h2>
+                        <p class="copy">Sensor threshold and calibration values are now saved locally inside the Flutter app and deployed directly to the ESP32 node. This dashboard no longer edits calibration profiles.</p>
                     </div>
-                    <button class="btn" id="saveProfilesButton" type="button">Save Sensor Profiles</button>
-                </div>
-                <div class="table-scroll">
-                    <table class="profile">
-                        <thead>
-                            <tr>
-                                <th>Sensor</th>
-                                <th>Family</th>
-                                <th>Min Alert</th>
-                                <th>Max Alert</th>
-                                <th>Calibration A</th>
-                                <th>Calibration B</th>
-                                <th>Calibration C</th>
-                            </tr>
-                        </thead>
-                        <tbody id="profileTableBody"></tbody>
-                    </table>
                 </div>
             </section>
         </section>
     </div>
 
-    <script src="dashboard_app.js"></script>
+    <script src="dashboard_app.js?v=20260423"></script>
 </body>
 </html>

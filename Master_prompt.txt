@@ -1,0 +1,245 @@
+You are a senior embedded systems and IoT software engineer.
+
+I already have a working IoT system:
+- ESP32 Node (WiFi config + LoRa TX)
+- ESP32-S2 HQ Gateway (LoRa RX)
+- PHP + MySQL Dashboard
+
+Your task is to UPGRADE the system by integrating a Smart Communication Framework.
+
+IMPORTANT:
+- DO NOT rewrite everything
+- ONLY extend and modify existing code
+- Maintain compatibility with current implementation
+- Follow a SAFE MIGRATION approach (do not break current LoRa communication)
+
+---------------------------------------
+SYSTEM OVERVIEW
+---------------------------------------
+Node → LoRa → HQ Gateway → WiFi → PHP/MySQL Server → Dashboard
+
+Node location is provided by mobile app (GPS) and stored in ESP32.
+Distance is manually configured for range testing.
+HQ measures RSSI.
+
+---------------------------------------
+FEATURES TO IMPLEMENT (UPGRADE ONLY)
+---------------------------------------
+
+1. ADAPTIVE COMMUNICATION STRATEGY
+- Keep sensor sampling at 5 seconds
+- Implement dynamic reporting interval using millis():
+
+  NORMAL → 15 minutes
+  ABNORMAL → 5 minutes
+  CRITICAL → 1 minute
+
+- CRITICAL condition must:
+  - bypass interval
+  - send immediately
+
+---------------------------------------
+
+2. DATA PRIORITIZATION
+- Add priority levels:
+  LOW → normal data
+  MEDIUM → abnormal
+  HIGH → critical alerts
+
+- HIGH priority:
+  - bypass queue
+  - send immediately via LoRa
+
+- Payload must include:
+  priority flag
+
+---------------------------------------
+
+3. STORE-AND-FORWARD (RELIABILITY)
+
+NODE:
+- If LoRa send fails:
+  - store payload in FIFO buffer
+- Retry later
+
+GATEWAY:
+- If HTTP fails:
+  - store data in SD
+- Retry later
+
+---------------------------------------
+
+4. SECURITY IMPLEMENTATION (CRITICAL UPGRADE WITH MIGRATION)
+
+CURRENT SYSTEM:
+- Uses AES-128 ECB
+- Uses HEX encoding
+- No integrity validation
+
+THIS MUST BE UPGRADED SAFELY IN STAGES.
+
+---------------------------------------
+STAGE 1 (MANDATORY FIRST STEP)
+---------------------------------------
+REMOVE HEX ENCODING
+
+- Stop using HEX strings
+- Send raw binary using:
+  LoRa.write(buffer, length)
+
+- Gateway must:
+  - read binary using LoRa.readBytes()
+
+THIS REDUCES PAYLOAD SIZE BY ~50%
+
+---------------------------------------
+STAGE 2
+---------------------------------------
+ADD PACKET STRUCTURE
+
+Instead of raw payload, use:
+
+[HEADER | NONCE | PAYLOAD | CHECKSUM]
+
+HEADER:
+- node ID
+- priority
+
+NONCE:
+- unique per packet (for CTR mode)
+
+PAYLOAD:
+- encrypted data (binary)
+
+CHECKSUM:
+- CRC32 or lightweight checksum
+
+---------------------------------------
+STAGE 3
+---------------------------------------
+ADD INTEGRITY VALIDATION
+
+Gateway must:
+- verify checksum BEFORE decrypting
+- discard invalid packets
+
+IMPORTANT:
+Switch from:
+"decrypt → trust"
+
+To:
+"validate → decrypt"
+
+---------------------------------------
+STAGE 4
+---------------------------------------
+UPGRADE ENCRYPTION MODE
+
+- Replace AES-ECB with AES-CTR
+
+REQUIREMENTS:
+- Use nonce as IV
+- No padding required
+- Same key as node
+
+NOTE:
+AES-128 is sufficient
+AES-256 optional but NOT required
+
+---------------------------------------
+5. FLEXIBLE SENSOR CONFIGURATION
+---------------------------------------
+
+- Keep current dynamic GPIO config
+- Do not hardcode sensors
+- Payload must remain dynamic
+
+---------------------------------------
+6. LOCATION + DISTANCE
+---------------------------------------
+
+Include in payload:
+- latitude
+- longitude
+- distance
+- node ID
+
+---------------------------------------
+7. HQ GATEWAY UPGRADE
+---------------------------------------
+
+Modify existing code to:
+
+- Support binary LoRa packets
+- Parse packet structure
+- Validate checksum
+- Decrypt payload (AES-CTR)
+
+Then extract:
+- sensor data
+- lat, lon
+- distance
+- node ID
+- priority
+
+Also capture:
+- RSSI
+- SNR
+
+---------------------------------------
+8. SERVER + DASHBOARD
+---------------------------------------
+
+Modify existing backend:
+
+DATABASE:
+Add:
+- latitude
+- longitude
+- distance
+- rssi
+- priority
+- node_id
+
+ANALYTICS:
+- count critical events
+- percentage priority levels
+- min/max/avg sensor values
+
+MAP:
+- plot node location
+- show RSSI
+
+---------------------------------------
+OUTPUT REQUIREMENTS
+---------------------------------------
+
+1. DO NOT rewrite full system
+2. Show ONLY modified sections
+3. Label clearly:
+   // ADD THIS
+   // MODIFY THIS
+4. Keep code modular
+5. Use millis() (no delay)
+6. Keep memory usage low
+
+---------------------------------------
+GOAL
+---------------------------------------
+
+Transform the system into:
+
+- adaptive LoRa communication system
+- prioritized alert system
+- reliable store-and-forward system
+- secure communication system (AES-CTR + validation)
+- optimized LoRa payload (binary, compact)
+- analytics-ready dashboard system
+
+---------------------------------------
+
+Start by:
+1. Architecture adjustments
+2. Then NODE upgrade
+3. Then HQ upgrade
+4. Then server update

@@ -5,7 +5,7 @@ body{padding:18px;position:relative}
 .shell{max-width:1360px;margin:0 auto}
 .shell>*{position:relative;z-index:1}
 .topbar,.panel,.card,.alert,.tablecard{border:1px solid var(--line);box-shadow:var(--shadow);background:linear-gradient(180deg,rgba(23,30,42,.96),rgba(10,14,21,.98));border-radius:22px}
-.topbar{display:flex;justify-content:space-between;gap:16px;padding:16px 18px;background:linear-gradient(135deg,rgba(24,34,46,.94),rgba(8,12,18,.98))}
+.topbar{display:flex;justify-content:space-between;gap:16px;padding:16px 18px;background:linear-gradient(135deg,rgba(24,34,46,.94),rgba(8,12,18,.98));z-index:50}
 .brand{display:flex;gap:14px;align-items:center}
 .mark{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;font-weight:800;color:var(--cyan);background:linear-gradient(145deg,rgba(0,251,251,.18),rgba(56,168,255,.14))}
 .eyebrow{margin:0 0 4px;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--cyan);font-weight:700}
@@ -27,7 +27,7 @@ p.copy{margin:6px 0 0;color:var(--muted);max-width:62ch}
 .btn{border:0;cursor:pointer;padding:10px 14px;font-weight:800;font-size:.82rem;background:linear-gradient(135deg,#fff,var(--blue));color:#07131a;transition:filter .15s ease}
 .btn:hover{filter:brightness(1.02)}
 .btn.alt{background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.04));color:var(--text);border:1px solid rgba(255,255,255,.1);box-shadow:none}
-.tabs{margin:16px 0 0;padding:6px;border:1px solid var(--line);border-radius:18px;background:rgba(10,16,24,.6);width:max-content;max-width:100%}
+.tabs{margin:16px 0 0;padding:6px;border:1px solid var(--line);border-radius:18px;background:rgba(10,16,24,.6);width:max-content;max-width:100%;z-index:50}
 .tab{border:1px solid transparent;background:transparent;color:var(--muted);padding:10px 15px;border-radius:14px;font:inherit;font-size:.79rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:background .15s ease,border-color .15s ease,color .15s ease}
 .tab:hover{color:var(--text)}
 .tab.active{background:linear-gradient(135deg,rgba(0,251,251,.12),rgba(56,168,255,.16));color:var(--text);border-color:rgba(0,251,251,.14)}

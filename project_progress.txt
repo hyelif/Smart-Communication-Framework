@@ -4,22 +4,22 @@ Date: 2026-04-23
 Completed Work
 
 1. Smart Communication Framework - FULLY IMPLEMENTED
-   ✓ Adaptive Communication Strategy
+   [OK] Adaptive Communication Strategy
      - 5-second sensor sampling interval
      - Dynamic reporting intervals: NORMAL (15min), ABNORMAL (5min), CRITICAL (1min)
      - CRITICAL condition bypasses interval, sends immediately
-   ✓ Data Prioritization
+   [OK] Data Prioritization
      - Priority levels: LOW, MEDIUM, HIGH
      - HIGH priority packets bypass queue, sent immediately
      - Payload includes priority flag and report mode
-   ✓ Store-and-Forward Reliability
+   [OK] Store-and-Forward Reliability
      - Node: FIFO retry buffer (12 packets max)
      - HQ: SD/SPIFFS backed HTTP retry queue
      - 30-second retry intervals
-   ✓ Security Implementation (AES-CTR)
+   [OK] Security Implementation (AES-CTR)
      - Stage 1: Removed HEX encoding, raw binary transmission
      - Stage 2: Structured packet [HEADER|NONCE|PAYLOAD|CHECKSUM]
-     - Stage 3: CRC32 validation BEFORE decryption (validate → decrypt)
+     - Stage 3: CRC32 validation BEFORE decryption (validate -> decrypt)
      - Stage 4: AES-CTR mode encryption with 16-byte nonce
 
 2. Packet Structure
@@ -46,13 +46,20 @@ Completed Work
    - RSSI/SNR capture for signal quality monitoring
    - Location metadata (lat/lon/distance) extraction
    - HMAC-SHA256 signed HTTP requests to PHP API
+   - SD-first offline storage (no SPIFFS fallback by default)
+     - Logs every received packet to SD (NDJSON)
+     - Uses SD-backed HTTP retry queue when Wi-Fi/PHP is down
 
 6. Node Capabilities
    - Dynamic GPIO sensor configuration (max 15 sensors)
    - Priority escalation based on readings (nan, out-of-range detection)
    - Location metadata sync via separate packet type
-   - Retry queue for failed LoRa transmissions
+   - No retry queue for failed LoRa transmissions (drops on failure; HQ handles persistence)
    - Serial command interface for config management
+   - Calibration profiles supported (threshold_min/max + calibration_a/b/c)
+     - Receives profiles from Flutter deploy payload (calibration block)
+     - Applies calibration coefficients to live sensor readings
+     - Uses profile thresholds for MEDIUM/HIGH priority classification
 
 7. PHP Backend (receive_data.php)
    - Validates: API key, timestamp, HMAC signature
@@ -69,20 +76,23 @@ Completed Work
    - Threshold-based alerts
 
 9. Security Baseline
-   ✓ LoRa payload: AES-128-CTR encryption
-   ✓ Integrity: CRC32 checksum (validated before decrypt)
-   ✓ HQ→PHP: X-API-Key + X-Timestamp + X-Signature (HMAC-SHA256)
-   ✓ Node config: X-Node-Key protection
-   ✓ Request timestamp validation (replay protection)
-   ✓ Strict input validation (node_id, sensor count, pin format, sensor name)
+   [OK] LoRa payload: AES-128-CTR encryption
+   [OK] Integrity: CRC32 checksum (validated before decrypt)
+   [OK] HQ->PHP: X-API-Key + X-Timestamp + X-Signature (HMAC-SHA256)
+   [OK] Node config: X-Node-Key protection
+   [OK] Request timestamp validation (replay protection)
+   [OK] Strict input validation (node_id, sensor count, pin format, sensor name)
 
 Current System Status
 - Smart Communication Framework fully implemented and compliant with requirements
 - Adaptive reporting with priority-based intervals working
 - Store-and-forward reliability with FIFO retry and SD/SPIFFS backup
+- HQ now persists offline logs + HTTP retry queue to SD card (set SD CS pin in HQ firmware)
 - Binary packet transmission reduces payload size by ~50% vs HEX
-- All security stages completed (HEX removal → packet structure → integrity first → AES-CTR)
+- All security stages completed (HEX removal -> packet structure -> integrity first -> AES-CTR)
 - Dashboard ready with communication analytics, location metadata, and signal quality
+- Calibration profiles deploy to ESP32 Node and apply to readings + priority classification
+- Calibration is managed in the Flutter app (local storage); PHP dashboard no longer edits calibration profiles
 
 Packet Size Calculation (12 sensor GPIO + 2 relay GPIO)
 - 12 GPIO sensors generate ~16 segments (DHT22 produces 2 readings each)
@@ -104,10 +114,4 @@ Main Files (PHP)
 - php/init.sql
 
 Remaining / Possible Next Work
-- Communication health panel with delivery status ✅ (PHP dashboard + Flutter DeviceScreen)
-- Packet freshness / delivery visibility ✅ (PHP analytics)
-- RSSI/SNR trend improvements ✅ (Signal stats panel in dashboard)
-- Threshold bands on trend charts ⚠️ (API data ready, chart rendering not implemented)
-- Alert acknowledge/resolved states ✅ (alerts table + dashboard_manage.php actions)
-- Flutter calibration management ✅ (CalibrationScreen tab with GPS location capture + threshold/calibration sync to PHP dashboard)
-- Flutter app calibration sync to ESP32 Node ⚠️ (Flutter↔PHP done, ESP32 sync not implemented)
+- Threshold bands on trend charts [TODO] (API data ready, chart rendering not implemented)

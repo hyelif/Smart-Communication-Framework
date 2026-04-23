@@ -5,13 +5,16 @@ class StorageService {
   static const String _configKey = 'esp_config_data';
   static const String _profilesKey = 'esp_profiles_list';
   static const String _aesKey = 'esp_aes_key';
+  static const String _calibrationKey = 'esp_calibration_profiles';
   static Future<SharedPreferences>? _prefsFuture;
   static bool _configLoaded = false;
   static bool _profilesLoaded = false;
   static bool _keyLoaded = false;
+  static bool _calibrationLoaded = false;
   static String? _cachedConfigJson;
   static String? _cachedProfilesJson;
   static String? _cachedKey;
+  static String? _cachedCalibrationJson;
 
   static Future<SharedPreferences> _prefs() {
     return _prefsFuture ??= SharedPreferences.getInstance();
@@ -36,6 +39,13 @@ class StorageService {
     final prefs = await _prefs();
     _cachedKey = prefs.getString(_aesKey);
     _keyLoaded = true;
+  }
+
+  static Future<void> _ensureCalibrationCache() async {
+    if (_calibrationLoaded) return;
+    final prefs = await _prefs();
+    _cachedCalibrationJson = prefs.getString(_calibrationKey);
+    _calibrationLoaded = true;
   }
 
   static Future<void> saveConfig(List<Map<String, dynamic>> config, String key) async {
@@ -64,6 +74,24 @@ class StorageService {
     final data = _cachedProfilesJson;
     if (data == null) return [];
     return List<Map<String, dynamic>>.from(jsonDecode(data));
+  }
+
+  // Calibration profiles are stored as:
+  // { "temperature": {threshold_min, threshold_max, calibration_a, calibration_b, calibration_c}, ... }
+  static Future<Map<String, dynamic>> loadCalibrationProfiles() async {
+    await _ensureCalibrationCache();
+    final data = _cachedCalibrationJson;
+    if (data == null || data.isEmpty) return {};
+    final decoded = jsonDecode(data);
+    if (decoded is Map<String, dynamic>) return decoded;
+    return {};
+  }
+
+  static Future<void> saveCalibrationProfiles(Map<String, dynamic> profiles) async {
+    final prefs = await _prefs();
+    _cachedCalibrationJson = jsonEncode(profiles);
+    _calibrationLoaded = true;
+    await prefs.setString(_calibrationKey, _cachedCalibrationJson!);
   }
 
   static Future<void> saveAsNewProfile(

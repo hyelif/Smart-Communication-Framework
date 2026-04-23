@@ -163,7 +163,14 @@ class ApiService {
   }
 
   // Dashboard API (PHP server - different network from ESP32 node AP)
-  static const String dashboardBaseUrl = 'http://localhost/smartponic/php';
+  // NOTE:
+  // - On a real phone, "localhost" means the phone itself (connection refused).
+  // - Use your PC/XAMPP IP on the same Wi-Fi network (example: 172.20.10.2).
+  // - Path matches HQ firmware: http://<PC-IP>/smartponic/*.php (no "/php" folder).
+  static const String dashboardBaseUrl = String.fromEnvironment(
+    'SMARTPONIC_DASHBOARD_BASE_URL',
+    defaultValue: 'http://172.20.10.2/smartponic',
+  );
 
   static Future<Map<String, dynamic>> fetchCalibrationProfiles() async {
     // Fetch profiles from dashboard_data.php (node_id=1 by default)
