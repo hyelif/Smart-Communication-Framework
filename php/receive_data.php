@@ -40,6 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 require_once 'db.php';
 require_once 'data_policy.php';
+require_once 'telegram_lib.php';
 
 function respondWithJsonError(int $statusCode, string $message): void
 {
@@ -357,6 +358,77 @@ try {
 
     // Commit transaction
     $pdo->commit();
+
+    // Optional: Telegram alerts (CRITICAL/ABNORMAL) based on firmware report_mode.
+    // Must never break ingestion when Telegram/DB is unavailable.
+    try {
+        $telegramConfig = telegramLoadConfig();
+        if ($telegramConfig !== null) {
+            $chatId = $telegramConfig['default_alert_chat_id'];
+            if ($chatId !== null && ($reportMode === 'CRITICAL' || $reportMode === 'ABNORMAL')) {
+                $stateKey = 'node:' . (int) $data['node_id'] . ':mode:' . strtolower($reportMode);
+                $cooldown = $reportMode === 'CRITICAL'
+                    ? (int) $telegramConfig['cooldown_critical_s']
+                    : (int) $telegramConfig['cooldown_abnormal_s'];
+
+                if (telegramShouldSendAlert($pdo, $stateKey, max(0, $cooldown))) {
+                    $lines = [];
+                    $lines[] = 'SmartPonic ALERT';
+                    $lines[] = 'Node ' . (int) $data['node_id'] . ' | Mode ' . $reportMode . ' | Priority ' . $priorityLevel;
+                    $lines[] = 'Time ' . date('Y-m-d H:i:s');
+
+                    $sig = [];
+                    if (isset($data['rssi'])) {
+                        $sig[] = 'RSSI ' . (string) $data['rssi'];
+                    }
+                    if (isset($data['snr'])) {
+                        $sig[] = 'SNR ' . (string) $data['snr'];
+                    }
+                    if ($sig) {
+                        $lines[] = implode(' | ', $sig);
+                    }
+
+                    $loc = [];
+                    if ($latitude !== null && $longitude !== null) {
+                        $loc[] = 'Lat ' . number_format($latitude, 6, '.', '');
+                        $loc[] = 'Lon ' . number_format($longitude, 6, '.', '');
+                    }
+                    if ($distanceMeters !== null) {
+                        $loc[] = 'Dist ' . number_format($distanceMeters, 1, '.', '') . ' m';
+                    }
+                    if ($loc) {
+                        $lines[] = 'Location ' . implode(' | ', $loc);
+                    }
+
+                    $lines[] = 'Sensors:';
+                    $sensorLines = 0;
+                    foreach ($data['sensors'] as $sensor) {
+                        if (!is_array($sensor)) {
+                            continue;
+                        }
+                        $name = isset($sensor['sensor']) ? trim((string) $sensor['sensor']) : '';
+                        $pin = isset($sensor['pin']) ? (string) $sensor['pin'] : '';
+                        $val = isset($sensor['value']) ? (string) $sensor['value'] : '';
+                        if ($name === '') {
+                            continue;
+                        }
+                        $lines[] = '- ' . $name . ' (pin ' . $pin . '): ' . $val;
+                        $sensorLines++;
+                        if ($sensorLines >= 14) {
+                            $lines[] = '...';
+                            break;
+                        }
+                    }
+
+                    $msg = implode("\n", $lines);
+                    telegramSendMessage($telegramConfig, (int) $chatId, $msg);
+                    telegramMarkAlertSent($pdo, $stateKey);
+                }
+            }
+        }
+    } catch (Exception $telegramException) {
+        // Ignore Telegram failures to keep data pipeline healthy.
+    }
 
     $retentionDeleted = 0;
     try {

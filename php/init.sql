@@ -178,6 +178,23 @@ CREATE TABLE IF NOT EXISTS alerts (
     INDEX idx_alerts_status (status)
 );
 
+-- Relay control command queue (polled by HQ)
+-- Note: MyISAM chosen to avoid InnoDB tablespace issues on some XAMPP setups.
+CREATE TABLE IF NOT EXISTS relay_commands (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    node_id INT NOT NULL,
+    relay_id INT NOT NULL,
+    action VARCHAR(10) NOT NULL,
+    requested_by_chat_id BIGINT NULL,
+    requested_by_label VARCHAR(120) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    sent_at TIMESTAMP NULL,
+    done_at TIMESTAMP NULL,
+    result_message VARCHAR(255) NULL,
+    INDEX idx_relay_cmd_node_status_created (node_id, status, created_at)
+) ENGINE=MyISAM;
+
 -- Remove old generic tables if they still exist
 DROP TABLE IF EXISTS sensor_data_misc;
 DROP TABLE IF EXISTS sensor_data;

@@ -1,0 +1,7 @@
+# Secrets / local config (do not commit)
+php/telegram_config.php
+php/telegram_config.local.php
+
+# Local logs
+php/logs/
+*.log

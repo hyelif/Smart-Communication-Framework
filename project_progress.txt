@@ -107,11 +107,97 @@ Main Files (Firmware)
 - HQ: C:\Users\HAKIMIE\Documents\PlatformIO\Projects\ESP32_HQ_Site\src\main.cpp
 - SmartPacket.h: include\SmartPacket.h
 
+Reminder (Firmware) //also update here for firmware ESP32
+- Node: C:\Users\HAKIMIE\smartponic_v2\firmware_esp32\ESP32_Node
+- HQ: C:\Users\HAKIMIE\smartponic_v2\firmware_esp32\ESP32_HQ_Site
+
 Main Files (PHP)
 - php/receive_data.php
 - php/dashboard_data.php
 - php/dashboard.php
 - php/init.sql
 
+XAMPP Deployment Note (IMPORTANT)
+- The live dashboard/API used by the browser is served from: C:\xampp\htdocs\smartponic\
+- After editing PHP dashboard/backend files in this repo, copy updated files into htdocs or you will not see changes.
+- Files we deploy to htdocs for the dashboard UI:
+  - php/dashboard.php  -> C:\xampp\htdocs\smartponic\dashboard.php
+  - php/dashboard_app.js -> C:\xampp\htdocs\smartponic\dashboard_app.js
+  - php/dashboard.css -> C:\xampp\htdocs\smartponic\dashboard.css
+- If you modify API endpoints, also deploy:
+  - php/receive_data.php -> C:\xampp\htdocs\smartponic\receive_data.php
+  - php/dashboard_data.php -> C:\xampp\htdocs\smartponic\dashboard_data.php
+  - php/dashboard_manage.php -> C:\xampp\htdocs\smartponic\dashboard_manage.php
+
 Remaining / Possible Next Work
 - Threshold bands on trend charts [TODO] (API data ready, chart rendering not implemented)
+
+Planned (Next Feature) - Monitoring, Controlling & Alerting via Telegram
+Date: 2026-04-25
+
+Goal
+- Provide real-time alerts and basic remote control through Telegram, aligned with existing priority/report-mode system.
+
+Phase 0 - Decisions / Inputs
+- [DONE] Telegram mode selected: Option B (bidirectional)
+- [DONE] Command ingestion method: Long Polling runner (telegram_poll.php)
+- [DONE] Telegram bot token handling:
+  - Template: php/telegram_config.example.php
+  - Local secret: php/telegram_config.php (gitignored)
+  - Note: token was accidentally pasted during setup and then removed; regenerate token in @BotFather if shared
+- [DONE] Allowed recipients model: allowlist chat IDs (allowed_chat_ids)
+- [DONE] BotFather menu note: register base commands only (no spaces); args are sent in chat (e.g. /relay 1 0 on)
+
+Phase 1 - Backend (PHP) Building Blocks
+- [DONE] Telegram config + loader: php/telegram_config.example.php + php/telegram_lib.php
+- [DONE] Telegram send helper (cURL + file_get_contents fallback): php/telegram_lib.php
+- [DONE] Polling runner + command parser: php/telegram_poll.php
+- [DONE] Bot troubleshooting tools:
+  - --self-test (getMe + getWebhookInfo)
+  - --delete-webhook
+  - --debug output
+- [DONE] Alert dedup/cooldown state:
+  - telegram_alert_state + telegram_bot_state (auto-repair + MyISAM fallback tables _v2 due to XAMPP InnoDB issues)
+- [TODO] Persistence/logging:
+  - Add telegram_send_log (optional) for audit/debug
+
+Phase 2 - Alerting (Monitoring)
+- [DONE] Telegram alert trigger from `receive_data.php`:
+  - Sends message when report_mode is ABNORMAL/CRITICAL (uses cooldown)
+  - Fail-safe: Telegram errors never block data ingestion
+- [DONE] Alert message format includes: node, mode/priority, time, RSSI/SNR, location (if present), sensor list
+- [TODO] Telegram alerts for dashboard threshold rules (profile min/max) even when firmware report_mode is NORMAL
+- [TODO] Freshness/offline Telegram alerts (no data window + recovery)
+- [TODO] Invalid sensor data spike Telegram alerts (invalid_sensor_data)
+- [TODO] Mute/snooze controls (per node/sensor, timed)
+
+Phase 3 - Controlling (Remote Actions)
+- [DONE] Telegram commands implemented (long polling):
+  - /status [node] -> latest packet summary
+  - /readings [node] -> latest sensor values (exact latest reading rows)
+  - /alerts [node], /ack, /resolve
+- [DONE] Relay control (queue only):
+  - /relay <node> <relay_id> <on|off> -> insert relay_commands
+  - /queue [node] -> view pending relay_commands
+  - PHP API: php/control_queue.php (signed) for HQ to fetch pending + ack done/failed
+  - Table: relay_commands (MyISAM)
+- [TODO] Firmware integration (required to actually toggle relays):
+  - HQ polls control_queue.php, sends LoRa control packet to Node, then acks back
+  - Node receives control packet, toggles GPIO, returns status/ack packet
+- [DONE] Security baseline for Telegram control:
+  - allowlist chat IDs only (unauthorized rejected)
+- [TODO] Add per-command rate limit (Telegram side) + optional admin roles
+
+Phase 4 - System Integration / UX
+- [TODO] Dashboard settings UI:
+  - Enable/disable Telegram
+  - Manage recipients (IDs), mute windows, alert levels, per-sensor rules
+- [TODO] Add "last alert sent" + "mute until" indicators on dashboard
+
+Phase 5 - Verification
+- [DONE] Verified Telegram bot connectivity via self-test (getMe + webhook info)
+- [DONE] Verified /whoami end-to-end through long polling
+- [TODO] Add dry-run mode for Telegram sends
+- [TODO] End-to-end tests:
+  - CRITICAL immediate alert + cooldown behavior
+  - Relay command: telegram -> relay_commands -> HQ fetch -> Node apply -> HQ ack -> DB status update
