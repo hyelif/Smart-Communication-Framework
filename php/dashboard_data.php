@@ -148,7 +148,6 @@ function ensureSensorReadingsColumns(PDO $pdo): void
 
 try {
     ensureDashboardTables($pdo);
-    ensureSensorReadingsColumns($pdo);
 
     $settings = getDashboardSettings($pdo);
     if (isset($settings['default_range']) && isset($rangeMap[$settings['default_range']]) && !isset($_GET['range'])) {
@@ -157,7 +156,7 @@ try {
     }
 
     $nodesStmt = $pdo->query("
-        SELECT id, name, location
+        SELECT id, name, location, hardware_id, latitude, longitude
         FROM nodes
         ORDER BY id ASC
     ");
@@ -169,13 +168,13 @@ try {
         : max(1, (int) $requestedNode);
 
     $nodeStmt = $pdo->prepare("
-        SELECT id, name, location
+        SELECT id, name, location, hardware_id, latitude, longitude
         FROM nodes
         WHERE id = :node_id
         LIMIT 1
     ");
     $nodeStmt->execute([':node_id' => $nodeId]);
-    $node = $nodeStmt->fetch() ?: ['id' => $nodeId, 'name' => 'Node ' . $nodeId, 'location' => 'Unknown', 'latitude' => null, 'longitude' => null, 'distance_m' => null];
+    $node = $nodeStmt->fetch() ?: ['id' => $nodeId, 'name' => 'Node ' . $nodeId, 'location' => 'Unknown', 'hardware_id' => null, 'latitude' => null, 'longitude' => null, 'distance_m' => null];
 
     $profiles = getSensorProfiles($pdo, $nodeId);
 
@@ -246,45 +245,62 @@ try {
     $configuredSensors = [];
     $alerts = [];
 
-    foreach ($sensorConfig as $sensorKey => $sensor) {
-        $configured = false;
-        if ($latestReading) {
-            $configuredStmt = $pdo->prepare("
-                SELECT 1
-                FROM {$sensor['table']}
-                WHERE node_id = :node_id AND reading_id = :reading_id
-                LIMIT 1
-            ");
-            $configuredStmt->execute([
-                ':node_id' => $nodeId,
-                ':reading_id' => $latestReading['id']
-            ]);
-            $configured = (bool) $configuredStmt->fetchColumn();
+    // --- Batch 1: configured check (one row per sensor present in the latest reading) ---
+    $configuredSet = [];
+    if ($latestReading) {
+        $cfgParts = [];
+        $cfgParams = [];
+        $ci = 0;
+        foreach ($sensorConfig as $sensorKey => $sensor) {
+            $cfgParts[] = "(SELECT '{$sensorKey}' AS sk FROM {$sensor['table']} WHERE node_id = :cfgn_{$ci} AND reading_id = :cfgr_{$ci} LIMIT 1)";
+            $cfgParams[":cfgn_{$ci}"] = $nodeId;
+            $cfgParams[":cfgr_{$ci}"] = (int) $latestReading['id'];
+            $ci++;
         }
+        $cfgStmt = $pdo->prepare(implode(' UNION ALL ', $cfgParts));
+        $cfgStmt->execute($cfgParams);
+        foreach ($cfgStmt->fetchAll(PDO::FETCH_COLUMN) as $sk) {
+            $configuredSet[$sk] = true;
+        }
+    }
 
-        $latestStmt = $pdo->prepare("
-            SELECT id, pin_number, value, created_at
-            FROM {$sensor['table']}
-            WHERE node_id = :node_id
-            ORDER BY created_at DESC, id DESC
-            LIMIT 1
-        ");
-        $latestStmt->execute([':node_id' => $nodeId]);
-        $latest = $latestStmt->fetch() ?: null;
+    // --- Batch 2: latest value per sensor (ranked subquery avoids per-table MAX join) ---
+    $latestParts = [];
+    $latestParams = [];
+    $li = 0;
+    foreach ($sensorConfig as $sensorKey => $sensor) {
+        $latestParts[] = "(SELECT '{$sensorKey}' AS sk, id, pin_number, value, created_at FROM {$sensor['table']} WHERE node_id = :ltn_{$li} ORDER BY created_at DESC, id DESC LIMIT 1)";
+        $latestParams[":ltn_{$li}"] = $nodeId;
+        $li++;
+    }
+    $latestStmt = $pdo->prepare(implode(' UNION ALL ', $latestParts));
+    $latestStmt->execute($latestParams);
+    $latestBySensor = [];
+    foreach ($latestStmt->fetchAll() as $row) {
+        $latestBySensor[$row['sk']] = $row;
+    }
 
-        $historyStmt = $pdo->prepare("
-            SELECT id, pin_number, value, created_at
-            FROM {$sensor['table']}
-            WHERE node_id = :node_id
-              AND created_at >= :range_start
-            ORDER BY created_at DESC, id DESC
-            LIMIT {$historyLimit}
-        ");
-        $historyStmt->execute([
-            ':node_id' => $nodeId,
-            ':range_start' => $rangeStart
-        ]);
-        $rows = array_reverse($historyStmt->fetchAll());
+    // --- Batch 3: history per sensor within range ---
+    $histParts = [];
+    $histParams = [];
+    $hi = 0;
+    foreach ($sensorConfig as $sensorKey => $sensor) {
+        $histParts[] = "(SELECT '{$sensorKey}' AS sk, id, pin_number, value, created_at FROM {$sensor['table']} WHERE node_id = :htn_{$hi} AND created_at >= :htr_{$hi} ORDER BY created_at DESC, id DESC LIMIT {$historyLimit})";
+        $histParams[":htn_{$hi}"] = $nodeId;
+        $histParams[":htr_{$hi}"] = $rangeStart;
+        $hi++;
+    }
+    $histStmt = $pdo->prepare(implode(' UNION ALL ', $histParts));
+    $histStmt->execute($histParams);
+    $histBySensor = [];
+    foreach ($histStmt->fetchAll() as $row) {
+        $histBySensor[$row['sk']][] = $row;
+    }
+
+    foreach ($sensorConfig as $sensorKey => $sensor) {
+        $configured = isset($configuredSet[$sensorKey]);
+        $latest = $latestBySensor[$sensorKey] ?? null;
+        $rows = array_reverse($histBySensor[$sensorKey] ?? []);
 
         $history = [];
         foreach ($rows as $row) {
@@ -482,27 +498,30 @@ try {
         'packet_count' => $signalStats ? (int) $signalStats['packet_count'] : 0,
     ];
 
+    // --- Batch 4: analytics (MIN/MAX/AVG) for all sensors in one query ---
     $sensorAnalytics = [];
+    $anParts = [];
+    $anParams = [];
+    $ai = 0;
     foreach ($sensorConfig as $sensorKey => $sensor) {
-        $statsStmt = $pdo->prepare("
-            SELECT MIN(CAST(value AS DECIMAL(12,4))) AS min_value,
-                   MAX(CAST(value AS DECIMAL(12,4))) AS max_value,
-                   AVG(CAST(value AS DECIMAL(12,4))) AS avg_value
-            FROM {$sensor['table']}
-            WHERE node_id = :node_id
-              AND value REGEXP '^-?[0-9]+(\\.[0-9]+)?$'
-              AND created_at >= :range_start
-        ");
-        $statsStmt->execute([
-            ':node_id' => $nodeId,
-            ':range_start' => $rangeStart,
-        ]);
-        $stats = $statsStmt->fetch() ?: null;
-        $sensorAnalytics[$sensorKey] = [
-            'min' => $stats && $stats['min_value'] !== null ? round((float) $stats['min_value'], 2) : null,
-            'max' => $stats && $stats['max_value'] !== null ? round((float) $stats['max_value'], 2) : null,
-            'avg' => $stats && $stats['avg_value'] !== null ? round((float) $stats['avg_value'], 2) : null,
+        $anParts[] = "(SELECT '{$sensorKey}' AS sk, MIN(CAST(value AS DECIMAL(12,4))) AS min_v, MAX(CAST(value AS DECIMAL(12,4))) AS max_v, AVG(CAST(value AS DECIMAL(12,4))) AS avg_v FROM {$sensor['table']} WHERE node_id = :ann_{$ai} AND value REGEXP '^-?[0-9]+(\\.[0-9]+)?$' AND created_at >= :anr_{$ai})";
+        $anParams[":ann_{$ai}"] = $nodeId;
+        $anParams[":anr_{$ai}"] = $rangeStart;
+        $ai++;
+    }
+    $anStmt = $pdo->prepare(implode(' UNION ALL ', $anParts));
+    $anStmt->execute($anParams);
+    foreach ($anStmt->fetchAll() as $row) {
+        $sensorAnalytics[$row['sk']] = [
+            'min' => $row['min_v'] !== null ? round((float) $row['min_v'], 2) : null,
+            'max' => $row['max_v'] !== null ? round((float) $row['max_v'], 2) : null,
+            'avg' => $row['avg_v'] !== null ? round((float) $row['avg_v'], 2) : null,
         ];
+    }
+    foreach ($sensorConfig as $sensorKey => $_) {
+        if (!isset($sensorAnalytics[$sensorKey])) {
+            $sensorAnalytics[$sensorKey] = ['min' => null, 'max' => null, 'avg' => null];
+        }
     }
 
     echo json_encode([

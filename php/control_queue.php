@@ -122,8 +122,22 @@ try {
         exit;
     }
 
+    if ($action === 'mark_sent') {
+        $commandId = isset($payload['command_id']) ? (int) $payload['command_id'] : 0;
+        if ($commandId <= 0) {
+            throw new InvalidArgumentException('command_id is required');
+        }
+
+        $ok = markRelayCommandSent($pdo, $commandId);
+        echo json_encode([
+            'status' => 'success',
+            'updated' => $ok,
+            'command_id' => $commandId,
+        ]);
+        exit;
+    }
+
     respondWithJsonError(400, 'Unsupported action');
 } catch (Exception $e) {
     respondWithJsonError(500, 'Failed to process control action: ' . $e->getMessage());
 }
-

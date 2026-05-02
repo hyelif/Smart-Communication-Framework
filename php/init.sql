@@ -8,13 +8,15 @@ USE smartponic;
 -- Nodes table (stores node information)
 CREATE TABLE IF NOT EXISTS nodes (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    hardware_id VARCHAR(16) NULL,
     name VARCHAR(100) NOT NULL,
     location VARCHAR(255),
     latitude DECIMAL(10,6) NULL,
     longitude DECIMAL(10,6) NULL,
     distance_m DECIMAL(10,2) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_nodes_hardware_id (hardware_id)
 );
 
 -- Sensor readings table (main reading record)
@@ -26,6 +28,7 @@ CREATE TABLE IF NOT EXISTS sensor_readings (
     priority_level VARCHAR(20) NULL,
     report_mode VARCHAR(20) NULL,
     sequence_number INT NULL,
+    hardware_id VARCHAR(16) NULL,
     latitude DECIMAL(10,6) NULL,
     longitude DECIMAL(10,6) NULL,
     distance_m DECIMAL(10,2) NULL,

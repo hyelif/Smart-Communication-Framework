@@ -206,6 +206,75 @@ function parseCommand(string $text): array
     return [$cmd, $args];
 }
 
+function telegramFreshnessCheck(PDO $pdo, array $config): void
+{
+    $chatId = $config['default_alert_chat_id'] ?? null;
+    if ($chatId === null) {
+        return;
+    }
+
+    $warningS = max(30, (int) ($config['freshness_warning_s'] ?? 300));
+    $offlineS = max($warningS, (int) ($config['freshness_offline_s'] ?? 900));
+
+    $nodesStmt = $pdo->query("SELECT id FROM nodes ORDER BY id ASC");
+    $nodes = $nodesStmt->fetchAll() ?: [];
+    foreach ($nodes as $node) {
+        $nodeId = (int) ($node['id'] ?? 0);
+        if ($nodeId <= 0) {
+            continue;
+        }
+
+        $latestStmt = $pdo->prepare("
+            SELECT created_at
+            FROM sensor_readings
+            WHERE node_id = :node_id
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+        ");
+        $latestStmt->execute([':node_id' => $nodeId]);
+        $createdAt = $latestStmt->fetchColumn();
+        if ($createdAt === false || $createdAt === null) {
+            continue;
+        }
+
+        $lastTs = strtotime((string) $createdAt);
+        if ($lastTs === false) {
+            continue;
+        }
+
+        $ageS = time() - $lastTs;
+        $offlineKey = "node:{$nodeId}:offline";
+        $recoveredKey = "node:{$nodeId}:recovered";
+
+        if ($ageS >= $offlineS) {
+            if (telegramShouldSendAlert($pdo, $offlineKey, 300)) {
+                $mins = (int) floor($ageS / 60);
+                telegramSendMessage($config, (int) $chatId, "SmartPonic OFFLINE\nNode {$nodeId} has no fresh data for {$mins} min.\nLast: {$createdAt}");
+                telegramMarkAlertSent($pdo, $offlineKey);
+            }
+            continue;
+        }
+
+        if ($ageS >= $warningS) {
+            $staleKey = "node:{$nodeId}:stale";
+            if (telegramShouldSendAlert($pdo, $staleKey, 300)) {
+                $mins = (int) floor($ageS / 60);
+                telegramSendMessage($config, (int) $chatId, "SmartPonic STALE\nNode {$nodeId} last update {$mins} min ago.\nLast: {$createdAt}");
+                telegramMarkAlertSent($pdo, $staleKey);
+            }
+            continue;
+        }
+
+        $offlineSentAt = telegramGetAlertLastSentAt($pdo, $offlineKey);
+        if ($offlineSentAt !== null && (time() - $offlineSentAt) < 24 * 3600) {
+            if (telegramShouldSendAlert($pdo, $recoveredKey, 600)) {
+                telegramSendMessage($config, (int) $chatId, "SmartPonic RECOVERED\nNode {$nodeId} is back online.\nLast: {$createdAt}");
+                telegramMarkAlertSent($pdo, $recoveredKey);
+            }
+        }
+    }
+}
+
 $config = telegramLoadConfig();
 if ($config === null) {
     fwrite(STDERR, "Telegram not configured. Create php/telegram_config.php (see php/telegram_config.example.php).\n");
@@ -306,7 +375,7 @@ do {
         echo "No new Telegram updates received.\n";
         echo "Tip: send /whoami to the bot FIRST, then run: C:\\xampp\\php\\php.exe .\\php\\telegram_poll.php --once\n";
     }
-    foreach ($updates as $update) {
+	    foreach ($updates as $update) {
         $updateId = isset($update['update_id']) ? (int) $update['update_id'] : 0;
         if ($updateId > 0) {
             telegramSetLastUpdateId($pdo, $updateId);
@@ -416,12 +485,24 @@ do {
             continue;
         }
 
-        if ($cmd !== '') {
-            telegramReply($config, $chatId, "Unknown command. Send /help");
-        }
-    }
+	        if ($cmd !== '') {
+	            telegramReply($config, $chatId, "Unknown command. Send /help");
+	        }
+	    }
 
-    if ($once) {
-        break;
-    }
+	    if (!$once) {
+	        static $lastFreshnessCheck = 0;
+	        if (time() - $lastFreshnessCheck >= 60) {
+	            $lastFreshnessCheck = time();
+	            try {
+	                telegramFreshnessCheck($pdo, $config);
+	            } catch (Exception $e) {
+	                // ignore
+	            }
+	        }
+	    }
+	
+	    if ($once) {
+	        break;
+	    }
 } while ($loop);

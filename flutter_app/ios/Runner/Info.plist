@@ -35,6 +35,8 @@
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>SmartPonic connects directly to your ESP32 node over local Wi-Fi.</string>
+	<key>NFCReaderUsageDescription</key>
+	<string>SmartPonic writes encrypted ESP32 node configuration to NFC tags.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

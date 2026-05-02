@@ -1,0 +1,7 @@
+paulstoffregen/OneWire@^2.3.8
+milesburton/DallasTemperature@^4.0.6
+sandeepmistry/LoRa@^0.8.0
+adafruit/Adafruit PN532@^1.1.0
+bblanchon/ArduinoJson@^7.2.2
+adafruit/DHT sensor library@^1.4.7
+adafruit/Adafruit BusIO@^1.14.5

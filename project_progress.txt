@@ -93,6 +93,16 @@ Current System Status
 - Dashboard ready with communication analytics, location metadata, and signal quality
 - Calibration profiles deploy to ESP32 Node and apply to readings + priority classification
 - Calibration is managed in the Flutter app (local storage); PHP dashboard no longer edits calibration profiles
+- ESP32 hardware identity is now implemented:
+  - Node derives immutable Hardware ID from ESP.getEfuseMac() as EUI-64 format
+  - Numeric nodeId remains only as internal 1-byte LoRa transport address for packet compatibility
+  - Encrypted node telemetry no longer includes node= metadata
+  - Node telemetry, location sync, and relay ACK payloads include hardware_id
+  - HQ displays node hardware_id in Serial and forwards it to PHP API
+  - PHP resolves the backend node record by hardware_id and stores hardware_id in nodes and sensor_readings tables
+- Two Node firmware variants are now aligned:
+  - firmware_esp32/ESP32_Node = WiFi AP configuration firmware (30-pin)
+  - firmware_esp32/ESP32_Node_38Pin = NFC-only configuration firmware (38-pin)
 
 Packet Size Calculation (12 sensor GPIO + 2 relay GPIO)
 - 12 GPIO sensors generate ~16 segments (DHT22 produces 2 readings each)
@@ -165,10 +175,13 @@ Phase 2 - Alerting (Monitoring)
 - [DONE] Telegram alert trigger from `receive_data.php`:
   - Sends message when report_mode is ABNORMAL/CRITICAL (uses cooldown)
   - Fail-safe: Telegram errors never block data ingestion
-- [DONE] Alert message format includes: node, mode/priority, time, RSSI/SNR, location (if present), sensor list
-- [TODO] Telegram alerts for dashboard threshold rules (profile min/max) even when firmware report_mode is NORMAL
-- [TODO] Freshness/offline Telegram alerts (no data window + recovery)
-- [TODO] Invalid sensor data spike Telegram alerts (invalid_sensor_data)
+- [DONE] Telegram threshold alerts from `receive_data.php` (profile min/max):
+  - Sends message even when firmware report_mode is NORMAL (uses cooldown_abnormal_s)
+- [DONE] Telegram invalid sensor alerts from `receive_data.php`:
+  - Sends message when invalid_sensor_data is recorded (skipped_sensors not empty)
+- [DONE] Freshness/offline Telegram alerts from `telegram_poll.php --loop`:
+  - Uses freshness_warning_s + freshness_offline_s with cooldown + recovery notice
+- [DONE] Alert message format includes: node, mode/priority, time, RSSI/SNR, location (if present), sensor list / threshold bounds
 - [TODO] Mute/snooze controls (per node/sensor, timed)
 
 Phase 3 - Controlling (Remote Actions)
@@ -176,14 +189,18 @@ Phase 3 - Controlling (Remote Actions)
   - /status [node] -> latest packet summary
   - /readings [node] -> latest sensor values (exact latest reading rows)
   - /alerts [node], /ack, /resolve
-- [DONE] Relay control (queue only):
-  - /relay <node> <relay_id> <on|off> -> insert relay_commands
-  - /queue [node] -> view pending relay_commands
-  - PHP API: php/control_queue.php (signed) for HQ to fetch pending + ack done/failed
-  - Table: relay_commands (MyISAM)
-- [TODO] Firmware integration (required to actually toggle relays):
-  - HQ polls control_queue.php, sends LoRa control packet to Node, then acks back
-  - Node receives control packet, toggles GPIO, returns status/ack packet
+- [DONE] Relay control (end-to-end):
+  - Telegram: /relay <node> <relay_id> <on|off> -> insert relay_commands
+  - Telegram: /queue [node] -> view pending relay_commands
+  - PHP: php/control_queue.php (signed) supports:
+    - get_pending (mark_sent=false recommended)
+    - mark_sent
+    - ack done/failed
+  - HQ firmware: polls control_queue.php, sends encrypted LoRa control packet (cmd=relay), forwards ACK back to control_queue.php
+  - Node firmware: receives encrypted LoRa control packet, maps relay_id to DO pin index, toggles GPIO, sends encrypted ACK (ack=relay)
+  - Applied to PlatformIO working files:
+    - C:\Users\HAKIMIE\Documents\PlatformIO\Projects\260325-164159-esp32dev\src\Aquaponic_LoRa_Transmitter.cpp
+    - C:\Users\HAKIMIE\Documents\PlatformIO\Projects\ESP32_HQ_Site\src\main.cpp
 - [DONE] Security baseline for Telegram control:
   - allowlist chat IDs only (unauthorized rejected)
 - [TODO] Add per-command rate limit (Telegram side) + optional admin roles
@@ -201,3 +218,727 @@ Phase 5 - Verification
 - [TODO] End-to-end tests:
   - CRITICAL immediate alert + cooldown behavior
   - Relay command: telegram -> relay_commands -> HQ fetch -> Node apply -> HQ ack -> DB status update
+  - Threshold Telegram alert (profile min/max) when report_mode is NORMAL
+  - Freshness offline + recovered messages from telegram_poll --loop
+
+================================================================================
+                    Planned (Next Feature) - Secure Key Storage (Node)
+================================================================================
+Date: 2026-04-25
+
+Goal
+- Replace hardcoded AES and Auth keys with secure flash storage
+- Keys stored in ESP32 Preferences namespace "secrets"
+- Managed via serial commands or Flutter app deploy payload
+- HQ and Node must have matching keys for LoRa communication
+
+Node Firmware Changes (ESP32_Node)
+----------------------------------
+File: firmware_esp32/ESP32_Node/src/Aquaponic_LoRa_Transmitter.cpp
+
+1. New preference keys (namespace "secrets"):
+   - aes_key: 16-character AES-128 encryption key
+   - auth_key: Authentication key for LoRa payload
+
+2. New functions:
+   - loadSecureKeys(): Load keys from flash at boot
+   - saveAesKey(): Save AES key (must be exactly 16 chars)
+   - saveAuthKey(): Save Auth key (1-64 chars)
+   - clearSecureKeys(): Reset keys to defaults
+
+3. Runtime variables (replace hardcoded constants):
+   - runtimeAesKey: Current AES key in memory
+   - runtimeAuthKey: Current Auth key in memory
+
+4. Serial commands:
+   - SETKEYS,AES128=xxx,AUTH=yyy - Set both keys
+   - SHOWKEYS - Display current keys
+   - CLEARKEYS - Reset to defaults
+
+5. Flutter app deploy payload support:
+   - JSON "keys" block with aes128 and auth fields
+   - Example: {"config":[...],"keys":{"aes128":"MySecureKey123456","auth":"MYAUTHKEY"}}
+
+6. Default fallback keys (if flash is empty):
+   - AES: "SmartPonic123456"
+   - Auth: "AQUA77"
+
+Important Notes
+--------------
+- If AES key is changed on Node, HQ MUST also be updated with same key
+- If Auth key is changed, HQ receive_data.php must match
+- Flash storage survives reboots and reflashing (until full erase)
+- Warning printed at boot if using default keys
+
+Implementation Status: COMPLETED (Both Node and HQ)
+----------------------------------------------------
+Node Firmware (ESP32_Node):
+- Node firmware updated with secure key storage
+- Serial commands: SETKEYS, SHOWKEYS, CLEARKEYS
+- Flutter deploy payload support added (keys block in JSON)
+- Keys stored in Preferences namespace "secrets"
+- Default: AES="SmartPonic123456", Auth="AQUA77"
+
+HQ Firmware (ESP32_HQ_Site):
+- HQ firmware updated with secure key storage
+- Serial commands: SETKEYS, SHOWKEYS, CLEARKEYS, WIFISTATUS, QUEUE
+- Keys stored in Preferences namespace "hq_secrets"
+- Stores 3 keys: AES (16 char), API key, HMAC secret
+- All 3 must match PHP backend (security_config.php) for communication
+- Default: AES="SmartPonic123456", API="smartponic-hq-key", HMAC="smartponic-hq-signature-secret"
+
+Key Synchronization Required When Changing Keys:
+- Node AES key = HQ AES key (LoRa communication)
+- Node Auth key = HQ "AQUA77" hardcoded (for payload validation)
+- HQ API key = PHP SMARTPONIC_API_KEY
+- HQ HMAC secret = PHP SMARTPONIC_HMAC_SECRET
+
+================================================================================
+     Planned (Next Feature) - Event-Driven Automation Layer (Non-Closed-Loop)
+================================================================================
+Date: 2026-04-25
+
+Goal
+- Implement automatic sensor-based relay control with human-in-the-loop safety
+- Safe actions auto-execute; unsafe actions require Telegram approval
+- Aligned with existing Smart Communication Framework priority system
+
+User Confirmed Setup
++-------------------
+Relay 0: Water Pump R385 (circulates water through filtration)
+Relay 1: Solenoid Valve (current setup, no pH dosing)
+Sensor: Turbidity -> High = dirty water from fish waste -> needs filtration cycle
+Sensor: pH -> No dosing pump available -> alert only (manual intervention)
+Sensor: WaterTemp -> >32C dangerous -> auto-circulate to cool
+Sensor: TDS -> Nutrient awareness -> alert only
+Flow: Fish Tank -> Filtration Tank -> Hydroponic System -> back to Filtration Tank
+
+Automation Rules (Confirmed)
+---------------------------
+| Sensor    | Condition         | Action          | Mode              | Why                       |
+|-----------|-------------------|-----------------|-------------------|---------------------------|
+| Turbidity | > 300 NTU        | Pump ON         | AUTO              | Safe - filtration cycle   |
+| Turbidity | < 250 NTU        | Pump OFF        | AUTO              | Safe - cleanup done       |
+| WaterTemp | > 30C            | Pump ON         | AUTO              | Safe - circulation cools  |
+| WaterTemp | < 18C            | Alert only      | ALERT ONLY        | Heating is complex/danger |
+| pH        | < 6.0 or > 8.0   | Alert + Approval| APPROVAL REQUIRED | No dosing pump - manual   |
+| TDS       | > 800 ppm        | Alert only      | ALERT ONLY        | No nutrient auto-dosing   |
+| DHT22     | > 35C            | Alert only      | ALERT ONLY        | HVAC beyond relay scope    |
+| DS18B20   | = -127 (error)   | Alert only      | ALERT ONLY        | Sensor malfunction        |
+
+Execution Modes
+--------------
+AUTO              : Executes relay action immediately + Telegram notification
+APPROVAL_REQUIRED : Creates pending approval, sends Telegram request, waits for /approve
+ALERT_ONLY        : Sends Telegram alert only, no relay action
+
+Database Changes (init.sql)
+---------------------------
+New table: automation_rules
+  - id, node_id, sensor_key, condition_type (high/low)
+  - threshold_value, target_relay_id, target_action (ON/OFF)
+  - execution_mode (auto/approval_required/alert_only)
+  - active, cooldown_seconds, created_at
+
+New table: pending_approvals
+  - id, command_id, rule_id, node_id, relay_id, action
+  - trigger_value, status (pending/approved/cancelled/expired)
+  - chat_id, created_at, expires_at (10-minute deadline)
+
+Modify: relay_commands.status VARCHAR(20)
+  - Values: pending, pending_approval, approved, sent, done, failed, cancelled
+
+New Files
+---------
+php/auto_actions.php (NEW)
+  - evaluateAutomationRules() - called from receive_data.php
+  - executeAutoAction() - auto mode: create relay command + notify Telegram
+  - requestApproval() - approval mode: create pending_approval + send approval request
+  - sendAutomationAlert() - alert-only mode
+  - approveAutomationCommand() - called from /approve command
+  - cancelAutomationCommand() - called from /cancel command
+  - expirePendingApprovals() - auto-expire stale approvals
+
+Modified Files
+--------------
+php/receive_data.php
+  - Call evaluateAutomationRules() after storing sensor data
+  - Automation failures must never break data ingestion pipeline
+
+php/telegram_poll.php
+  - Add: /approve <cmd_id> - approve pending automation command
+  - Add: /cancel <cmd_id> - cancel pending automation command
+  - Update: /queue [node] - show pending relay commands AND approvals
+  - Update: /help - document new commands
+
+php/control_queue.php
+  - Add: status_filter parameter to get_pending action
+  - Filter out pending_approval and cancelled from normal poll
+  - Update: mark_sent only transitions pending/approved -> sent
+
+firmware_esp32/ESP32_HQ_Site/src/main.cpp
+  - Update: pollControlQueueIfNeeded() to skip pending_approval/cancelled
+  - Only forward 'pending' or 'approved' status to node
+
+Safety Principles
+-----------------
+1. AUTO mode only for physically safe, reversible actions (water circulation)
+2. APPROVAL_REQUIRED for actions affecting chemistry (pH, nutrients)
+3. ALERT_ONLY for sensor readings requiring human judgment
+4. Each rule has independent cooldown to prevent flapping
+5. 10-minute expiration on pending approvals prevents stale commands
+6. Chat ID verification on approve/cancel prevents unauthorized control
+
+Future Enhancement (When pH Dosing Added)
+------------------------------------------
+When user adds peristaltic pumps for pH Up and pH Down:
+1. Add Relay 2 = pH Up pump, Relay 3 = pH Down pump
+2. Change pH rules from APPROVAL_REQUIRED to AUTO
+3. Add delay and dose-quantity logic (drip for X seconds, then re-check)
+4. Note: Requires pH calibration and gradual dosing safety logic
+
+Implementation Sequence (When Ready)
+-----------------------------------
+1. Database: Add automation_rules + pending_approvals tables
+2. Core PHP: Create auto_actions.php rules engine
+3. Control Queue: Add status_filter to get_pending
+4. Integration: Call evaluateAutomationRules() in receive_data.php
+5. Telegram: Add /approve, /cancel handlers in telegram_poll.php
+6. HQ Firmware: Filter pending_approval/cancelled in pollControlQueueIfNeeded()
+7. Seed Data: Insert default automation rules into automation_rules table
+8. Testing: Full end-to-end flow test
+
+Verification Plan (When Ready to Test)
+---------------------------------------
+1. Database: Run init.sql, verify tables created
+2. Telegram self-test: php telegram_poll.php --self-test
+3. Manual relay test: /relay 0 on -> verify pump turns on
+4. Auto mode test (turbidity):
+   - Temporarily set turbidity threshold to low value (e.g., 10 NTU)
+   - Simulate high turbidity reading
+   - Verify pump turns ON automatically
+   - Verify Telegram: "SmartPonic AUTO-ACTION"
+5. Approval mode test (pH):
+   - Set pH threshold to current value +/- 0.5
+   - Wait for threshold crossing
+   - Verify Telegram: "SmartPonic AUTOMATION APPROVAL REQUIRED"
+   - Type /approve <cmd_id>
+   - Verify relay executes
+6. Cancel test:
+   - Trigger approval-required rule
+   - Type /cancel <cmd_id>
+   - Verify command cancelled, relay does NOT execute
+
+================================================================================
+                    Planned (Next Feature) - NFC Configuration (PN532)
+================================================================================
+Date: 2026-04-29
+
+Goal
+- Replace WiFi AP configuration with NFC tap-to-config workflow (Node only, NOT HQ)
+- HQ keeps current firmware (no NFC needed)
+- Primary method: Direct phone tap (Android HCE)
+- NFC firmware is NFC-only; WiFi AP configuration remains in firmware_esp32/ESP32_Node
+- iOS workaround: NFC tag write (iOS has no HCE for 3rd-party apps)
+
+Hardware Required
+-----------------
+1. PN532 NFC Module (V3 with antenna board)
+   - Search: "PN532 NFC module V3" on AliExpress/Shopee
+   - Price: $8-15 USD
+   - Interface: I2C (SDA=GPIO21, SCL=GPIO22)
+
+2. NTAG215 Tags (for testing + iOS fallback)
+   - Search: "NTAG215 sticker NFC" or "NTAG215 card"
+   - Price: ~$0.50-1.00 per tag
+   - Buy 5-10 pieces for testing
+
+Wiring (ESP32 Node)
+-------------------
+| PN532 Pin | ESP32 GPIO |
+|-----------|------------|
+| VCC       | 5V (or 3.3V) |
+| GND       | GND |
+| SDA       | GPIO 21 |
+| SCL       | GPIO 22 |
+| IRQ       | Not connected (or GPIO 23 for interrupt) |
+| NSS       | GND (for I2C mode) |
+
+Workflow (Android - Direct Phone Tap)
+-------------------------------------
+1. User configures ESP32 settings in Flutter app
+2. User taps "Deploy via NFC" button
+3. Phone enters NFC card emulation mode (HCE)
+4. User taps phone to ESP32's PN532 reader
+5. ESP32 reads phone's emulated card, decrypts config
+6. ESP32 stores to Preferences, sends ACK via NFC
+7. Phone shows confirmation ("Config deployed!")
+
+Workflow (iOS - NFC Tag)
+------------------------
+iOS does NOT support HCE for third-party apps.
+1. User configures ESP32 in Flutter app
+2. User taps phone to NTAG215 tag → writes encrypted config
+3. User taps tag to ESP32's PN532 reader
+4. ESP32 reads tag, decrypts, stores config
+
+Phase 0 - Decisions / Inputs
+- [DONE] Primary method: Direct Phone Tap (Android HCE)
+- [DONE] NFC firmware is NFC-only; no WiFi AP fallback
+- [DONE] iOS workaround: NFC tag write
+- [DONE] HQ does NOT need NFC - keep current HQ firmware
+- [TODO] Purchase PN532 modules and NTAG215 tags
+
+Phase 1 - Hardware Setup & Research
+- [TODO] Receive PN532 modules
+- [TODO] Receive NTAG215 tags (for iOS fallback)
+- [DONE] Review PN532 datasheet and wiring diagrams
+- [DONE] Test PN532 with ESP32 I2C example code (basic read/write)
+
+Phase 2 - ESP32 NFC Reader (Foundation)
+- [DONE] NFCConfigReader class created (ESP32_Node_38Pin)
+- [DONE] Add Adafruit_PN532 library to PlatformIO
+- [DONE] Implement I2C communication with PN532
+- [DONE] Implement card detection and NDEF read
+- [DONE] Add LED indicator for NFC activity
+- [DONE] Direct Android HCE/APDU support (AID: F0.53.4D.41.52.54.50.4F.4E.49.43)
+- [DONE] NTAG215 physical tag fallback (read pages 4+)
+- [DONE] AES-128-CTR decryption (same key as LoRa)
+- [TODO] Test with NTAG215 physical tags first
+- [TODO] Test direct Android HCE tap
+
+Phase 3 - Flutter NFC Service (Android HCE)
+- [TODO] Add flutter_nfc_kit dependency to pubspec.yaml
+- [TODO] Create NfcService class with HCE mode
+- [TODO] Implement ISO-DEP (ISO14443-4) APDU service with AID: F0.53.4D.41.52.54.50.4F.4E.49.43
+- [TODO] APDU commands to implement:
+  - SELECT AID → respond with success
+  - GET LENGTH (00 CA 00 00 04) → return 4-byte big-endian payload length
+  - READ BINARY (00 B0 XX XX LL) → return encrypted config chunk
+- [TODO] AES encryption of JSON config (same CTR mode as LoRa)
+- [TODO] Test HCE on Android device
+
+HCE APDU Protocol (must match ESP32 side)
+------------------------------------------
+Phone (HCE) must respond to these commands from PN532:
+1. SELECT AID: 00 A4 04 00 0B F0 53 4D 41 52 54 50 4F 4E 49 43 00
+   → Success: 90 00
+2. GET LENGTH: 00 CA 00 00 04
+   → Response: [4-byte payload length] + 90 00
+3. READ: 00 B0 [offset_hi] [offset_lo] [max_len]
+   → Response: [data chunk] + 90 00
+- Payload: [16-byte IV] + [AES-CTR encrypted JSON config]
+- Max payload: 512 bytes (IV + ~496 bytes ciphertext)
+
+Phase 4 - Integration (Direct Tap - Android)
+- [DONE] ESP32 parses received config payload (both HCE and physical tag paths)
+- [DONE] Store to Preferences (same format as WiFi AP)
+- [DONE] Send ACK back to phone via NFC
+- [TODO] Phone shows confirmation message
+- [TODO] Flutter app: detect NFC unavailable, show "Use WiFi mode" prompt
+
+Phase 5 - Firmware Separation
+- [DONE] ESP32_Node remains the WiFi AP configuration firmware
+- [DONE] ESP32_Node_38Pin is NFC-only and does not start WiFi AP /config server
+- [DONE] NFC firmware keeps serial/debug commands but configuration path is NFC
+
+Phase 6 - iOS Fallback (NFC Tag Write)
+- [DONE] ESP32 reads NTAG215 physical tags (same code as HCE)
+- [TODO] Flutter app: "Write to NFC Tag" option (physical NTAG215)
+- [TODO] User taps tag to phone, phone writes encrypted config to NTAG215
+- [TODO] User taps tag to ESP32 PN532
+- [TODO] Document iOS workflow (tag write)
+
+Phase 7 - Polish & Testing
+- [TODO] Add NFC troubleshooting guide
+- [TODO] Range testing (optimal PN532 distance)
+- [TODO] Test with various Android phones (HCE compatibility)
+- [TODO] Document iOS workflow (tag write)
+
+New Files (Flutter App)
+-----------------------
+- flutter_app/lib/services/nfc_service.dart
+- flutter_app/lib/services/nfc_payload.dart (CBOR encoding/decoding)
+- flutter_app/lib/widgets/nfc_writer_dialog.dart
+
+Modified Files (Flutter App)
+----------------------------
+- flutter_app/lib/screens/config_screen.dart (add NFC buttons)
+- flutter_app/pubspec.yaml (add dependencies)
+
+New Files (ESP32 Firmware)
+--------------------------
+- firmware_esp32/ESP32_Node_38Pin/src/NFCConfigReader.cpp (DONE)
+- firmware_esp32/ESP32_Node_38Pin/src/NFCConfigReader.h (DONE)
+- firmware_esp32/ESP32_Node_38Pin/include/NFCConfigReader.h (DONE)
+
+Modified Files (ESP32 Firmware)
+-------------------------------
+- firmware_esp32/ESP32_Node_38Pin/src/Aquaponic_LoRa_Transmitter.cpp (integrate NFC)
+- firmware_esp32/ESP32_Node_38Pin/platformio.ini (add PN532 library)
+
+Security Considerations
+-----------------------
+- NFC payload: AES-128 encryption (same key as LoRa payload)
+- CRC32 checksum before encryption
+- Sequence number to prevent replay attacks
+- Security key verification (same as WiFi AP /config endpoint)
+- Optional: NTAG password protection (32-bit password stored in ESP32)
+
+Payload Structure (CBOR encoded, then AES encrypted)
+----------------------------------------------------
+{
+  "config": [...],           // Same as WiFi AP config array
+  "nodeId": 1,
+  "latitude": 3.123456,
+  "longitude": 101.123456,
+  "distance": 10.5,
+  "calibration": {...},      // Calibration profiles
+  "keys": {...},             // Optional: AES/Auth keys
+  "seq": 12345,              // Sequence number (anti-replay)
+  "ts": 1714377600           // Timestamp (Unix epoch)
+}
+
+Verification Plan (When Ready to Test)
+--------------------------------------
+1. Hardware: PN532 detected via I2C scan
+2. ESP32: Basic NFC tag read test (read NDEF from NTAG215)
+3. Flutter: NFC availability check on Android device
+4. Integration: Write config to tag, read back, verify integrity
+5. End-to-End: Configure in app → tap phone to ESP32 → verify config stored
+6. WiFi AP config: use separate ESP32_Node firmware when NFC hardware is not used
+7. iOS Test: Write to NTAG215 → tap to ESP32 → verify config stored
+
+Implementation Status: COMPLETED
+- ESP32_Node_38Pin NFC: DONE (direct HCE + NTAG215 fallback, AES-CTR decrypt)
+- Flutter NFC app: DONE (HCE APDU service + AES encryption + tag write)
+- Android HCE: DONE (SmartPonicHceService.kt with APDU protocol)
+- NFC-only separation: DONE (WiFi AP disabled in ESP32_Node_38Pin)
+- iOS tag workflow: PARTIAL (ESP32 reads NTAG215 done, Flutter write DONE)
+------------------------------------------------------------------------------------
+
+================================================================================
+                    Progress Update - Hardware ID Alignment
+================================================================================
+Date: 2026-05-01
+
+Goal
+- Replace "Node ID as identity" concept with ESP32 hardware identity
+- Keep nodeId only as a compact LoRa transport address because SmartPacket header stores nodeId as uint8_t
+- Align both node firmware variants:
+  1. WiFi AP configuration firmware
+  2. NFC-only configuration firmware
+
+Implementation Status: COMPLETED
+--------------------------------
+ESP32_Node (WiFi AP config firmware):
+- [DONE] Added getHardwareId() using ESP.getEfuseMac()
+- [DONE] Formats hardware identity as 16-character EUI-64 style ID
+- [DONE] Shows Hardware ID on boot Serial
+- [DONE] Adds /health field: hardwareId
+- [DONE] Shows Hardware ID on root web page
+- [DONE] Adds serial command: ID
+- [DONE] LIST now shows Hardware ID + LoRa address
+- [DONE] Telemetry payload includes hardware_id
+- [DONE] Location metadata payload includes hardware_id
+- [DONE] Relay ACK payload includes hardware_id
+
+ESP32_Node_38Pin (NFC-only config firmware):
+- [DONE] Same hardware ID implementation synced from ESP32_Node
+- [DONE] NFC-specific PN532/HCE/NTAG logic kept intact
+- [DONE] NFC_ONLY_MODE disables WiFi AP /config server
+- [DONE] Build verified successfully with PN532 dependencies
+
+HQ Gateway:
+- [DONE] Extracts hardware_id from decrypted LoRa payload
+- [DONE] Prints "Node hardware ID" in Serial monitor
+- [DONE] Forwards hardware_id in signed JSON to PHP receive_data.php
+- [DONE] Build verified successfully
+
+PHP Backend:
+- [DONE] receive_data.php accepts optional hardware_id
+- [DONE] Validates hardware_id as 16 uppercase hex characters
+- [DONE] Auto-adds nodes.hardware_id if missing
+- [DONE] Auto-adds sensor_readings.hardware_id if missing
+- [DONE] Stores hardware_id for node registry and each reading
+- [DONE] init.sql updated for fresh database setup
+- [DONE] receive_data.php deployed to C:\xampp\htdocs\smartponic\
+
+Verification
+------------
+- [DONE] ESP32_Node PlatformIO build: SUCCESS
+- [DONE] ESP32_Node_NFC PlatformIO build: SUCCESS
+- [DONE] ESP32_HQ_Site PlatformIO build: SUCCESS
+- [DONE] PHP lint receive_data.php: SUCCESS
+- [TODO] Flash updated ESP32_Node firmware to WiFi AP node
+- [TODO] Flash updated ESP32_Node_NFC firmware to NFC test node
+- [TODO] Confirm HQ Serial shows "Node hardware ID: <16 hex chars>"
+- [TODO] Confirm MySQL nodes.hardware_id and sensor_readings.hardware_id are populated
+
+Notes
+-----
+- hardware_id is now the real device identity.
+- nodeId is still required because the existing LoRa packet header only has a uint8_t nodeId field.
+- Do not remove nodeId until SmartPacket header and HQ control queue are redesigned for hardware_id routing.
+
+================================================================================
+                    Progress Update - hardware_id-Only Pipeline & Dashboard
+================================================================================
+Date: 2026-05-02
+
+Goal
+- Strip node_id from the HTTP API surface; hardware_id becomes the sole node identity
+- Fix the full Node → HQ → PHP pipeline for multi-node differentiation
+- Add interactive node location map to dashboard
+- Optimize dashboard query performance
+
+Changes Completed
+-----------------
+PHP (receive_data.php):
+- [DONE] Removed node_id from all API inputs; hardware_id is now required and validated
+- [DONE] Removed ensureNodesColumns() and ensureSensorReadingsColumns() from hot path (eliminated SHOW COLUMNS per-request)
+- [DONE] Node resolution by hardware_id only (lookup → auto-provision if new)
+- [DONE] Unknown sensor type now logs to invalid_sensor_data and skips (no longer throws inside transaction)
+- [DONE] Location update uses hardware_id: UPDATE nodes SET location=? WHERE hardware_id=?
+
+HQ Firmware (ESP32_HQ_Site):
+- [DONE] Added std::vector<int> knownNodeIds and registerKnownNode(int nodeId)
+- [DONE] pollControlQueueIfNeeded() now iterates all knownNodeIds (not just node 1)
+- [DONE] sendToAPI() always uses hardware_id; drops packet silently if hardware_id absent
+- [DONE] Location update validates lat/lon before forwarding to PHP
+
+Node Firmware (ESP32_Node):
+- [DONE] Removed duplicate handleIncomingControl() call at end of loop() (was called twice per iteration)
+
+Dashboard (dashboard.php):
+- [DONE] Added "Map" tab button in nav
+- [DONE] Added Map panel section with Leaflet full-screen map and "nodes without location" list
+
+Dashboard CSS (dashboard.css):
+- [DONE] Added .leaflet-map-full (520px height), .no-coords-section, .no-coords-list, .no-coords-item
+- [DONE] Added Leaflet popup dark theme overrides
+
+Dashboard JS (dashboard_app.js):
+- [DONE] Added renderNodeMap(nodes) — renders all node GPS markers with popups and fitBounds
+- [DONE] Fixed renderSignalMap() — was referencing non-existent DOM elements; now correctly initialises Leaflet circleMarker on #nodeMap
+- [DONE] Tab switch handler calls renderNodeMap and invalidateSize() with 120ms delay (fixes Leaflet hidden-tab sizing bug)
+
+Dashboard Data API (dashboard_data.php):
+- [DONE] Both nodes queries include hardware_id, latitude, longitude
+
+================================================================================
+                    Progress Update - Dashboard Performance Optimization
+================================================================================
+Date: 2026-05-02
+
+Goal
+- Reduce dashboard_data.php query count from ~35–40 per page load to ~10
+
+Changes Completed
+-----------------
+dashboard_data.php:
+- [DONE] Removed ensureSensorReadingsColumns() call (was running SHOW COLUMNS on every GET)
+- [DONE] Replaced 21-query sensor loop (7 configured-check + 7 latest + 7 history) with 3 UNION ALL batch queries
+  - Batch 1: single query checks all sensors for presence in the latest reading
+  - Batch 2: single query fetches latest value row for all sensors
+  - Batch 3: single query fetches history rows for all sensors within the selected range
+- [DONE] Replaced 7-query per-sensor analytics loop with 1 UNION ALL batch query (MIN/MAX/AVG all sensors)
+- Net result: ~35–40 queries reduced to ~10 queries per page load
+
+dashboard_app.js:
+- [DONE] Removed dead renderProfileTable() — referenced #profileTableBody which does not exist in the HTML
+- [DONE] Removed dead collectProfiles() — only called by renderProfileTable
+- [DONE] Removed dead saveProfilesButton event listener — referenced a non-existent DOM element
+
+dashboard.php / dashboard_app.js:
+- [DONE] Cache-busting version bumped to v=20260501 on both CSS and JS
+
+================================================================================
+                    Thesis Feature Implementation Status
+================================================================================
+Date: 2026-05-02
+
+Mapping SYSTEM_THESIS.txt chapters to implemented features:
+
+CHAPTER 3 - Node Firmware (ESP32)
+- 3.1 Hardware Overview                    [IMPLEMENTED]
+- 3.2 Hardware Device Identity (EUI-64)    [IMPLEMENTED] - hardware_id via ESP.getEfuseMac()
+- 3.3 Sensor Sampling System               [IMPLEMENTED] - 5-second sampling, multiple sensor types
+- 3.4 Priority Classification Engine       [IMPLEMENTED] - threshold-based LOW/MEDIUM/HIGH
+- 3.5 Adaptive Communication Strategy     [IMPLEMENTED] - 15min/5min/1min dynamic intervals
+- 3.6 Store-and-Forward Retry Queue        [IMPLEMENTED] - FIFO 12-packet queue
+
+CHAPTER 4 - LoRa Radio Communication
+- 4.1 Physical Layer                       [IMPLEMENTED] - 433 MHz, SPI interface
+- 4.2 Binary Packet Structure             [IMPLEMENTED] - HEADER|NONCE|PAYLOAD|CRC32
+- 4.3 Encryption (AES-CTR)                [IMPLEMENTED] - AES-128-CTR with 16-byte nonce
+- 4.4 CRC32 Integrity Validation          [IMPLEMENTED] - validated BEFORE decryption
+
+CHAPTER 5 - HQ Gateway (ESP32)
+- 5.1 LoRa Packet Reception               [IMPLEMENTED] - continuous receive mode
+- 5.2 Decryption and Validation           [IMPLEMENTED] - binary + legacy HEX paths
+- 5.3 HTTP Forwarding with HMAC Auth      [IMPLEMENTED] - X-API-Key + X-Timestamp + X-Signature
+- 5.4 Offline Storage and Retry Queue     [IMPLEMENTED] - SD card / SPIFFS fallback
+- 5.5 Relay Control Downlink              [IMPLEMENTED] - pollControlQueueIfNeeded()
+
+CHAPTER 6 - PHP Backend
+- 6.1 API Endpoint (receive_data.php)     [IMPLEMENTED]
+- 6.2 Request Authentication/Validation   [IMPLEMENTED] - HMAC-SHA256 + timestamp
+- 6.3 Data Routing to Per-Sensor Tables   [IMPLEMENTED] - dedicated tables per sensor type
+- 6.4 Control Queue Endpoint              [IMPLEMENTED] - control_queue.php
+- 6.5 Database Schema                     [IMPLEMENTED] - init.sql with all tables
+
+CHAPTER 7 - Telegram Integration
+- 7.1 Bot Architecture (Long Polling)     [IMPLEMENTED] - telegram_poll.php --loop
+- 7.2 Alert System                        [IMPLEMENTED] - mode-based + threshold + invalid sensor
+- 7.3 Bidirectional Commands              [IMPLEMENTED] - /status /readings /relay /queue
+- 7.4 Cooldown and Deduplication         [IMPLEMENTED] - telegram_alert_state table
+- 7.5 Freshness Monitoring                [IMPLEMENTED] - warning/offline alerts
+
+CHAPTER 8 - Dashboard
+- 8.1 Data Visualization                 [IMPLEMENTED] - real-time readings, panels
+- 8.2 Signal Quality Tracking            [IMPLEMENTED] - RSSI/SNR history
+- 8.3 Threshold Bands on Trend Charts    [NOT IMPLEMENTED] - TODO in thesis
+
+CHAPTER 9 - Security Architecture
+- 9.1 LoRa Layer Security (AES-CTR)      [IMPLEMENTED]
+- 9.2 Integrity Protection (CRC32)       [IMPLEMENTED]
+- 9.3 HTTP API Security (HMAC-SHA256)   [IMPLEMENTED]
+- 9.4 Node Configuration Protection      [IMPLEMENTED] - X-Node-Key header
+- 9.5 Telegram Access Control            [IMPLEMENTED] - chat ID allowlist
+
+CHAPTER 10 - NFC Configuration System
+- 10.1 NFC Configuration Overview        [IMPLEMENTED] - Flutter + Android HCE
+- 10.2 PN532 Hardware Interface           [IMPLEMENTED] - I2C wiring in ESP32 code
+- 10.3 Direct Android HCE                 [IMPLEMENTED] - SmartPonicHceService.kt
+- 10.4 Physical NTAG215 Tag Fallback      [PARTIAL] - ESP32 reads, Flutter writes
+- 10.5 Encryption and Security           [IMPLEMENTED] - AES-CTR, same key as LoRa
+- 10.6 iOS Fallback Workflow              [IMPLEMENTED] - physical tag workflow
+
+CHAPTER 11 - Event-Driven Automation
+- 11.1 Automation Architecture            [NOT IMPLEMENTED] - designed but not coded
+- 11.2 Automation Rules Table             [NOT IMPLEMENTED] - schema not in init.sql
+- 11.3 Execution Modes                    [NOT IMPLEMENTED]
+- 11.4 Pending Approvals Workflow        [NOT IMPLEMENTED]
+- 11.5 Telegram /approve /cancel         [NOT IMPLEMENTED]
+- 11.6 Safety Principles                  [NOT IMPLEMENTED]
+
+================================================================================
+                    Progress Update - NFC Configuration (Flutter + Android HCE)
+================================================================================
+Date: 2026-05-02
+
+Goal
+- Complete Flutter NFC configuration workflow with Android HCE and NFC tag writing
+- iOS fallback via physical NFC tags
+
+Implementation Status: COMPLETED
+-------------------------------
+Flutter App (nfc_service.dart, nfc_payload_service.dart):
+- [DONE] NfcService class with isAvailable(), isDirectTapSupported()
+- [DONE] prepareDirectPhoneTap() - prepares HCE payload with 2-minute TTL
+- [DONE] stopDirectPhoneTap() - clears HCE payload
+- [DONE] writeSmartPonicTag() - writes encrypted config to physical NFC tag
+- [DONE] NfcPayloadService with AES-CTR encryption (same key as LoRa)
+- [DONE] withFirmwareFields() adds securityKey and keys block
+- [DONE] _padForLongNdef() pads to minimum 256 bytes for long NDEF format
+
+Android App (SmartPonicHceService.kt):
+- [DONE] HostApduService implementation for direct phone-to-PN532 tap
+- [DONE] AID: F0.53.4D.41.52.54.50.4F.4E.49.43 (SMARTPONIC)
+- [DONE] SELECT AID handler (returns OK if payload exists)
+- [DONE] GET LENGTH (0xCA) handler - returns 4-byte payload length
+- [DONE] READ BINARY (0xB0) handler - returns encrypted config chunks (48 bytes max)
+- [DONE] HceStore object for SharedPreferences-backed payload storage
+- [DONE] TTL-based payload expiration (activeUntilMs)
+- [DONE] Base64-encoded payload storage
+
+Android Manifest (AndroidManifest.xml):
+- [DONE] NFC permission and hardware feature
+- [DONE] SmartPonicHceService registered with HOST_APDU_SERVICE intent filter
+- [DONE] AID group metadata for Android NFC system registration
+
+Android Resources (strings.xml):
+- [DONE] hce_service_description: "SmartPonic direct ESP32 configuration"
+- [DONE] hce_aid_group_description: "SmartPonic node config"
+
+Config Screen Integration (config_screen.dart):
+- [DONE] NFC AES Key input field with validation (exactly 16 chars)
+- [DONE] "Write NFC Tag" button - writes to physical NTAG215
+- [DONE] "Prepare NFC Tap" button - prepares Android HCE for direct tap
+- [DONE] 38-Pin variant dropdown option with NFC icon
+- [DONE] Reserved GPIO warnings for NFC (GPIO 21, 22)
+- [DONE] Error handling and user feedback messages
+
+Dependencies Added (pubspec.yaml):
+- [DONE] nfc_manager: ^4.1.1
+- [DONE] pointycastle: ^4.0.0
+
+Remaining Tasks
+--------------
+- [TODO] Test physical NFC tag write with NTAG215
+- [TODO] Test direct Android HCE tap to PN532 reader
+- [TODO] Verify ESP32 NFC firmware receives and applies config
+
+================================================================================
+                    Progress Update - 38-Pin Node Variant
+================================================================================
+Date: 2026-05-01
+
+Goal
+- Support larger ESP32 38-pin node deployments without exceeding the 255-byte LoRa packet limit
+- Keep hardware_id as the real identity for multi-node differentiation
+- Avoid changing HQ/PHP sensor parsing format
+
+Design Decision
+---------------
+Chosen option: split telemetry into multiple LoRa packets.
+
+Reason:
+- LoRa library packet limit is 255 bytes.
+- SmartPacket overhead is 34 bytes, leaving about 221 bytes for encrypted plaintext.
+- Keeping readable text segments preserves current HQ parsing and PHP storage behavior.
+- Compact binary sensor IDs would save bytes but requires a larger HQ/PHP/dashboard mapping refactor.
+
+New Firmware Variant
+--------------------
+Path:
+- firmware_esp32/ESP32_Node_38Pin
+
+Behavior:
+- Based on ESP32_Node WiFi AP configuration firmware
+- Uses hardware_id only in encrypted payload metadata
+- Removes node= from encrypted telemetry/location/ACK payloads
+- Increases MAX_SENSORS to 24
+- Expands allowed GPIO list for 38-pin ESP32 while avoiding LoRa SPI pins
+- Splits telemetry into packet chunks using packet_part metadata
+- Each chunk gets its own sequence number, nonce, AES-CTR encryption, CRC32, and LoRa packet
+
+Backend / HQ Compatibility
+--------------------------
+- HQ accepts packets that contain hardware_id even when node= is absent
+- HQ ignores packet_part as metadata
+- PHP accepts hardware_id as identity and resolves/creates the backend nodes.id internally
+- Existing database still uses node_id as an internal relational key, but operator-facing identity is hardware_id
+
+Verification
+------------
+- [DONE] ESP32_Node build: SUCCESS
+- [DONE] ESP32_Node_NFC build: SUCCESS
+- [DONE] ESP32_Node_38Pin build: SUCCESS (with NFC_ONLY_MODE)
+- [DONE] ESP32_HQ_Site build: SUCCESS
+- [DONE] PHP receive_data.php lint: SUCCESS
+- [DONE] Live XAMPP receive_data.php deployed
+- [TODO] Flash ESP32_Node_38Pin to 38-pin board
+- [TODO] Test telemetry with >7 sensor readings and confirm HQ receives multiple packet chunks
+- [TODO] Confirm MySQL groups readings under the same hardware_id-backed node record
+
+ESP32_Node_38Pin NFC-Only Mode (2026-05-02)
+-------------------------------------------
+- Added NFC_ONLY_MODE build flag to platformio.ini
+- WiFi.h and WebServer.h only included when NFC_ONLY_MODE is NOT defined
+- All HTTP handlers (handleRoot, handleHealth, handleConfig, etc.) wrapped in #ifndef NFC_ONLY_MODE
+- readRequestSecurityKey() and requireAuthorizedNodeKey() wrapped in #ifndef NFC_ONLY_MODE
+- Serial commands that reference WiFi removed from NFC-only help
+- 38Pin variant now has NO WiFi AP fallback - NFC is the ONLY configuration method
+- If NFC fails/not working, node cannot be configured (must fix NFC hardware)

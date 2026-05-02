@@ -9,7 +9,7 @@ header('Expires: 0');
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SmartPonic Dashboard</title>
-    <link rel="stylesheet" href="dashboard.css?v=20260423">
+    <link rel="stylesheet" href="dashboard.css?v=20260501">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
@@ -34,6 +34,7 @@ header('Expires: 0');
 
         <nav class="tabs">
             <button class="tab active" data-tab="overview" type="button">Overview</button>
+            <button class="tab" data-tab="map" type="button">Map</button>
             <button class="tab" data-tab="trends" type="button">Trends</button>
             <button class="tab" data-tab="activity" type="button">Activity</button>
             <button class="tab" data-tab="health" type="button">Health</button>
@@ -195,6 +196,24 @@ header('Expires: 0');
             </div>
         </section>
 
+        <section class="paneltab" data-panel="map">
+            <div class="panel map-tab-panel">
+                <div class="head">
+                    <div>
+                        <p class="eyebrow">Node Locations</p>
+                        <h2>Network Map</h2>
+                        <p class="copy">Last known GPS position for each node. Positions are updated when the node sends a location sync packet.</p>
+                    </div>
+                    <div class="pill" id="mapNodeCount">0 nodes</div>
+                </div>
+                <div id="nodeMapFull" class="leaflet-map-full"></div>
+                <div id="mapNoCoordsList" class="no-coords-section" style="display:none">
+                    <p class="eyebrow" style="margin-top:18px">Nodes without location</p>
+                    <div id="mapNoCoordNodes" class="no-coords-list"></div>
+                </div>
+            </div>
+        </section>
+
         <section class="paneltab" data-panel="health">
             <div class="two">
                 <div class="panel">
@@ -334,6 +353,6 @@ header('Expires: 0');
         </section>
     </div>
 
-    <script src="dashboard_app.js?v=20260423"></script>
+    <script src="dashboard_app.js?v=20260501"></script>
 </body>
 </html>

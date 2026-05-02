@@ -6,6 +6,7 @@
 #include <ArduinoJson.h>
 #include <Preferences.h>
 #include <vector>
+#include <algorithm>
 #include <cmath>
 #include <DHT.h>
 #include <OneWire.h>
@@ -19,20 +20,33 @@ float readTDS(int raw);
 String readTurbidity(int raw);
 String canonicalSensorName(String sensor);
 void handleSerialCommand(String input);
+String getFieldValue(const String &data, const String &key);
+String getHardwareId();
+bool decryptStructuredPacket(const std::vector<uint8_t> &input, SmartPacket::Header &header, String &payload);
+void handleIncomingControl();
 
 // ================= SETTINGS =================
-const char *key = "SmartPonic123456";
+// NOTE: AES key and Auth key are now stored in flash Preferences
+// Use serial commands to set them: SETKEYS,AES128=xxx,AUTH=yyy
+// Or use Flutter app to deploy via /config endpoint
 const char *ssid = "AQUA_NODE";
 const char *password = "12345678";
+
+// Runtime key storage (loaded from flash at startup)
+String runtimeAesKey = "SmartPonic123456";  // Default fallback
+String runtimeAuthKey = "AQUA77";          // Default fallback
 
 WebServer server(80);
 Preferences prefs;
 bool loraReady = false;
 uint32_t packetSeq = 0;  // Sequence counter for data integrity
+String runtimeHardwareId = "";
 const char *nodeKeyHeader = "X-Node-Key";
 const char *configNamespace = "cfg";
 const char *configJsonPrefKey = "json";
 const char *nodeSecurityPrefKey = "node_key";
+const char *aesKeyPrefKey = "aes_key";
+const char *authKeyPrefKey = "auth_key";
 
 // ADD THIS: smart communication timing profile
 constexpr unsigned long SAMPLE_INTERVAL_MS = 5000UL;
@@ -50,7 +64,8 @@ constexpr size_t MAX_PENDING_PACKETS = 12;
 #define LORA_RST 14
 #define LORA_DIO0 -1
 #define LORA_SYNC_WORD 0xB4
-const String SECRET_KEY = "AQUA77";
+// NOTE: runtimeAuthKey replaces the old SECRET_KEY constant
+// Update references to use runtimeAuthKey variable
 
 struct GPIOConfig {
   int pin;
@@ -61,7 +76,9 @@ struct GPIOConfig {
 
 // ADD THIS: node-side metadata provided by the app / range testing workflow
 struct NodeRuntimeSettings {
-  uint8_t nodeId = 1;
+  // nodeId is fixed at 0 for all nodes - hardwareId (from ESP32 eFuse MAC)
+  // is used as the unique identifier in the encrypted payload
+  uint8_t nodeId = 0;
   float latitude = 0.0f;
   float longitude = 0.0f;
   float distanceMeters = 0.0f;
@@ -132,6 +149,27 @@ String boardName() {
 #endif
 }
 
+String getHardwareId() {
+  uint64_t mac = ESP.getEfuseMac();
+  uint8_t macBytes[6];
+  for (int i = 0; i < 6; i++) {
+    macBytes[5 - i] = (uint8_t) ((mac >> (8 * i)) & 0xFF);
+  }
+
+  char eui64[17];
+  snprintf(
+      eui64,
+      sizeof(eui64),
+      "%02X%02X%02XFFFE%02X%02X%02X",
+      macBytes[0],
+      macBytes[1],
+      macBytes[2],
+      macBytes[3],
+      macBytes[4],
+      macBytes[5]);
+  return String(eui64);
+}
+
 void addCommonHeaders() {
   server.sendHeader("Access-Control-Allow-Origin", "*");
   server.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -150,6 +188,69 @@ void saveNodeSecurityKey(const String &value) {
   prefs.begin(configNamespace, false);
   prefs.putString(nodeSecurityPrefKey, value);
   prefs.end();
+}
+
+// ================= SECURE KEY STORAGE =================
+// Keys are stored in ESP32 flash via Preferences namespace "secrets"
+// This provides secure, persistent storage separate from config namespace
+
+void loadSecureKeys() {
+  prefs.begin("secrets", true);
+  runtimeAesKey = prefs.getString(aesKeyPrefKey, "");
+  runtimeAuthKey = prefs.getString(authKeyPrefKey, "");
+  prefs.end();
+
+  if (runtimeAesKey.length() == 0) {
+    runtimeAesKey = "SmartPonic123456";
+    Serial.println("WARNING: Using default AES key - set custom key with SETKEYS command");
+  }
+  if (runtimeAuthKey.length() == 0) {
+    runtimeAuthKey = "AQUA77";
+    Serial.println("WARNING: Using default Auth key - set custom key with SETKEYS command");
+  }
+
+  Serial.println("Secure keys loaded from flash storage");
+  Serial.print("AES key configured: ");
+  Serial.println(runtimeAesKey.length() > 0 ? "YES" : "NO");
+  Serial.print("Auth key configured: ");
+  Serial.println(runtimeAuthKey.length() > 0 ? "YES" : "NO");
+}
+
+bool saveAesKey(const String &value) {
+  if (value.length() != 16) {
+    Serial.println("ERROR: AES key must be exactly 16 characters");
+    return false;
+  }
+  prefs.begin("secrets", false);
+  prefs.putString(aesKeyPrefKey, value);
+  prefs.end();
+  runtimeAesKey = value;
+  Serial.println("AES key saved to flash storage");
+  return true;
+}
+
+bool saveAuthKey(const String &value) {
+  if (value.length() == 0 || value.length() > 64) {
+    Serial.println("ERROR: Auth key must be 1-64 characters");
+    return false;
+  }
+  prefs.begin("secrets", false);
+  prefs.putString(authKeyPrefKey, value);
+  prefs.end();
+  runtimeAuthKey = value;
+  Serial.println("Auth key saved to flash storage");
+  return true;
+}
+
+bool clearSecureKeys() {
+  prefs.begin("secrets", false);
+  prefs.remove(aesKeyPrefKey);
+  prefs.remove(authKeyPrefKey);
+  prefs.end();
+  runtimeAesKey = "SmartPonic123456";
+  runtimeAuthKey = "AQUA77";
+  Serial.println("Secure keys cleared - using defaults");
+  return true;
 }
 
 String readRequestSecurityKey() {
@@ -400,7 +501,10 @@ void handleRoot() {
       "<p><strong>Locked:</strong> <code>" +
       String(loadNodeSecurityKey().isEmpty() ? "no" : "yes") +
       "</code></p>"
-      "<p><strong>Node ID:</strong> <code>" +
+      "<p><strong>Hardware ID:</strong> <code>" +
+      runtimeHardwareId +
+      "</code></p>"
+      "<p><strong>LoRa address:</strong> <code>" +
       String(runtimeSettings.nodeId) +
       "</code></p>"
       "<p><strong>Distance:</strong> <code>" +
@@ -429,6 +533,7 @@ void handleHealth() {
                 "\",\"board\":\"" + boardName() +
                 "\",\"chipModel\":\"" + String(ESP.getChipModel()) +
                 "\",\"chipRevision\":" + String(ESP.getChipRevision()) +
+                ",\"hardwareId\":\"" + runtimeHardwareId + "\"" +
                 ",\"heapKb\":" + String(freeHeapKb) +
                 ",\"uptimeSec\":" + String(uptimeSec) +
                 ",\"locked\":" +
@@ -514,6 +619,23 @@ void handlePostConfig() {
     Serial.println("Security key saved to node.");
   }
 
+  // Handle secure keys from Flutter deploy payload
+  if (doc.containsKey("keys") && doc["keys"].is<JsonObject>()) {
+    JsonObject keysObj = doc["keys"];
+    if (keysObj.containsKey("aes128") && keysObj["aes128"].is<const char*>()) {
+      String aesKey = keysObj["aes128"].as<String>();
+      if (saveAesKey(aesKey)) {
+        Serial.println("AES key updated from deploy payload");
+      }
+    }
+    if (keysObj.containsKey("auth") && keysObj["auth"].is<const char*>()) {
+      String authKey = keysObj["auth"].as<String>();
+      if (saveAuthKey(authKey)) {
+        Serial.println("Auth key updated from deploy payload");
+      }
+    }
+  }
+
   Serial.println("Config applied and saved to flash.");
   server.send(200, "application/json", "{\"status\":\"ok\"}");
 }
@@ -585,13 +707,13 @@ void sampleSensors() {
 }
 
 String buildPlainPayload(uint32_t sequence, uint8_t priority, uint8_t reportMode) {
-  String payload = "auth=" + SECRET_KEY + "&";
+  String payload = "auth=" + runtimeAuthKey + "&";
 
   for (size_t i = 0; i < latestSegments.size(); i++) {
     payload += latestSegments[i].segment + "&";
   }
 
-  payload += "node=" + String(runtimeSettings.nodeId);
+  payload += "hardware_id=" + runtimeHardwareId;
   payload += "&seq=" + String(sequence);
   payload += "&priority=" + SmartPacket::priorityLabel(priority);
   payload += "&mode=" + SmartPacket::reportModeLabel(reportMode);
@@ -601,9 +723,9 @@ String buildPlainPayload(uint32_t sequence, uint8_t priority, uint8_t reportMode
 }
 
 String buildLocationSyncPayload(uint32_t sequence) {
-  String payload = "auth=" + SECRET_KEY;
+  String payload = "auth=" + runtimeAuthKey;
   payload += "&meta=location";
-  payload += "&node=" + String(runtimeSettings.nodeId);
+  payload += "&hardware_id=" + runtimeHardwareId;
   payload += "&seq=" + String(sequence);
   payload += "&lat=" + String(runtimeSettings.latitude, 6);
   payload += "&lon=" + String(runtimeSettings.longitude, 6);
@@ -632,7 +754,7 @@ std::vector<uint8_t> encryptCtrPayload(const String &plainText, const uint8_t no
 
   mbedtls_aes_context aes;
   mbedtls_aes_init(&aes);
-  mbedtls_aes_setkey_enc(&aes, reinterpret_cast<const unsigned char *>(key), 128);
+  mbedtls_aes_setkey_enc(&aes, reinterpret_cast<const unsigned char *>(runtimeAesKey.c_str()), 128);
   mbedtls_aes_crypt_ctr(
       &aes,
       plainText.length(),
@@ -684,7 +806,147 @@ bool sendBinaryPacket(const std::vector<uint8_t> &packetBytes) {
   LoRa.beginPacket();
   size_t written = LoRa.write(packetBytes.data(), packetBytes.size());
   int result = LoRa.endPacket();
+  LoRa.receive();
   return written == packetBytes.size() && result == 1;
+}
+
+String getFieldValue(const String &data, const String &key) {
+  int start = 0;
+  const String prefix = key + "=";
+  while (true) {
+    int amp = data.indexOf('&', start);
+    if (amp == -1) amp = data.length();
+
+    String segment = data.substring(start, amp);
+    if (segment.startsWith(prefix)) {
+      return segment.substring(prefix.length());
+    }
+
+    if (amp >= data.length()) break;
+    start = amp + 1;
+  }
+  return "";
+}
+
+bool decryptStructuredPacket(const std::vector<uint8_t> &input, SmartPacket::Header &header, String &payload) {
+  const size_t minimumLength = sizeof(SmartPacket::Header) + SmartPacket::NONCE_SIZE + sizeof(uint32_t);
+  if (input.size() < minimumLength) {
+    return false;
+  }
+
+  memcpy(&header, input.data(), sizeof(SmartPacket::Header));
+  if (header.magic != SmartPacket::MAGIC || header.version != SmartPacket::VERSION) {
+    return false;
+  }
+
+  const size_t expectedLength = sizeof(SmartPacket::Header) + SmartPacket::NONCE_SIZE + header.payloadLength + sizeof(uint32_t);
+  if (input.size() != expectedLength) {
+    return false;
+  }
+
+  const size_t checksumOffset = input.size() - sizeof(uint32_t);
+  uint32_t receivedChecksum = 0;
+  memcpy(&receivedChecksum, input.data() + checksumOffset, sizeof(receivedChecksum));
+  uint32_t calculatedChecksum = SmartPacket::crc32(input.data(), checksumOffset);
+  if (receivedChecksum != calculatedChecksum) {
+    return false;
+  }
+
+  const uint8_t *nonce = input.data() + sizeof(SmartPacket::Header);
+  const unsigned char *encryptedPayload = input.data() + sizeof(SmartPacket::Header) + SmartPacket::NONCE_SIZE;
+
+  std::vector<unsigned char> output(header.payloadLength, 0);
+  std::vector<unsigned char> nonceCounter(SmartPacket::NONCE_SIZE, 0);
+  memcpy(nonceCounter.data(), nonce, SmartPacket::NONCE_SIZE);
+  size_t ncOffset = 0;
+  unsigned char streamBlock[16] = {0};
+
+  mbedtls_aes_context aes;
+  mbedtls_aes_init(&aes);
+  mbedtls_aes_setkey_enc(&aes, reinterpret_cast<const unsigned char *>(runtimeAesKey.c_str()), 128);
+  mbedtls_aes_crypt_ctr(
+      &aes,
+      header.payloadLength,
+      &ncOffset,
+      nonceCounter.data(),
+      streamBlock,
+      encryptedPayload,
+      output.data());
+  mbedtls_aes_free(&aes);
+
+  payload = "";
+  for (size_t i = 0; i < output.size(); i++) {
+    payload += (char) output[i];
+  }
+  payload.trim();
+  return payload.length() > 0;
+}
+
+void handleIncomingControl() {
+  if (!loraReady) return;
+
+  int packetSize = LoRa.parsePacket();
+  if (packetSize <= 0) return;
+
+  std::vector<uint8_t> received(packetSize, 0);
+  LoRa.readBytes(received.data(), packetSize);
+
+  SmartPacket::Header header = {};
+  String decrypted;
+  if (!decryptStructuredPacket(received, header, decrypted)) {
+    return;
+  }
+
+  if (getFieldValue(decrypted, "auth") != runtimeAuthKey) {
+    return;
+  }
+
+  if (getFieldValue(decrypted, "cmd") != "relay") {
+    return;
+  }
+
+  int relayId = getFieldValue(decrypted, "relay").toInt();
+  int state = getFieldValue(decrypted, "state").toInt();
+  uint32_t commandId = (uint32_t) getFieldValue(decrypted, "command_id").toInt();
+
+  // Relay mapping: relay_id is the index of configured DO pins (sorted by pin).
+  std::vector<int> relayPins;
+  for (size_t i = 0; i < configList.size(); i++) {
+    if (configList[i].type == "DO") {
+      relayPins.push_back(configList[i].pin);
+    }
+  }
+  std::sort(relayPins.begin(), relayPins.end());
+
+  String status = "failed";
+  String message = "relay not found";
+  int appliedPin = -1;
+  if (relayId >= 0 && relayId < (int) relayPins.size()) {
+    appliedPin = relayPins[(size_t) relayId];
+    pinMode(appliedPin, OUTPUT);
+    digitalWrite(appliedPin, state ? HIGH : LOW);
+    status = "done";
+    message = "ok";
+  }
+
+  uint32_t seq = packetSeq++;
+  String ack = "auth=" + runtimeAuthKey;
+  ack += "&ack=relay";
+  ack += "&hardware_id=" + runtimeHardwareId;
+  ack += "&seq=" + String(seq);
+  ack += "&command_id=" + String(commandId);
+  ack += "&status=" + status;
+  ack += "&relay=" + String(relayId);
+  ack += "&pin=" + String(appliedPin);
+  ack += "&state=" + String(state ? 1 : 0);
+  ack += "&msg=" + message;
+
+  std::vector<uint8_t> ackPacket = buildStructuredPacket(
+      ack,
+      SmartPacket::PRIORITY_HIGH,
+      SmartPacket::REPORT_MODE_ABNORMAL,
+      seq);
+  sendBinaryPacket(ackPacket);
 }
 
 void enqueuePendingPacket(const std::vector<uint8_t> &packetBytes, uint8_t priority, uint8_t reportMode, uint32_t sequence) {
@@ -842,6 +1104,8 @@ void setup() {
   Serial.println();
   Serial.println("BOOT OK");
   Serial.println("Starting SmartPonic node...");
+  runtimeHardwareId = getHardwareId();
+  Serial.println("Hardware ID: " + runtimeHardwareId);
 
   for (int i = 0; i < MAX_SENSORS; i++) {
     dhtSensors[i] = nullptr;
@@ -876,6 +1140,9 @@ void setup() {
   Serial.print("Node security key configured: ");
   Serial.println(loadNodeSecurityKey().isEmpty() ? "no" : "yes");
 
+  // Load AES and Auth keys from secure flash storage
+  loadSecureKeys();
+
   if (savedJson != "") {
     DynamicJsonDocument doc(4096);
     DeserializationError error = deserializeJson(doc, savedJson);
@@ -905,6 +1172,7 @@ void setup() {
   loraReady = LoRa.begin(433E6);
   if (loraReady) {
     LoRa.setSyncWord(LORA_SYNC_WORD);
+    LoRa.receive();
     Serial.println("System Ready");
   } else {
     Serial.println("LoRa init failed");
@@ -916,6 +1184,7 @@ void setup() {
 
 void loop() {
   server.handleClient();
+  handleIncomingControl();
 
   if (millis() - lastSampleMs >= SAMPLE_INTERVAL_MS) {
     lastSampleMs = millis();
@@ -953,7 +1222,13 @@ void handleSerialCommand(String input) {
     Serial.println("LIST           - Show current sensor config");
     Serial.println("CLEAR          - Clear all sensor config");
     Serial.println("ADD,pin,type,sensor,label - Add sensor");
-    Serial.println("META,nodeId,lat,lon,distance - Update node metadata");
+    Serial.println("META,nodeAddress,lat,lon,distance - Update node metadata");
+    Serial.println("ID             - Show ESP32 hardware identity");
+    Serial.println("");
+    Serial.println("KEY MANAGEMENT:");
+    Serial.println("SETKEYS,AES128=xxx,AUTH=yyy - Set AES(16char) + Auth keys");
+    Serial.println("SHOWKEYS       - Show current keys (masked)");
+    Serial.println("CLEARKEYS      - Reset keys to defaults");
     Serial.println("");
     Serial.println("Examples:");
     Serial.println("ADD,4,AI,DHT22,TempSensor");
@@ -978,7 +1253,8 @@ void handleSerialCommand(String input) {
                      " Sensor:" + c.sensor +
                      " Label:" + c.label);
     }
-    Serial.println("Node ID: " + String(runtimeSettings.nodeId));
+    Serial.println("Hardware ID: " + runtimeHardwareId);
+    Serial.println("LoRa address: " + String(runtimeSettings.nodeId));
     Serial.println("Latitude: " + String(runtimeSettings.latitude, 6));
     Serial.println("Longitude: " + String(runtimeSettings.longitude, 6));
     Serial.println("Distance(m): " + String(runtimeSettings.distanceMeters, 1));
@@ -990,6 +1266,15 @@ void handleSerialCommand(String input) {
     configList.clear();
     latestSegments.clear();
     Serial.println("Config cleared!");
+    return;
+  }
+
+  if (command == "ID") {
+    Serial.println("=== HARDWARE IDENTITY ===");
+    Serial.println("Hardware ID (EUI-64): " + runtimeHardwareId);
+    Serial.println("LoRa transport address: " + String(runtimeSettings.nodeId));
+    Serial.println("Chip model: " + String(ESP.getChipModel()));
+    Serial.println("Chip revision: " + String(ESP.getChipRevision()));
     return;
   }
 
@@ -1007,7 +1292,7 @@ void handleSerialCommand(String input) {
     }
 
     if (partIdx < 4) {
-      Serial.println("ERROR: Invalid format. Use: META,nodeId,lat,lon,distance");
+      Serial.println("ERROR: Invalid format. Use: META,nodeAddress,lat,lon,distance");
       return;
     }
 
@@ -1016,6 +1301,57 @@ void handleSerialCommand(String input) {
     runtimeSettings.longitude = parts[2].toFloat();
     runtimeSettings.distanceMeters = parts[3].toFloat();
     Serial.println("Node metadata updated.");
+    return;
+  }
+
+  if (command.startsWith("SETKEYS,")) {
+    // Format: SETKEYS,AES128=your16charkey,AUTH=yourauthkey
+    String args = input.substring(8);
+    bool aesSet = false;
+    bool authSet = false;
+
+    int aesPos = args.indexOf("AES128=");
+    int authPos = args.indexOf("AUTH=");
+
+    if (aesPos >= 0) {
+      int aesEnd = args.indexOf(",", aesPos);
+      if (aesEnd < 0) aesEnd = args.length();
+      String aesKey = args.substring(aesPos + 7, aesEnd);
+      aesKey.trim();
+      if (aesSet = saveAesKey(aesKey)) {
+        // Key saved
+      }
+    }
+
+    if (authPos >= 0) {
+      int authEnd = args.indexOf(",", authPos);
+      if (authEnd < 0) authEnd = args.length();
+      String authKey = args.substring(authPos + 5, authEnd);
+      authKey.trim();
+      if (authSet = saveAuthKey(authKey)) {
+        // Key saved
+      }
+    }
+
+    if (!aesSet && !authSet) {
+      Serial.println("ERROR: Invalid format. Use: SETKEYS,AES128=your16charkey,AUTH=yourauthkey");
+      Serial.println("Example: SETKEYS,AES128=SmartPonic123456,AUTH=AQUA77");
+    } else {
+      if (aesSet) Serial.println("AES key: " + runtimeAesKey);
+      if (authSet) Serial.println("Auth key: " + runtimeAuthKey);
+    }
+    return;
+  }
+
+  if (command == "SHOWKEYS") {
+    Serial.println("=== SECURE KEYS ===");
+    Serial.println("AES key: " + runtimeAesKey);
+    Serial.println("Auth key: " + runtimeAuthKey);
+    return;
+  }
+
+  if (command == "CLEARKEYS") {
+    clearSecureKeys();
     return;
   }
 

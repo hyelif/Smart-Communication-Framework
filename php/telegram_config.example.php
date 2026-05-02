@@ -15,4 +15,8 @@ return [
     // Anti-spam defaults (seconds).
     'cooldown_critical_s' => 0,
     'cooldown_abnormal_s' => 300,
+
+    // Freshness monitoring (seconds). Used by telegram_poll.php in --loop mode.
+    'freshness_warning_s' => 300,
+    'freshness_offline_s' => 900,
 ];

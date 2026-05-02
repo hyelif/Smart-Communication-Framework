@@ -41,6 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 require_once 'db.php';
 require_once 'data_policy.php';
 require_once 'telegram_lib.php';
+require_once 'dashboard_store.php';
 
 function respondWithJsonError(int $statusCode, string $message): void
 {
@@ -93,26 +94,22 @@ $json = file_get_contents('php://input');
 verifySignedRequest($json);
 $data = json_decode($json, true);
 
-// Validate input
-if (!is_array($data) || !isset($data['node_id']) || !isset($data['sensors'])) {
+if (!is_array($data) || !isset($data['hardware_id']) || !is_string($data['hardware_id'])) {
+    respondWithJsonError(400, 'hardware_id is required');
+}
+
+$hardwareId = strtoupper(trim($data['hardware_id']));
+if (preg_match('/^[A-F0-9]{16}$/', $hardwareId) !== 1) {
+    respondWithJsonError(400, 'Invalid hardware_id format');
+}
+
+if (!isset($data['sensors']) || !is_array($data['sensors'])) {
     respondWithJsonError(400, 'Invalid data format');
-}
-
-if (!is_int($data['node_id']) && !(is_string($data['node_id']) && ctype_digit($data['node_id']))) {
-    respondWithJsonError(400, 'Invalid node ID');
-}
-
-if ((int) $data['node_id'] <= 0) {
-    respondWithJsonError(400, 'Node ID must be positive');
 }
 
 $eventType = isset($data['event_type']) && is_string($data['event_type']) ? strtolower(trim($data['event_type'])) : 'telemetry';
 if (!in_array($eventType, ['telemetry', 'location_update'], true)) {
     $eventType = 'telemetry';
-}
-
-if (!is_array($data['sensors'])) {
-    respondWithJsonError(400, 'Invalid sensor list');
 }
 
 if ($eventType === 'telemetry' && count($data['sensors']) === 0) {
@@ -159,30 +156,6 @@ function ensureInvalidSensorTable(PDO $pdo): void
     ");
 }
 
-function ensureSensorReadingsColumns(PDO $pdo): void
-{
-    $requiredColumns = [
-        'priority_level' => "ALTER TABLE sensor_readings ADD COLUMN priority_level VARCHAR(20) NULL AFTER snr",
-        'report_mode' => "ALTER TABLE sensor_readings ADD COLUMN report_mode VARCHAR(20) NULL AFTER priority_level",
-        'sequence_number' => "ALTER TABLE sensor_readings ADD COLUMN sequence_number INT NULL AFTER report_mode",
-        'latitude' => "ALTER TABLE sensor_readings ADD COLUMN latitude DECIMAL(10,6) NULL AFTER sequence_number",
-        'longitude' => "ALTER TABLE sensor_readings ADD COLUMN longitude DECIMAL(10,6) NULL AFTER latitude",
-        'distance_m' => "ALTER TABLE sensor_readings ADD COLUMN distance_m DECIMAL(10,2) NULL AFTER longitude",
-    ];
-
-    $columnStmt = $pdo->query("SHOW COLUMNS FROM sensor_readings");
-    $existingColumns = [];
-    foreach ($columnStmt->fetchAll() as $column) {
-        $existingColumns[$column['Field']] = true;
-    }
-
-    foreach ($requiredColumns as $columnName => $sql) {
-        if (!isset($existingColumns[$columnName])) {
-            $pdo->exec($sql);
-        }
-    }
-}
-
 function classifyInvalidSensorValue(string $sensorKey, string $rawValue): ?string
 {
     $trimmed = trim($rawValue);
@@ -225,7 +198,26 @@ try {
     ];
 
     ensureInvalidSensorTable($pdo);
-    ensureSensorReadingsColumns($pdo);
+
+    $lookupNodeStmt = $pdo->prepare("SELECT id FROM nodes WHERE hardware_id = :hardware_id LIMIT 1");
+    $lookupNodeStmt->execute([':hardware_id' => $hardwareId]);
+    $existingNodeId = $lookupNodeStmt->fetchColumn();
+
+    if ($existingNodeId !== false) {
+        $resolvedNodeId = (int) $existingNodeId;
+    } else {
+        $nodeInsertStmt = $pdo->prepare("
+            INSERT INTO nodes (hardware_id, name)
+            VALUES (:hardware_id, :name)
+        ");
+        $nodeInsertStmt->execute([
+            ':hardware_id' => $hardwareId,
+            ':name' => 'Node ' . substr($hardwareId, -6),
+        ]);
+        $resolvedNodeId = (int) $pdo->lastInsertId();
+    }
+
+    $data['node_id'] = $resolvedNodeId;
 
     if ($eventType === 'location_update') {
         $locationParts = [];
@@ -240,13 +232,10 @@ try {
         $locationSummary = implode(' | ', $locationParts);
         if ($locationSummary !== '') {
             $nodeUpdateStmt = $pdo->prepare("
-                INSERT INTO nodes (id, name, location)
-                VALUES (:node_id, :name, :location)
-                ON DUPLICATE KEY UPDATE location = VALUES(location)
+                UPDATE nodes SET location = :location WHERE hardware_id = :hardware_id
             ");
             $nodeUpdateStmt->execute([
-                ':node_id' => (int) $data['node_id'],
-                ':name' => 'Node ' . (int) $data['node_id'],
+                ':hardware_id' => $hardwareId,
                 ':location' => $locationSummary,
             ]);
         }
@@ -255,7 +244,7 @@ try {
             'status' => 'success',
             'message' => 'Location metadata updated successfully',
             'event_type' => 'location_update',
-            'node_id' => (int) $data['node_id'],
+            'hardware_id' => $hardwareId,
             'latitude' => $latitude,
             'longitude' => $longitude,
             'distance' => $distanceMeters,
@@ -271,8 +260,8 @@ try {
 
     // Insert main reading record
     $stmt = $pdo->prepare("
-        INSERT INTO sensor_readings (node_id, rssi, snr, priority_level, report_mode, sequence_number, latitude, longitude, distance_m)
-        VALUES (:node_id, :rssi, :snr, :priority_level, :report_mode, :sequence_number, :latitude, :longitude, :distance_m)
+        INSERT INTO sensor_readings (node_id, rssi, snr, priority_level, report_mode, sequence_number, hardware_id, latitude, longitude, distance_m)
+        VALUES (:node_id, :rssi, :snr, :priority_level, :report_mode, :sequence_number, :hardware_id, :latitude, :longitude, :distance_m)
     ");
     $stmt->execute([
         ':node_id' => $data['node_id'],
@@ -281,6 +270,7 @@ try {
         ':priority_level' => $priorityLevel,
         ':report_mode' => $reportMode,
         ':sequence_number' => $sequenceNumber,
+        ':hardware_id' => $hardwareId,
         ':latitude' => $latitude,
         ':longitude' => $longitude,
         ':distance_m' => $distanceMeters
@@ -325,7 +315,20 @@ try {
         ];
 
         if (!isset($sensorTableMap[$sensorKey])) {
-            throw new InvalidArgumentException('Unsupported sensor type: ' . $sensor['sensor']);
+            $invalidSensorStmt->execute([
+                ':node_id' => $data['node_id'],
+                ':reading_id' => $reading_id,
+                ':sensor_name' => $sensor['sensor'],
+                ':pin_number' => $sensor['pin'],
+                ':raw_value' => (string) $sensor['value'],
+                ':reason' => 'Unknown sensor type',
+            ]);
+            $skippedSensors[] = [
+                'sensor' => $sensor['sensor'],
+                'pin' => $sensor['pin'],
+                'reason' => 'Unknown sensor type',
+            ];
+            continue;
         }
 
         $invalidReason = classifyInvalidSensorValue($sensorKey, (string) $sensor['value']);
@@ -423,6 +426,98 @@ try {
                     $msg = implode("\n", $lines);
                     telegramSendMessage($telegramConfig, (int) $chatId, $msg);
                     telegramMarkAlertSent($pdo, $stateKey);
+                }
+            }
+        }
+    } catch (Exception $telegramException) {
+        // Ignore Telegram failures to keep data pipeline healthy.
+    }
+
+    // Telegram alerts based on dashboard threshold profiles (even when report_mode is NORMAL).
+    // Also notifies on invalid sensor readings captured into invalid_sensor_data.
+    try {
+        $telegramConfig = telegramLoadConfig();
+        if ($telegramConfig !== null) {
+            $chatId = $telegramConfig['default_alert_chat_id'];
+            if ($chatId !== null) {
+                $profiles = getSensorProfiles($pdo, (int) $data['node_id']);
+
+                $sensorKeyMap = [
+                    'temperature' => 'temperature',
+                    'humidity' => 'humidity',
+                    'watertemp' => 'waterTemp',
+                    'ph' => 'ph',
+                    'tds' => 'tds',
+                    'turbidity' => 'turbidity',
+                    'rain' => 'rain',
+                ];
+
+                foreach ($data['sensors'] as $sensor) {
+                    if (!is_array($sensor) || !isset($sensor['sensor'], $sensor['value'])) {
+                        continue;
+                    }
+
+                    $incomingKey = preg_replace('/[^a-z0-9]+/', '', strtolower(trim((string) $sensor['sensor'])));
+                    if (!isset($sensorKeyMap[$incomingKey])) {
+                        continue;
+                    }
+
+                    $profileKey = $sensorKeyMap[$incomingKey];
+                    $profile = $profiles[$profileKey] ?? null;
+                    if (!is_array($profile)) {
+                        continue;
+                    }
+
+                    $raw = trim((string) $sensor['value']);
+                    if ($raw === '' || !is_numeric($raw)) {
+                        continue;
+                    }
+
+                    $value = (float) $raw;
+                    $min = $profile['threshold_min'];
+                    $max = $profile['threshold_max'];
+
+                    $isLow = $min !== null && $value < (float) $min;
+                    $isHigh = $max !== null && $value > (float) $max;
+                    if (!$isLow && !$isHigh) {
+                        continue;
+                    }
+
+                    $side = $isLow ? 'low' : 'high';
+                    $stateKey = 'node:' . (int) $data['node_id'] . ':threshold:' . $profileKey . ':' . $side;
+                    if (!telegramShouldSendAlert($pdo, $stateKey, (int) ($telegramConfig['cooldown_abnormal_s'] ?? 300))) {
+                        continue;
+                    }
+
+                    $unit = is_string($profile['unit'] ?? null) ? (string) $profile['unit'] : '';
+                    $label = is_string($profile['label'] ?? null) ? (string) $profile['label'] : $profileKey;
+
+                    $msg = "SmartPonic THRESHOLD\n" .
+                           "Node " . (int) $data['node_id'] . " | " . $label . " is " . strtoupper($side) . "\n" .
+                           "Value: " . $raw . ($unit !== '' ? " {$unit}" : "") . "\n" .
+                           "Min/Max: " . ($min === null ? '-' : (string) $min) . " / " . ($max === null ? '-' : (string) $max) . "\n" .
+                           "Time: " . date('Y-m-d H:i:s');
+
+                    telegramSendMessage($telegramConfig, (int) $chatId, $msg);
+                    telegramMarkAlertSent($pdo, $stateKey);
+                }
+
+                if (!empty($skippedSensors)) {
+                    $stateKey = 'node:' . (int) $data['node_id'] . ':invalid_sensors';
+                    if (telegramShouldSendAlert($pdo, $stateKey, 300)) {
+                        $lines = ["SmartPonic INVALID SENSOR", "Node " . (int) $data['node_id'], "Time: " . date('Y-m-d H:i:s'), "Items:"];
+                        $count = 0;
+                        foreach ($skippedSensors as $row) {
+                            $lines[] = "- " . (string) ($row['sensor'] ?? '') . " pin " . (string) ($row['pin'] ?? '') . ": " . (string) ($row['reason'] ?? '');
+                            $count++;
+                            if ($count >= 12) {
+                                $lines[] = "...";
+                                break;
+                            }
+                        }
+                        telegramSendMessage($telegramConfig, (int) $chatId, implode("\n", $lines));
+                        telegramMarkAlertSent($pdo, $stateKey);
+                    }
                 }
             }
         }

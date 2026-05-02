@@ -269,7 +269,7 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: StitchColors.primaryContainer.withOpacity(0.12),
+                  color: StitchColors.primaryContainer.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
@@ -544,7 +544,7 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: StitchColors.primaryContainer.withOpacity(0.15),
+                  color: StitchColors.primaryContainer.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -590,7 +590,7 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: StitchColors.primaryContainer.withOpacity(0.12),
+                    color: StitchColors.primaryContainer.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(

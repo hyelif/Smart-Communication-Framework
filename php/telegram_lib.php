@@ -21,6 +21,8 @@ function telegramLoadConfig(): ?array
     $config['default_alert_chat_id'] = $config['default_alert_chat_id'] ?? null;
     $config['cooldown_critical_s'] = isset($config['cooldown_critical_s']) ? (int) $config['cooldown_critical_s'] : 0;
     $config['cooldown_abnormal_s'] = isset($config['cooldown_abnormal_s']) ? (int) $config['cooldown_abnormal_s'] : 300;
+    $config['freshness_warning_s'] = isset($config['freshness_warning_s']) ? (int) $config['freshness_warning_s'] : 300;
+    $config['freshness_offline_s'] = isset($config['freshness_offline_s']) ? (int) $config['freshness_offline_s'] : 900;
 
     return $config;
 }
@@ -229,4 +231,18 @@ function telegramMarkAlertSent(PDO $pdo, string $stateKey): void
         ON DUPLICATE KEY UPDATE last_sent_at = VALUES(last_sent_at)
     ");
     $stmt->execute([':k' => $stateKey]);
+}
+
+function telegramGetAlertLastSentAt(PDO $pdo, string $stateKey): ?int
+{
+    telegramEnsureTables($pdo);
+    $t = telegramResolveStateTables($pdo);
+    $stmt = $pdo->prepare("SELECT last_sent_at FROM {$t['alert']} WHERE state_key = :k");
+    $stmt->execute([':k' => $stateKey]);
+    $last = $stmt->fetchColumn();
+    if ($last === false || $last === null) {
+        return null;
+    }
+    $ts = strtotime((string) $last);
+    return $ts === false ? null : $ts;
 }

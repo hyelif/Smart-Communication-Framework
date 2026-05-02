@@ -1,0 +1,1651 @@
+================================================================================
+           SMARTPONIC: AN ADAPTIVE IoT AQUAPONICS MONITORING SYSTEM
+                 A Final Year Project Technical Thesis
+================================================================================
+
+                              Student Name: [Author]
+                              Supervisor: [Supervisor]
+                              Date: April 2026
+
+================================================================================
+                                TABLE OF CONTENTS
+================================================================================
+
+Chapter 1 - Introduction
+  1.1  Project Background
+  1.2  Problem Statement
+  1.3  Project Objectives
+  1.4  Scope and Limitations
+
+Chapter 2 - System Architecture Overview
+  2.1  High-Level Data Flow
+  2.2  System Components
+  2.3  Technology Stack
+
+Chapter 3 - Node Firmware (ESP32)
+  3.1  Hardware Overview
+  3.2  Hardware Device Identity (EUI-64 MAC)
+  3.3  Sensor Sampling System
+  3.4  Priority Classification Engine
+  3.5  Adaptive Communication Strategy
+  3.6  Store-and-Forward Retry Queue
+  3.7  NFC Configuration (PN532)
+
+Chapter 4 - LoRa Radio Communication
+  4.1  Physical Layer
+  4.2  Binary Packet Structure
+  4.3  Encryption (AES-CTR)
+  4.4  CRC32 Integrity Validation
+
+Chapter 5 - HQ Gateway (ESP32)
+  5.1  LoRa Packet Reception
+  5.2  Decryption and Validation
+  5.3  HTTP Forwarding with HMAC Authentication
+  5.4  Offline Storage and Retry Queue
+  5.5  Relay Control Downlink
+
+Chapter 6 - PHP Backend
+  6.1  API Endpoint (receive_data.php)
+  6.2  Request Authentication and Validation
+  6.3  Data Routing to Per-Sensor Tables
+  6.4  Control Queue Endpoint (control_queue.php)
+  6.5  Database Schema
+
+Chapter 7 - Telegram Integration
+  7.1  Bot Architecture (Long Polling)
+  7.2  Alert System
+  7.3  Bidirectional Commands
+  7.4  Cooldown and Deduplication
+  7.5  Freshness Monitoring
+
+Chapter 8 - Dashboard
+  8.1  Data Visualization
+  8.2  Communication Analytics
+  8.3  Signal Quality Tracking
+
+Chapter 9 - Security Architecture
+  9.1  LoRa Layer Security (AES-CTR)
+  9.2  Integrity Protection (CRC32)
+  9.3  HTTP API Security (HMAC-SHA256)
+  9.4  Node Configuration Protection
+  9.5  Telegram Access Control
+
+Chapter 10 - NFC Configuration System
+  10.1  NFC Configuration Overview
+  10.2  PN532 Hardware Interface
+  10.3  Direct Android HCE (Host Card Emulation)
+  10.4  Physical NTAG215 Tag Fallback
+  10.5  Encryption and Security
+  10.6  iOS Fallback Workflow
+
+Chapter 11 - Event-Driven Automation
+  11.1  Automation Architecture
+  11.2  Automation Rules Table
+  11.3  Execution Modes (AUTO / APPROVAL_REQUIRED / ALERT_ONLY)
+  11.4  Pending Approvals Workflow
+  11.5  Telegram /approve and /cancel Commands
+  11.6  Safety Principles
+
+Chapter 12 - Conclusion and Future Work
+
+================================================================================
+                              CHAPTER 1: INTRODUCTION
+================================================================================
+
+1.1 PROJECT BACKGROUND
+----------------------
+
+Aquaponics is a sustainable food production system that combines conventional
+aquaculture (raising aquatic animals) with hydroponics (cultivating plants in
+water) in a symbiotic environment. As aquaponics systems grow in complexity
+and scale, manual monitoring becomes impractical. Real-time monitoring of
+water quality parameters such as temperature, pH, dissolved oxygen, and
+turbidity is essential to maintain optimal conditions for both fish and
+plant health.
+
+This project, SmartPonic, implements a complete IoT-based monitoring and
+control system for aquaponics environments. The system employs ESP32
+microcontrollers at each monitoring node, LoRa radio for long-range wireless
+communication, a gateway hub connected to the internet, a PHP/MySQL backend,
+Telegram for real-time alerts and remote control, and a web-based dashboard
+for data visualization.
+
+1.2 PROBLEM STATEMENT
+----------------------
+
+Traditional aquaponics monitoring systems face several challenges:
+
+(a) Fixed reporting intervals waste bandwidth and power when conditions are
+    normal, yet may be too slow to detect emergencies.
+
+(b) Sensor failures (e.g., a DHT22 returning NaN) can go unnoticed for long
+    periods, leading to data loss.
+
+(c) Unencrypted LoRa radio transmissions are vulnerable to eavesdropping and
+    replay attacks.
+
+(d) One-way communication systems provide no way for operators to remotely
+    control actuators such as water pumps or feeders.
+
+(e) Cloud-dependent systems fail when internet connectivity is unavailable
+    in remote farm locations.
+
+1.3 PROJECT OBJECTIVES
+----------------------
+
+The primary objectives of this project are:
+
+(i)   To implement an adaptive communication strategy that dynamically
+      adjusts reporting intervals based on sensor conditions.
+
+(ii)  To provide bidirectional communication enabling remote relay control
+      via Telegram.
+
+(iii) To secure all wireless transmissions using AES-CTR encryption with
+      CRC32 integrity validation.
+
+(iv)  To ensure data reliability through a store-and-forward architecture
+      with offline buffering.
+
+(v)   To deliver real-time alerts and system status through a Telegram bot.
+
+(vi)  To provide a web-based dashboard for historical data analysis.
+
+(vii) To enable wireless node configuration via NFC tap (Android HCE /
+      NTAG215 physical tag).
+
+(viii) To implement event-driven automation rules for automatic relay
+      control based on sensor thresholds.
+
+1.4 SCOPE AND LIMITATIONS
+-------------------------
+
+This implementation covers:
+- Up to 15 GPIO sensors per ESP32 node
+- Maximum 12 pending retry packets in the node FIFO queue
+- LoRa frequency: 433 MHz
+- HTTP API hosted on XAMPP (local PHP/MySQL)
+- Telegram as the sole notification and control channel
+- NFC wireless configuration (PN532 module)
+- Event-driven automation with human-in-the-loop approval for unsafe actions
+
+Limitations:
+- LoRa range is dependent on antenna quality and environmental obstacles
+- SD card buffering on HQ requires hardware configuration (CS pin)
+- The system uses a local XAMPP server rather than a cloud-hosted solution
+- iOS uses physical NTAG215 tag workflow for NFC configuration (no direct HCE)
+
+================================================================================
+                           CHAPTER 2: SYSTEM ARCHITECTURE
+================================================================================
+
+2.1 HIGH-LEVEL DATA FLOW
+------------------------
+
+The complete data path from sensor to dashboard follows this sequence:
+
+  +---------+      LoRa       +---------+      HTTP      +--------+
+  |  Node   | ----binary----> |   HQ    | ----signed---> |  PHP   |
+  | (ESP32) |    encrypted    | (ESP32) |    JSON        |   API  |
+  +---------+                 +---------+                 +--------+
+                                                                |
+                    +--------------------------------------------+
+                    |
+              +-----v-----+     Telegram Bot       +-----------+
+              | Dashboard | <---- polling ----     | Telegram  |
+              |  (PHP)    |                        |  Server   |
+              +-----------+                        +-----------+
+
+Additionally, Telegram commands flow upstream:
+
+  +-----------+      Telegram      +---------+      LoRa       +--------+
+  | Operator  | --- /relay 1 0 on  |   HQ    | --encrypted-->  |  Node  |
+  | (Mobile)  |                    | (ESP32) |   control cmd   |(ESP32) |
+  +-----------+                    +---------+                 +--------+
+
+2.2 SYSTEM COMPONENTS
+---------------------
+
+Component           Role
+--------           ----
+ESP32 Node          Sensor sampling, priority classification, LoRa transmitter
+ESP32 HQ Gateway    LoRa receiver, HTTP client, control command forwarder
+LoRa Radio (433MHz) Long-range wireless communication link
+PHP receive_data    API endpoint, data ingestion, alert triggering
+PHP control_queue   Relay command queue management
+MySQL Database      Time-series sensor storage, per-sensor tables
+Telegram Bot        Real-time alerts and bidirectional command interface
+Dashboard (PHP/JS)  Data visualization and system health monitoring
+
+2.3 TECHNOLOGY STACK
+--------------------
+
+Layer             Technology
+-----             ----------
+Microcontroller   Espressif ESP32 (ESP32-S3, ESP32-S2 Mini)
+Radio             LoRa (433 MHz, SPI interface)
+Firmware          Arduino Framework (PlatformIO)
+Encryption        mbedTLS AES-CTR (AES-128)
+WiFi              ESP32 WiFi station mode
+Backend           PHP 8.x + MySQL (XAMPP)
+Web Server        Apache (XAMPP)
+Database          MySQL 8.x (InnoDB/MyISAM)
+Telegram API      Bot API via Long Polling
+Dashboard         Vanilla JS + PHP (no framework)
+
+================================================================================
+                          CHAPTER 3: NODE FIRMWARE (ESP32)
+================================================================================
+
+3.1 HARDWARE OVERVIEW
+---------------------
+
+The ESP32 node operates as a self-contained sensor hub with:
+
+- WiFi AP mode for initial configuration (SSID: AQUA_NODE)
+- LoRa transmitter for data uplink
+- Up to 15 GPIO-configurable sensor ports
+- Preferences library for flash-based configuration storage
+- Web server for remote configuration updates
+
+The node maintains a JSON configuration in flash memory that defines:
+- Sensor pin assignments
+- Sensor types (DHT22, WaterTemp, pH, TDS, Turbidity, Rain)
+- Calibration coefficients
+- Node ID, latitude, longitude, distance from base
+- Unique hardware device EUI-64 identifier
+
+3.2 HARDWARE DEVICE IDENTITY (EUI-64)
+--------------------------------------
+
+Each ESP32 node carries a unique hardware identifier derived from its
+internal eFuse MAC address. This EUI-64 (Extended Unique Identifier) is:
+
+- Burned into ESP32 silicon at the Espressif factory
+- Physically immutable (cannot be changed or cloned without special tools)
+- Globally unique across all ESP32 devices ever manufactured
+- Used as the definitive node identity in all system communications
+
+The EUI-64 is derived from the 6-byte Bluetooth/WiFi MAC address:
+
+    ESP32 MAC Address:  24:0A:C4:XX:XX:XX  (6 bytes, 12 hex chars)
+    EUI-64 Format:     FFFEXXXXXXXXXX   (reversed + padded)
+
+In SmartPonic, the EUI-64 is:
+- Stored in ESP32 Preferences namespace "identity"
+- Used as the primary key in the nodes database table
+- Printed on the device label for physical identification
+- Encoded in QR codes for rapid provisioning
+- Broadcast in every LoRa packet as part of the nodeId field
+
+QR Code Provisioning:
+When deploying a new node, the Flutter app scans the device's QR code
+(which encodes: EUI-64, AES key, nodeId). The app auto-configures the
+node without manual entry:
+
+    QR Data: {"eui":"24A0C4FFFE112233","aes":"SmartPonic123456","nodeId":1}
+              ||                                  ||
+              v                                   v
+         Stored in nodes DB              Loaded by node at boot
+
+This eliminates manual node ID assignment and ensures every device has a
+cryptographically unguessable unique identity from the factory floor.
+
+Persistence in Preferences:
+The hardware device ID is stored at first boot and persists across firmware
+reflashing (unless full flash erase is performed):
+
+    Preferences prefs;
+    prefs.begin("identity", false);        // namespace "identity"
+    prefs.putString("eui64", euiString);   // e.g., "24A0C4FFFE112233"
+    prefs.putString("device_name", "smartponic-node-1");
+    prefs.end();
+
+Note: The nodeId used in LoRa packets (1-255) is a short runtime ID
+assigned during provisioning, distinct from the hardware EUI-64. The HQ
+maintains a mapping table: nodes(eui64) -> runtime nodeId.
+
+3.3 HARDWARE DEVICE IDENTITY (EUI-64)
+--------------------------------------
+
+Each ESP32 node carries a unique hardware identifier derived from its
+internal eFuse MAC address. This EUI-64 (Extended Unique Identifier) is:
+
+- Burned into ESP32 silicon at the Espressif factory
+- Physically immutable (cannot be changed or cloned without special tools)
+- Globally unique across all ESP32 devices ever manufactured
+- Used as the definitive node identity in all system communications
+
+The EUI-64 is derived from the 6-byte Bluetooth/WiFi MAC address:
+
+    ESP32 MAC Address:  24:0A:C4:XX:XX:XX  (6 bytes, 12 hex chars)
+    EUI-64 Format:     FFFEXXXXXXXXXX   (reversed + padded)
+
+In SmartPonic, the EUI-64 is:
+- Stored in ESP32 Preferences namespace "identity"
+- Used as the primary key in the nodes database table
+- Printed on the device label for physical identification
+- Encoded in QR codes for rapid provisioning
+- Broadcast in every LoRa packet as part of the nodeId field
+
+QR Code Provisioning:
+When deploying a new node, the Flutter app scans the device's QR code
+(which encodes: EUI-64, AES key, nodeId). The app auto-configures the
+node without manual entry:
+
+    QR Data: {"eui":"24A0C4FFFE112233","aes":"SmartPonic123456","nodeId":1}
+              ||                                  ||
+              v                                  v
+         Stored in nodes DB              Loaded by node at boot
+
+This eliminates manual node ID assignment and ensures every device has a
+cryptographically unguessable unique identity from the factory floor.
+
+Persistence in Preferences:
+The hardware device ID is stored at first boot and persists across firmware
+reflashing (unless full flash erase is performed):
+
+    Preferences prefs;
+    prefs.begin("identity", false);        // namespace "identity"
+    prefs.putString("eui64", euiString);   // e.g., "24A0C4FFFE112233"
+    prefs.putString("device_name", "smartponic-node-1");
+    prefs.end();
+
+Note: The nodeId used in LoRa packets (1-255) is a short runtime ID
+assigned during provisioning, distinct from the hardware EUI-64. The HQ
+maintains a mapping table: nodes(eui64) -> runtime nodeId.
+
+3.4 SENSOR SAMPLING SYSTEM
+--------------------------
+
+Sensors are sampled every 5 seconds (SAMPLE_INTERVAL_MS = 5000):
+
+    +---------------------+
+    | sampleSensors()     |
+    +---------------------+
+              |
+              v
+    +---------------------+
+    | For each GPIO config|
+    +---------------------+
+              |
+              v
+    +---------------------+
+    | Read based on type  |---- DHT22 ----> Temperature + Humidity
+    |                     |---- WaterTemp --> DS18B20 (OneWire)
+    |                     |---- pH -------> Analog ADC
+    |                     |---- TDS ------> Analog ADC
+    |                     |---- Turbidity -> Analog ADC
+    |                     |---- Rain -----> Digital pin
+    +---------------------+
+              |
+              v
+    +----------------------+
+    | Append to segments   |
+    | vector (pin=name=val)|
+    +----------------------+
+              |
+              v
+    +---------------------+
+    | classifySensorPri() |  (per-sensor priority)
+    | escalatePriority()  |  (overall highest priority)
+    | updateReportMode()  |  (set interval based on priority)
+    +---------------------+
+
+Each sampled reading is stored as a "segment" string:
+    "4=Temperature=28.5&21=Humidity=75.2&..."
+
+These segments are accumulated in latestSegments vector for transmission.
+
+3.5 PRIORITY CLASSIFICATION ENGINE
+-----------------------------------
+
+Sensors are sampled every 5 seconds (SAMPLE_INTERVAL_MS = 5000):
+
+    +---------------------+
+    |   sampleSensors()   |
+    +---------------------+
+              |
+              v
+    +---------------------+
+    |For each GPIO config |
+    +---------------------+
+              |
+              v
+    +---------------------+
+    | Read based on type  |---- DHT22 ----> Temperature + Humidity
+    |                     |---- WaterTemp --> DS18B20 (OneWire)
+    |                     |---- pH -------> Analog ADC
+    |                     |---- TDS ------> Analog ADC
+    |                     |---- Turbidity -> Analog ADC
+    |                     |---- Rain -----> Digital pin
+    +---------------------+
+              |
+              v
+    +---------------------+
+    | Append to segments   |
+    | vector (pin=name=val)|
+    +---------------------+
+              |
+              v
+    +---------------------+
+    | classifySensorPri() |  (per-sensor priority)
+    | escalatePriority()  |  (overall highest priority)
+    | updateReportMode()  |  (set interval based on priority)
+    +---------------------+
+
+Each sampled reading is stored as a "segment" string:
+    "4=Temperature=28.5&21=Humidity=75.2&..."
+
+These segments are accumulated in latestSegments vector for transmission.
+
+3.4 PRIORITY CLASSIFICATION ENGINE
+-----------------------------------
+
+Each sensor reading is evaluated against threshold bands to determine its
+priority level. The node takes the HIGHEST priority across all sensors.
+
++------------------+-------------------+-------------------+
+| Sensor           | MEDIUM (ABNORMAL) | HIGH (CRITICAL)   |
++------------------+-------------------+-------------------+
+| Temperature      | <22 or >32 C      | <18 or >35 C      |
+| Humidity         | <40 or >80%       | <30 or >90%       |
+| WaterTemp        | <20 or >30 C      | <15 or >32 C      |
+| pH               | <6.0 or >8.0      | <5.5 or >8.5      |
+| TDS              | >800 ppm          | >1200 ppm         |
+| Turbidity        | >300 NTU          | >1000 NTU         |
+| Rain (digital)   | Raining (1)       | ---               |
+| DHT NaN reading  | ---               | Returns "nan"     |
+| DS18B20 error    | ---               | Returns -127 C    |
++------------------+-------------------+-------------------+
+
+The escalatePriority() function (line 213) returns the greater of two
+priorities, ensuring the highest classification wins.
+
+3.5 ADAPTIVE COMMUNICATION STRATEGY
+-----------------------------------
+
+This is the core innovation of the system. Instead of fixed reporting
+intervals, the node dynamically adjusts based on conditions:
+
+Reporting Intervals:
+  PRIORITY_LOW    (NORMAL)    -> 15 minutes
+  PRIORITY_MEDIUM (ABNORMAL)  -> 5 minutes
+  PRIORITY_HIGH   (CRITICAL)  -> 1 minute
+
+Additionally, CRITICAL conditions bypass the timer entirely and trigger
+immediate transmission:
+
+    void updateReportMode(uint8_t priority) {
+        if (priority == PRIORITY_HIGH) {
+            currentReportMode = REPORT_MODE_CRITICAL;
+            currentReportIntervalMs = 60000UL;      // 1 minute
+            criticalDispatchPending = true;          // <-- IMMEDIATE
+        } else if (priority == PRIORITY_MEDIUM) {
+            currentReportMode = REPORT_MODE_ABNORMAL;
+            currentReportIntervalMs = 300000UL;      // 5 minutes
+        } else {
+            currentReportMode = REPORT_MODE_NORMAL;
+            currentReportIntervalMs = 900000UL;      // 15 minutes
+        }
+    }
+
+In the main loop, the sendCurrentTelemetry() function enforces this:
+
+    if (currentPriority == PRIORITY_HIGH && criticalDispatchPending) {
+        sendCurrentTelemetry(true);  // forceImmediate = true
+    } else {
+        sendCurrentTelemetry(false);
+    }
+
+The forceImmediate flag bypasses the interval check entirely.
+
+This approach provides three key benefits:
+1. Power efficiency: Normal conditions transmit only 4 times per hour
+2. Responsiveness: Critical events are reported within 1 second
+3. Bandwidth savings: No redundant transmissions during stable periods
+
+3.6 STORE-AND-FORWARD RETRY QUEUE
+---------------------------------
+
+Failed LoRa transmissions are not silently dropped. The node maintains a
+FIFO queue of up to 12 pending packets (MAX_PENDING_PACKETS):
+
+    struct PendingPacket {
+        std::vector<uint8_t> bytes;   // encrypted binary packet
+        uint8_t priority;              // for queue ordering
+        uint8_t reportMode;
+        uint32_t sequence;
+        unsigned long queuedAtMs;      // timestamp for aging
+    };
+
+Queueing behavior:
+- HIGH priority packets are inserted at the front (highest priority first)
+- LOW priority packets are appended to the back
+- When the queue is full, the oldest packet is evicted (FIFO)
+- Retry attempts occur every 30 seconds (RETRY_INTERVAL_MS)
+- Only one packet is retried per interval to avoid flooding
+
+================================================================================
+                        CHAPTER 4: LORA RADIO COMMUNICATION
+================================================================================
+
+4.1 PHYSICAL LAYER
+------------------
+
+Parameter           Value
+---------           -----
+Frequency           433 MHz (LMAC band, site-dependent)
+Sync Word           0xB4
+SPI Interface       SCK=18, MISO=19, MOSI=23, SS=5
+Reset Pin           GPIO 14
+DIO0 Pin            Not used (-1)
+Mode                LoRa.beginPacket() / endPacket()
+
+The 433 MHz band provides good penetration through walls and vegetation
+compared to 2.4 GHz WiFi, making it suitable for greenhouse environments.
+
+4.2 BINARY PACKET STRUCTURE
+---------------------------
+
+The system uses a structured binary packet format (not ASCII HEX) to maximize
+efficiency. Each packet consists of four sections:
+
++-----------+-----------+------------------+--------+
+| HEADER    | NONCE     | ENCRYPTED        | CRC32  |
+| 14 bytes  | 16 bytes  | PAYLOAD          | 4 bytes|
++-----------+-----------+------------------+--------+
+|<-------- encrypted payload region ------>|
+|<----------- full packet (variable) ----->|
+
+HEADER (14 bytes, packed struct):
+  Offset  Size  Field            Description
+  ------  ----  -----            -----------
+  0       4     magic            0x31504653 ("SPF1")
+  4       1     version          Protocol version (1)
+  5       1     nodeId           Runtime node identifier (1-255)
+  6       1     priority         0=LOW, 1=MEDIUM, 2=HIGH
+  7       1     reportMode       0=NORMAL, 1=ABNORMAL, 2=CRITICAL
+  8       2     payloadLength     Length of encrypted payload
+  10      4     sequence         Monotonically increasing counter
+
+Note: The HEADER.nodeId is a short runtime ID (1-255), not the hardware
+EUI-64. HQ resolves nodeId -> EUI-64 via the nodes database table.
+
+NONCE (16 bytes):
+  Offset  Size  Field            Source
+  ------  ----  -----            ------
+  0       4     sequence         Mirrors header.sequence
+  4       4     timestamp        esp_timer (millis)
+  8       4     random           esp_random()
+  12      4     nodeId           Mirrors header.nodeId
+
+CRC32 (4 bytes):
+  CRC32 checksum computed over HEADER + NONCE + ENCRYPTED_PAYLOAD.
+  Validated BEFORE decryption to reject corrupted packets early.
+
+4.3 ENCRYPTION (AES-CTR)
+-------------------------
+
+The system uses AES-128 in CTR (Counter) mode for authenticated encryption:
+
+Why AES-CTR instead of AES-CBC?
+- CTR mode does not require padding, eliminating padding oracle attacks
+- Each packet uses a unique nonce, so identical plaintexts produce
+  different ciphertexts (semantic security)
+- CTR mode allows random access decryption (not needed here but a benefit)
+- mbedTLS provides hardware-accelerated AES on ESP32
+
+Encryption process:
+1. Build plaintext payload string: "auth=AQUA77&4=Temperature=28.5&..."
+2. Generate 16-byte nonce from (sequence, timestamp, random, nodeId)
+3. Initialize AES-CTR with shared 128-bit key (same on all nodes/HQ)
+4. Encrypt payload in one call -> encryptedPayload bytes
+5. Assemble packet: [HEADER][NONCE][encryptedPayload][CRC32]
+
+The nonce is transmitted in cleartext alongside the ciphertext. Since CTR
+mode uses the nonce as a counter base (never reused within a key's lifetime),
+transmitting it openly does not compromise security, provided no nonce is
+ever reused. With 64 bits of (sequence + timestamp + random), the probability
+of nonce collision is negligible.
+
+4.4 CRC32 INTEGRITY VALIDATION
+-------------------------------
+
+CRC32 is computed BEFORE decryption (validate-then-decrypt pattern):
+
+    checksum = CRC32(HEADER || NONCE || ENCRYPTED_PAYLOAD)
+    packet   = HEADER || NONCE || ENCRYPTED_PAYLOAD || checksum
+
+This ordering ensures:
+- Corrupted packets are rejected before wasting CPU cycles on decryption
+- Bit-flipping attacks on the encrypted payload are detectable
+- The checksum itself is protected by being placed after the ciphertext
+
+The CRC32 implementation uses the standard Ethernet polynomial (0xEDB88320)
+with bit-reversed arithmetic, providing strong error detection capability.
+
+================================================================================
+                          CHAPTER 5: HQ GATEWAY (ESP32)
+================================================================================
+
+5.1 LORA PACKET RECEPTION
+-------------------------
+
+The HQ gateway runs in continuous receive mode:
+
+    void loop() {
+        int packetSize = LoRa.parsePacket();
+        if (packetSize) {
+            // Read packet bytes
+            std::vector<unsigned char> received(packetSize, 0);
+            LoRa.readBytes(received.data(), packetSize);
+
+            int rssi = LoRa.packetRssi();    // Signal strength
+            float snr = LoRa.packetSnr();    // Signal-to-noise ratio
+        }
+    }
+
+The RSSI and SNR values are captured and forwarded to the PHP API as signal
+quality metrics, enabling the dashboard to track link health over time.
+
+5.2 DECRYPTION AND VALIDATION
+-----------------------------
+
+HQ maintains two decryption paths to support firmware upgrades:
+
+Path 1 - Structured Binary (current):
+    decryptStructuredPacket()
+    1. Verify magic bytes (0x31504653)
+    2. Verify protocol version
+    3. Verify packet length matches header.payloadLength + overhead
+    4. Verify CRC32 checksum
+    5. Extract nonce from packet
+    6. AES-CTR decrypt with nonce
+    7. Return plaintext payload string
+
+Path 2 - Legacy HEX (backward compatibility):
+    decryptLegacyHex()
+    1. Convert ASCII HEX string to bytes
+    2. AES-ECB decrypt (old method, no nonce)
+    3. Strip padding
+    4. Return plaintext
+
+The payload is validated using lookLikeValidPayload():
+    - Must contain "auth=AQUA77&"
+    - Must contain "&node="
+    - Must contain "&seq="
+
+Sequence tracking (lastSeq) rejects duplicate or out-of-order packets:
+    if (sequence <= lastSeq) {
+        // Duplicate/Reject
+    } else {
+        lastSeq = sequence;
+        // Forward to API
+    }
+
+5.3 HTTP FORWARDING WITH HMAC AUTHENTICATION
+--------------------------------------------
+
+HQ forwards validated sensor data to receive_data.php via HTTP POST:
+
+    POST /smartponic/receive_data.php
+    Headers:
+        Content-Type: application/json
+        X-API-Key: smartponic-hq-key
+        X-Timestamp: 1714000000
+        X-Signature: [HMAC-SHA256 of timestamp + body]
+
+JSON payload format:
+    {
+      "node_id": 1,
+      "rssi": -45,
+      "snr": 10.5,
+      "priority": "HIGH",
+      "report_mode": "CRITICAL",
+      "sequence": 1234,
+      "event_type": "telemetry",
+      "sensors": [
+        {"pin": 32, "sensor": "pH", "value": "7.2"},
+        {"pin": 33, "sensor": "TDS", "value": "450"}
+      ]
+    }
+
+The HMAC-SHA256 signature ensures:
+- authenticity: only HQ and PHP share the HMAC secret
+- integrity: any body modification invalidates the signature
+- replay protection: X-Timestamp prevents reuse of old requests
+
+5.4 OFFLINE STORAGE AND RETRY QUEUE
+-----------------------------------
+
+When HTTP POST fails (no WiFi or API unreachable), HQ queues payloads to
+local storage for later retry:
+
+    queueFailedJson(jsonBody)  ->  SD card or SPIFFS
+
+    Storage path: /pending_http_queue.ndjson  (newline-delimited JSON)
+
+Retry behavior (every 30 seconds):
+    retryQueuedHttpIfNeeded()
+    1. Open queue file
+    2. Read one line at a time
+    3. Attempt sendJsonToAPI()
+    4. On success: discard the line
+    5. On failure: keep in queue, stop retrying this cycle
+    6. Rewrite remaining queue to file
+
+Storage priority: SD card > SPIFFS > none
+
+This store-and-forward approach ensures zero data loss even during extended
+internet outages.
+
+5.5 RELAY CONTROL DOWNLINK
+---------------------------
+
+HQ also handles the downlink path for relay control commands:
+
+    pollControlQueueIfNeeded()  // Every 4 seconds
+    1. POST to control_queue.php with action=get_pending
+    2. For each pending command:
+       - Build encrypted LoRa control packet (cmd=relay, relay_id, state)
+       - Send via LoRa to target node
+       - POST to control_queue.php with action=mark_sent
+
+When the node executes the relay command, it sends an encrypted ACK back
+via LoRa. HQ receives this ACK and forwards it:
+
+    handleControlAckIfPresent()
+    1. Detect ack=relay in decrypted payload
+    2. Extract command_id, status, message
+    3. POST to control_queue.php with action=ack
+
+================================================================================
+                            CHAPTER 6: PHP BACKEND
+================================================================================
+
+6.1 API ENDPOINT (receive_data.php)
+-----------------------------------
+
+This is the primary ingestion point for all sensor data. Its responsibilities:
+
+1. Validate signed HTTP requests (API key + HMAC + timestamp)
+2. Parse and validate incoming JSON
+3. Route sensor values to per-sensor tables
+4. Trigger Telegram alerts
+5. Apply data retention policies
+
+Request validation flow:
+    verifySignedRequest(rawJson)
+    1. Check X-API-Key matches SMARTPONIC_API_KEY
+    2. Check X-Timestamp is numeric and within 5 minutes of server time
+    3. Compute HMAC-SHA256(timestamp + "\n" + body)
+    4. Compare against X-Signature (constant-time comparison via hash_equals)
+
+Input validation:
+- node_id: must be positive integer
+- sensors: must be non-empty array, max 32 items
+- Each sensor: must have pin (int), sensor (string), value (string)
+- priority: one of LOW, MEDIUM, HIGH (default: LOW)
+- report_mode: one of NORMAL, ABNORMAL, CRITICAL (default: NORMAL)
+
+6.2 DATA ROUTING TO PER-SENSOR TABLES
+--------------------------------------
+
+Instead of storing all sensor values in one generic table, the system uses
+dedicated tables for each sensor type:
+
+    sensor_readings (main record)
+        |
+        +-- temperature_data (reading_id, node_id, pin, value)
+        +-- humidity_data
+        +-- water_temp_data
+        +-- ph_data
+        +-- tds_data
+        +-- turbidity_data
+        +-- rain_data
+
+This design enables:
+- Efficient queries for specific sensor trends
+- Independent indexing per sensor type
+- Schema changes to one sensor without affecting others
+
+Invalid sensor values are logged to invalid_sensor_data:
+- DHT22 returning "nan" -> reason: "Check DHT sensor"
+- DS18B20 returning -127 -> reason: "Check DS18B20 sensor"
+- Humidity <0 or >100 -> reason: "Humidity out of valid range"
+- pH <0 or >14 -> reason: "pH out of valid range"
+
+6.3 CONTROL QUEUE ENDPOINT (control_queue.php)
+----------------------------------------------
+
+This endpoint manages relay command state machine:
+
+    States: pending -> sent -> done | failed
+
+Actions:
+    get_pending(node_id, limit, mark_sent)
+        - Returns pending commands for a node
+        - Optionally marks them as "sent" (so they aren't re-queued)
+
+    mark_sent(command_id)
+        - HQ calls after successfully transmitting via LoRa
+
+    ack(command_id, status, message)
+        - HQ calls after receiving ACK from node
+        - status: "done" or "failed"
+        - Updates done_at timestamp and result_message
+
+6.4 DATABASE SCHEMA
+-------------------
+
+Key tables:
+
+nodes                    - Node metadata (id, eui64, name, location, lat/lon)
+                         The eui64 column stores the hardware EUI-64 as the
+                         definitive unique identifier; id is the runtime
+                         nodeId (1-255) used in LoRa packet headers.
+sensor_readings          - Main reading record with priority, mode, RSSI/SNR
+                           Links to nodes via runtime nodeId, not EUI-64
+temperature_data         - Per-reading temperature values
+humidity_data            - Per-reading humidity values
+water_temp_data          - Per-reading water temperature values
+ph_data                  - Per-reading pH values
+tds_data                 - Per-reading TDS values
+turbidity_data           - Per-reading turbidity values
+rain_data                - Per-reading rain state
+invalid_sensor_data      - Logged sensor errors
+dashboard_settings       - System configuration key-value store
+sensor_profiles          - Per-node/sensor calibration and thresholds
+alerts                   - Active/acknowledged/resolved alerts
+relay_commands           - Command queue with state machine
+communication_health     - Signal quality metrics over time
+
+Indexes are created on (node_id, created_at) for all sensor tables,
+enabling efficient time-range queries for the dashboard.
+
+================================================================================
+                       CHAPTER 7: TELEGRAM INTEGRATION
+================================================================================
+
+7.1 BOT ARCHITECTURE (LONG POLLING)
+-----------------------------------
+
+Instead of webhook-based callbacks (which require a public-facing server),
+the system uses a long-polling runner (telegram_poll.php):
+
+    Run modes:
+    php telegram_poll.php --once   -> Process one batch, then exit
+    php telegram_poll.php --loop   -> Continuous polling (for systemd/service)
+
+Polling mechanism:
+    offset = telegramGetLastUpdateId()
+    updates = telegramGetUpdates(offset + 1, timeout=25)
+    for each update:
+        parse command
+        execute handler
+        telegramSetLastUpdateId(update_id)
+
+The offset mechanism ensures no update is processed twice, even across
+process restarts. State is persisted in MySQL tables.
+
+7.2 ALERT SYSTEM
+----------------
+
+Telegram alerts are triggered from receive_data.php in three scenarios:
+
+Scenario 1: Firmware report mode is ABNORMAL or CRITICAL
+    - Triggered by: receive_data.php (lines 366-428)
+    - Cooldown: 300 seconds (CRITICAL), configurable
+    - State key: "node:{id}:mode:{mode}"
+
+Scenario 2: Dashboard threshold profile violation (even during NORMAL)
+    - Triggered by: receive_data.php (lines 434-524)
+    - Uses per-sensor threshold_min/threshold_max from sensor_profiles
+    - Cooldown: cooldown_abnormal_s (default 300s)
+    - State key: "node:{id}:threshold:{sensor}:{low|high}"
+
+Scenario 3: Invalid sensor readings
+    - Triggered when: invalid_sensor_data has entries for this reading
+    - State key: "node:{id}:invalid_sensors"
+    - Cooldown: 300 seconds
+
+Alert cooldown prevents flood attacks on Telegram:
+    telegramShouldSendAlert(stateKey, cooldownSeconds)
+    1. Query last_sent_at for stateKey
+    2. If never sent OR (now - last_sent_at) >= cooldownSeconds -> ALLOW
+    3. Otherwise -> SUPPRESS
+
+7.3 BIDIRECTIONAL COMMANDS
+--------------------------
+
+Available Telegram commands:
+
+/whoami              - Returns the user's chat ID (for allowlist setup)
+/help, /start        - Shows all available commands
+/status [node]       - Latest packet summary (priority, mode, RSSI, alerts)
+/readings [node]     - Latest sensor values with units
+/alerts [node]       - List of alerts (active/ack/resolved)
+/ack <node> <key>   - Acknowledge an active alert
+/resolve <node> <key> - Mark an alert as resolved
+/relay <node> <id> <on|off> - Queue a relay command for execution
+/queue [node]        - View pending relay commands
+
+Example relay flow:
+    User: /relay 1 0 on
+    Bot:  Queued relay command #42: node 1 relay 0 ON
+    HQ:   (polls, gets pending command)
+    HQ:   (sends encrypted LoRa packet to node)
+    Node: (executes GPIO toggle, sends ACK)
+    HQ:   (receives ACK, posts to control_queue.php)
+    Bot:  (no direct reply; user sees /queue cleared)
+
+7.4 COOLDOWN AND DEDUPLICATION
+------------------------------
+
+The alert state table (telegram_alert_state) stores the last_sent_at
+timestamp for each unique alert state key:
+
+    CREATE TABLE telegram_alert_state (
+        state_key VARCHAR(190) PRIMARY KEY,
+        last_sent_at TIMESTAMP NULL,
+        updated_at TIMESTAMP
+    );
+
+This is shared between receive_data.php (alert sending) and telegram_poll.php
+(freshness checking), ensuring coherent cooldown across both entry points.
+
+For database resilience, if InnoDB tables fail (XAMPP tablespace issues),
+the system automatically falls back to MyISAM variants:
+    telegram_bot_state_v2 + telegram_alert_state_v2 (MyISAM)
+
+7.5 FRESHNESS MONITORING
+------------------------
+
+The telegram_poll.php --loop process also monitors node health:
+
+    telegramFreshnessCheck()
+    1. For each registered node:
+       - Get last sensor_readings.created_at
+       - age = now - created_at
+       - If age >= freshness_offline_s:
+            send "SmartPonic OFFLINE" alert (cooldown: 300s)
+         If age >= freshness_warning_s:
+            send "SmartPonic STALE" alert (cooldown: 300s)
+         If OFFLINE was sent but node recovered:
+            send "SmartPonic RECOVERED" message
+
+This provides a watchdog mechanism: if a node stops transmitting for
+too long (configurable, e.g., 15 minutes warning, 30 minutes offline),
+operators receive a Telegram alert even without explicit CRITICAL detection.
+
+================================================================================
+                             CHAPTER 8: DASHBOARD
+================================================================================
+
+8.1 DATA VISUALIZATION
+----------------------
+
+The PHP dashboard (dashboard.php) provides:
+
+- Real-time sensor readings from the latest packet
+- Communication overview panel:
+    - Node ID, Priority, Report Mode, Sequence Number
+    - RSSI and SNR signal quality indicators
+- Location metadata display (latitude, longitude, distance)
+- Communication analytics:
+    - Critical event count over time
+    - Priority percentage distribution
+    - Min/Max/Avg for each sensor type in selected time range
+- Signal quality tracking (RSSI/SNR history)
+- Health monitoring with data freshness detection
+- Threshold-based alert indicators
+
+8.2 SIGNAL QUALITY TRACKING
+----------------------------
+
+RSSI (Received Signal Strength Indicator) and SNR (Signal-to-Noise Ratio)
+are captured at HQ and stored in sensor_readings:
+
+    INSERT INTO sensor_readings (rssi, snr, ...) VALUES (-45, 10.5, ...)
+
+The dashboard plots these over time to detect:
+- Degrading link quality (falling RSSI)
+- Increasing noise (falling SNR)
+- Intermittent connectivity (gaps in data)
+
+This allows proactive maintenance before complete link failure.
+
+8.3 THRESHOLD BANDS ON TREND CHARDS
+------------------------------------
+
+Each sensor type has configurable min/max thresholds stored in
+sensor_profiles. The dashboard can render these as bands on trend charts:
+
+    [threshold_min] ---- lower bound band ----
+    [optimal range] ---- shaded optimal zone ----
+    [threshold_max] ---- upper bound band ----
+
+Values outside bands are highlighted in red (HIGH priority),
+values near boundaries are highlighted in yellow (MEDIUM priority).
+
+Note: Trend chart rendering with threshold bands is listed as a pending
+TODO in the project roadmap (project_progress.txt line 133).
+
+================================================================================
+                         CHAPTER 9: SECURITY ARCHITECTURE
+================================================================================
+
+9.1 LORA LAYER SECURITY (AES-CTR)
+---------------------------------
+
+All LoRa payloads are encrypted with AES-128-CTR using a shared 128-bit
+key ("SmartPonic123456"). This provides:
+
+- Confidentiality: Eavesdroppers cannot read sensor data
+- Semantic security: Identical plaintexts produce different ciphertexts
+  (due to unique nonce per packet)
+- No padding oracle attacks: CTR mode does not use padding
+
+Key management consideration:
+The symmetric key is hardcoded in both node and HQ firmware. In production,
+this should be stored in ESP32 secure boot eFuses or an encrypted flash
+partition. The current implementation assumes a trusted deployment environment.
+
+9.2 INTEGRITY PROTECTION (CRC32)
+---------------------------------
+
+CRC32 checksum is prepended to every packet and validated at HQ before
+decryption:
+
+    receivedChecksum = packet[packetSize - 4 ... packetSize - 1]
+    calculatedChecksum = CRC32(packet[0 ... packetSize - 5])
+
+This prevents:
+- Bit flip errors during LoRa transmission
+- Malformed packet injection attacks
+- Truncated or garbled packet acceptance
+
+The checksum covers the encrypted region, protecting both plaintext
+content and structural fields from tampering.
+
+9.3 HTTP API SECURITY (HMAC-SHA256)
+------------------------------------
+
+Every HTTP request from HQ to PHP includes three security headers:
+
+    X-API-Key:       Shared API key (pre-shared between HQ and PHP)
+    X-Timestamp:     Unix timestamp of request generation
+    X-Signature:     HMAC-SHA256(timestamp + "\n" + body, secret)
+
+PHP validates:
+1. API key matches (authenticates the caller)
+2. Timestamp is recent (within 5 minutes, prevents replay)
+3. HMAC signature matches (ensures body integrity)
+
+Replay attack prevention:
+The 5-minute timestamp window (SMARTPONIC_REQUEST_MAX_AGE_SECONDS) ensures
+captured requests cannot be replayed after 5 minutes. The HMAC prevents
+modification of the body within that window.
+
+9.4 NODE CONFIGURATION PROTECTION
+-----------------------------------
+
+Node firmware endpoints are protected by X-Node-Key:
+
+    requireAuthorizedNodeKey(allowBootstrap)
+    - If no key configured: allow deployment (bootstrap mode)
+    - If key configured: require matching X-Node-Key header
+    - Invalid key -> HTTP 403
+
+This prevents unauthorized reconfiguration of sensor pins, calibration
+coefficients, or node identity after initial deployment.
+
+9.5 TELEGRAM ACCESS CONTROL
+----------------------------
+
+Telegram bot access is restricted to an allowlist of chat IDs:
+
+    telegramIsAllowedChat(config, chatId)
+    1. Load allowed_chat_ids from telegram_config.php
+    2. Compare incoming chatId against allowlist
+    3. Reject with "Unauthorized chat" message if not found
+
+This ensures that even if someone discovers the bot's username, they
+cannot issue commands or receive alerts without explicit authorization.
+
+================================================================================
+                    CHAPTER 10: NFC CONFIGURATION SYSTEM
+================================================================================
+
+10.1 NFC CONFIGURATION OVERVIEW
+-------------------------------
+
+SmartPonic supports wireless node configuration via NFC tap. Instead of
+connecting the ESP32 Node to a WiFi access point for HTTP-based
+configuration, users can tap their phone directly to the PN532 NFC module
+attached to the ESP32. This is particularly useful for:
+
+- Quick reconfiguration in the field without opening the enclosure
+- Scenarios where WiFi infrastructure is unavailable
+- iOS users who cannot use Android HCE (Host Card Emulation)
+- Physical audit trail via NFC tag interchange
+
+The system implements two complementary NFC paths:
+
+(a) Direct Android HCE (Host Card Emulation): Primary method for Android
+    users. The phone emulates an NFC smart card; ESP32 reads config
+    directly from the phone via ISO-DEP protocol.
+
+(b) Physical NTAG215 Tag: iOS fallback. The Flutter app writes an
+    encrypted config to a physical NTAG215 NFC tag; the user then taps
+    the tag to the ESP32 PN532 reader.
+
+10.2 PN532 HARDWARE INTERFACE
+-----------------------------
+
+The PN532 NFC module is connected to the ESP32 Node via I2C:
+
+    PN532 Pin    ESP32 GPIO
+    ---------   ----------
+    VCC         5V
+    GND         GND
+    SDA         GPIO 21 (I2C SDA)
+    SCL         GPIO 22 (I2C SCL)
+    IRQ         GPIO 27 (interrupt, optional)
+    NSS         GND (I2C mode select)
+
+The PN532 is initialized over I2C using the Adafruit_PN532 library:
+
+    Wire.begin(NFC_I2C_SDA, NFC_I2C_SCL);  // Start I2C bus
+    _nfc.begin();                          // Initialize PN532
+    _nfc.setPassiveActivationRetries(0xFF);
+    _nfc.SAMConfig();                      // Configure Secure Access Module
+
+LED indicator on GPIO 2 provides visual feedback:
+- Solid ON while waiting for NFC tap
+- Flashing during read operation
+- 5 quick flashes on successful configuration
+
+10.3 DIRECT ANDROID HCE (HOST CARD EMULATION)
+--------------------------------------------
+
+When an Android phone running the SmartPonic app taps the PN532:
+
+    [Android Phone]  ---ISO-DEP APDU---  [PN532]  ---I2C---  [ESP32 Node]
+
+The phone's HCE service registers with the Android OS an AID (Application
+Identifier): F0.53.4D.41.52.54.50.4F.4E.49.43 (ASCII: "F0.SMARTPONI C")
+
+The ESP32 acts as the NFC reader, sending APDU commands and collecting
+responses from the phone. The protocol sequence is:
+
+Step 1 - Target Selection:
+    The ESP32 polls for ISO14443A targets using inListPassiveTarget().
+    On detection, it selects the SmartPonic AID.
+
+Step 2 - SELECT AID APDU:
+    Command:  00 A4 04 00 0B F0 53 4D 41 52 54 50 4F 4E 49 43 00
+    Response: 90 00 (status: success, SW1-SW2)
+
+Step 3 - GET LENGTH APDU:
+    Command:  00 CA 00 00 04
+    Response: [4-byte big-endian payload length] + 90 00
+    The 4-byte length indicates total encrypted payload size (max 2048).
+
+Step 4 - READ BINARY APDU (chunked):
+    Command:  00 B0 [offset_hi] [offset_lo] [max_len]
+    Response: [data chunk] + 90 00
+    Payload is read in 48-byte chunks until full length is retrieved.
+
+Step 5 - AES-CTR Decryption:
+    Once complete encrypted payload is received:
+    [16-byte IV/nonce] + [ciphertext] -> AES-CTR decrypt -> JSON config
+
+The ESP32 implementation (NFCConfigReader::readDirectHceConfig):
+
+    exchangeApdu() wraps inDataExchange() for APDU send/receive
+    isSuccessStatus() checks response SW (90 00 = OK)
+    decryptPayload() performs AES-CTR with the node's stored AES key
+
+10.4 PHYSICAL NTAG215 TAG FALLBACK
+----------------------------------
+
+For devices without HCE support (iOS), or as a backup method:
+
+    [Android Phone]  ---NFC write---  [NTAG215 Tag]  ---NFC read---  [ESP32]
+
+The NTAG215 NFC tag has 135 pages of 4 bytes each (540 bytes total user
+memory, 504 bytes usable for application data):
+
+    Pages 0-3:   Manufacturer data (read-only, locked)
+    Pages 4-39:  Primary user memory (144 bytes)
+    Pages 40-135: Extended user memory (384 bytes)
+
+The ESP32 reads pages starting at page 4:
+
+    page = 4
+    while offset < NFC_MAX_PAYLOAD_SIZE:
+        ntag2xx_ReadPage(page, pageData)  // 4 bytes per page
+        Copy pageData to buffer
+        page++
+        if page > 135: break
+
+The raw data is parsed as an NDEF (NFC Data Exchange Format) record:
+
+    [Header (1B)] [Type Len (1B)] [Payload Len (4B, BE)] [Type] [Payload]
+    -> Extract payload (encrypted config)
+
+The encrypted payload is then AES-CTR decrypted using the same key.
+
+Note: Physical tag storage is limited to ~500 bytes. For large
+calibration profiles or extended sensor configurations, the Android
+HCE path is preferred (no memory limit).
+
+10.5 ENCRYPTION AND SECURITY
+----------------------------
+
+All NFC payloads use AES-128-CTR encryption, identical to the LoRa
+communication layer:
+
+    Key:         16-character string from ESP32 Preferences "secrets" namespace
+    Nonce/IV:    16 bytes prepended to ciphertext
+    Mode:        AES-128-CTR (same function for encrypt/decrypt)
+    Plaintext:   JSON config: { config, nodeId, lat, lon, calibration, keys, seq, ts }
+
+The AES key is shared between:
+- LoRa transmitter (node -> HQ)
+- NFC configuration (phone -> node)
+- HTTP API (HQ -> PHP)
+
+This means the Flutter app must use the same AES key to encrypt the NFC
+payload as configured in the ESP32 node's flash storage.
+
+Security notes:
+- No per-packet authentication (HMAC) on NFC payloads
+- Replay protection via seq (sequence number) and ts (timestamp) in JSON
+- Physical access required for NFC configuration (tap phone to device)
+- Optional: node_key header can enforce additional configuration protection
+
+10.6 IOS FALLBACK WORKFLOW
+--------------------------
+
+iOS does not support third-party HCE (Host Card Emulation). Apple
+restricts NFC card emulation to Apple Pay and specific use cases.
+
+iOS users configure the ESP32 Node via physical NFC tag:
+
+    1. User configures ESP32 settings in SmartPonic Flutter app
+    2. User taps phone to blank NTAG215 NFC tag
+    3. Flutter app encrypts config and writes to NTAG215 pages
+    4. User physically presents tag to ESP32 PN532 reader
+    5. ESP32 reads, decrypts, and applies configuration
+    6. Confirmation via LED flash pattern on ESP32
+
+The same ESP32 NFCConfigReader class handles both workflows:
+- HCE path: attempts first (inListPassiveTarget + ISO-DEP APDUs)
+- NTAG215 path: automatic fallback if HCE read fails
+
+================================================================================
+                CHAPTER 11: EVENT-DRIVEN AUTOMATION
+================================================================================
+
+11.1 AUTOMATION ARCHITECTURE
+-----------------------------
+
+SmartPonic implements an event-driven automation layer that evaluates
+sensor readings against configurable threshold rules and executes
+corresponding relay actions. The automation system is designed with a
+human-in-the-loop safety model: safe actions execute automatically,
+while unsafe actions require explicit Telegram approval before execution.
+
+The automation engine is triggered in receive_data.php after each
+validated sensor reading is stored:
+
+    evaluateAutomationRules(nodeId, sensorKey, value, priority)
+    1. Load active automation rules for this node + sensor
+    2. Evaluate condition (threshold comparison)
+    3. If condition met:
+       - AUTO mode:        create relay command immediately + notify Telegram
+       - APPROVAL mode:    create pending_approval + send approval request
+       - ALERT_ONLY mode:  send Telegram alert only
+
+Automation failures (database errors, Telegram send failures) must never
+break the data ingestion pipeline. All automation logic is wrapped in
+try-catch with silent failure logging.
+
+11.2 AUTOMATION RULES TABLE
+---------------------------
+
+Each automation rule defines a single sensor-threshold-action mapping:
+
+    CREATE TABLE automation_rules (
+      id                INT AUTO_INCREMENT PRIMARY KEY,
+      node_id           TINYINT UNSIGNED NOT NULL,
+      sensor_key        VARCHAR(32) NOT NULL,        -- e.g., "turbidity", "ph"
+      condition_type    ENUM('high','low') NOT NULL,
+      threshold_value   DECIMAL(10,4) NOT NULL,
+      target_relay_id   TINYINT UNSIGNED NOT NULL,    -- GPIO index on node
+      target_action     ENUM('ON','OFF') NOT NULL,
+      execution_mode    ENUM('auto','approval_required','alert_only') NOT NULL,
+      active            BOOLEAN DEFAULT TRUE,
+      cooldown_seconds  INT UNSIGNED DEFAULT 300,
+      created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+Default aquaponics automation rules (seeded at system setup):
+
+    | Sensor      | Condition | Threshold  | Relay | Action | Mode            |
+    |-------------|-----------|------------|-------|--------|-----------------|
+    | turbidity   | > 300 NTU | 300        | 0     | ON     | AUTO            |
+    | turbidity   | < 250 NTU | 250        | 0     | OFF    | AUTO            |
+    | water_temp  | > 30 C    | 30         | 0     | ON     | AUTO            |
+    | water_temp  | < 18 C    | 18         | 0     | ON     | ALERT_ONLY      |
+    | ph          | < 6.0     | 6.0        | 1     | ON     | APPROVAL        |
+    | ph          | > 8.0     | 8.0        | 1     | ON     | APPROVAL        |
+    | tds         | > 800     | 800        | 1     | ON     | ALERT_ONLY      |
+    | temperature | > 35 C    | 35         | 1     | ON     | ALERT_ONLY      |
+
+Each rule has an independent cooldown to prevent rapid flapping.
+The cooldown is tracked per-rule, keyed as: "node:{id}:rule:{ruleId}"
+
+11.3 EXECUTION MODES
+--------------------
+
+SmartPonic defines three execution modes that reflect the severity and
+reversibility of the action:
+
+AUTO (automatic execution):
+    The relay command is created immediately without waiting.
+    Telegram notification is sent concurrently.
+    Appropriate for: safe, reversible actions (water circulation via pump).
+
+    Flow: threshold crossed -> create relay_command (status=pending) ->
+           send Telegram notification -> HQ polls -> forwards to node
+
+APPROVAL_REQUIRED (human-in-the-loop):
+    A pending approval record is created, blocking relay execution.
+    A Telegram request is sent to the operator asking for /approve {cmdId}.
+    If not approved within 10 minutes, the pending command expires.
+
+    Flow: threshold crossed -> create pending_approval ->
+           send Telegram approval request -> wait for /approve or /cancel
+           -> on approve: execute relay_command -> on cancel: discard
+
+ALERT_ONLY (monitoring only):
+    No relay action is taken. A Telegram alert is sent to alert the
+    operator, who must take manual action.
+
+    Flow: threshold crossed -> send Telegram alert only
+
+11.4 PENDING APPROVALS WORKFLOW
+------------------------------
+
+When an APPROVAL_REQUIRED rule triggers:
+
+    CREATE TABLE pending_approvals (
+      id           INT AUTO_INCREMENT PRIMARY KEY,
+      command_id   INT UNSIGNED NOT NULL,        -- FK to relay_commands.id
+      rule_id      INT NOT NULL,
+      node_id      TINYINT UNSIGNED NOT NULL,
+      relay_id     TINYINT UNSIGNED NOT NULL,
+      action       VARCHAR(4) NOT NULL,
+      trigger_value DECIMAL(10,4) NOT NULL,
+      status       ENUM('pending','approved','cancelled','expired') DEFAULT 'pending',
+      chat_id      BIGINT,
+      created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      expires_at   TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL 10 MINUTE)
+    );
+
+The 10-minute expiration prevents stale commands from executing if the
+operator is unavailable. If no /approve or /cancel is received within
+10 minutes, the command transitions to 'expired' and is cleaned up.
+
+Expire check runs during each telegram_poll.php cycle:
+    expirePendingApprovals()
+    1. UPDATE pending_approvals SET status='expired'
+       WHERE status='pending' AND expires_at < NOW()
+    2. DELETE expired records older than 24 hours
+
+11.5 TELEGRAM /approve AND /cancel COMMANDS
+-------------------------------------------
+
+Operator approves a pending automation command:
+
+    User: /approve 42
+    Bot:  Approving automation command #42 (node 1 relay 0 ON)
+    Bot:  Command executed. Node confirmed: pump ON.
+
+    Command execution:
+    1. Validate user chat_id is in allowed_chat_ids
+    2. Verify pending_approvals.id = 42 AND status = 'pending'
+    3. Update status = 'approved'
+    4. Create or update relay_commands record with target relay state
+    5. HQ polls, forwards to node, receives ACK
+
+Operator cancels a pending automation command:
+
+    User: /cancel 42
+    Bot:  Cancelled automation command #42 (node 1 relay 0 ON)
+
+    Cancellation:
+    1. Validate chat_id
+    2. Update pending_approvals.status = 'cancelled'
+    3. relay_commands record is left as-is (already expired if not acted on)
+
+11.6 SAFETY PRINCIPLES
+----------------------
+
+The automation system is designed with multiple layers of safety:
+
+1. SAFE ACTIONS ONLY: AUTO mode is only used for physically reversible
+   actions (water pump toggle for circulation/filtration). It is never
+   used for chemical dosing (pH adjusters) or temperature control.
+
+2. APPROVAL FOR HAZARDOUS ACTIONS: Any action affecting water chemistry
+   (pH dosing, nutrient dosing) is APPROVAL_REQUIRED. This ensures a
+   human operator assesses the situation before any chemical is introduced.
+
+3. ALERT_ONLY FOR UNCERTAIN: When the correct response is ambiguous
+   (water temperature too low - heating is complex/dangerous), the
+   system alerts the operator without attempting any automatic response.
+
+4. INDEPENDENT COOLDOWNS: Each automation rule has its own cooldown
+   timer. A triggered rule does not affect cooldown timers on other rules.
+
+5. HARDWARE INTERLOCK: Physical relay wiring should include normally-open
+   contacts and manual overrides, ensuring manual shutdown is always
+   possible regardless of firmware state.
+
+6. EXPIRY ON PENDING: Pending approvals expire after 10 minutes if
+   unacted upon, preventing stale commands from executing.
+
+================================================================================
+                CHAPTER 12: CONCLUSION AND FUTURE WORK
+================================================================================
+
+10.1 SUMMARY OF ACHIEVEMENTS
+-----------------------------
+
+This project demonstrates a complete, production-grade IoT monitoring
+and control system with the following key achievements:
+
+1. ADAPTIVE COMMUNICATION: The dynamic priority-based reporting system
+   reduces unnecessary transmissions by ~96% during normal operation
+   (4 packets/hour vs naive 720 packets/hour at 5-second sampling), while
+   providing sub-second critical alerts when needed.
+
+2. END-TO-END SECURITY: A defense-in-depth approach protects data at
+   every layer - AES-CTR encryption over LoRa, CRC32 integrity
+   validation, HMAC-SHA256 authenticated HTTP API, and chat-ID allowlist
+   for Telegram access.
+
+3. BIDIRECTIONAL IoT: The relay control command pipeline demonstrates
+   true bidirectional communication - from Telegram through PHP API
+   through HQ gateway via encrypted LoRa to the node, completing a
+   full round-trip acknowledgment.
+
+4. STORE-AND-FORWARD RELIABILITY: The node-side FIFO retry queue and
+   HQ-side SD/SPIFFS-backed HTTP retry queue ensure zero data loss
+   during temporary link failures.
+
+5. OPERATIONAL ALERTING: The Telegram integration provides real-time
+   situational awareness through threshold-based alerts, freshness
+   monitoring, and offline detection - all with deduplication cooldowns
+   to prevent alert fatigue.
+
+10.2 SYSTEM SPECIFICATIONS
+--------------------------
+
+Parameter                          Value
+---------                          -----
+Sensor sampling interval            5 seconds
+NORMAL report interval              15 minutes
+ABNORMAL report interval            5 minutes
+CRITICAL report interval            1 minute (immediate bypass)
+Node retry queue size               12 packets max
+Node retry interval                 30 seconds
+HQ HTTP retry interval              30 seconds
+Lora frequency                      433 MHz
+Encryption                          AES-128-CTR
+Nonce size                          16 bytes
+Packet overhead                     34 bytes (header+nonce+crc)
+Max sensors per node                15 GPIO
+Relay control round-trip            ~8-12 seconds (estimated)
+Telegram alert cooldown (CRITICAL)  300 seconds (default)
+Telegram alert cooldown (ABNORMAL)  300 seconds (default)
+Telegram freshness warning          300 seconds (default)
+Telegram freshness offline          900 seconds (default)
+HTTP request timestamp window       300 seconds
+
+10.3 FUTURE WORK
+-----------------
+
+The following enhancements are identified for future development:
+
+(a) Threshold Bands on Trend Charts
+    - API data is already captured in database
+    - Chart rendering with threshold band visualization pending
+    - Would enable operators to quickly see which readings are out of range
+
+(b) Mute/Snooze Controls
+    - Per-node or per-sensor alert muting for scheduled maintenance
+    - Timed snooze windows (e.g., mute for 2 hours)
+    - Dashboard UI for managing mute state
+
+(c) Per-Command Rate Limiting
+    - Telegram Bot API provides per-minute and per-hour rate limits
+    - Implementing client-side rate limiting prevents command rejection
+
+(d) Multi-Node Aggregation Dashboard
+    - Current dashboard assumes single-node deployment
+    - Multi-node view would show all nodes on one screen
+    - Comparative analytics across nodes
+
+(e) Secure Key Management
+    - Replace hardcoded AES key with ESP32 secure boot / eFuse storage
+    - HTTPS/TLS for PHP API endpoints
+    - OAuth2 for dashboard authentication
+
+(f) Automated Calibration
+    - Calibration profiles already supported in firmware
+    - Dashboard UI for calibrating sensors and pushing profiles
+    - Automated calibration based on known reference solutions
+
+(g) Data Export and Reporting
+    - CSV/Excel export of historical data
+    - Automated daily/weekly summary reports via Telegram or email
+    - PDF report generation for regulatory compliance
+
+================================================================================
+                                  REFERENCES
+================================================================================
+
+[1]  Espressif Systems. ESP32 Datasheet. https://www.espresso.org
+[2]  Semtech. SX1276/77/78/79 Datasheet. LoRa RF Technology.
+[3]  mbedTLS. AES-CTR Mode Implementation. ARM Limited.
+[4]  ArduinoJson. JSON Serialization for Embedded Systems.
+[5]  Telegram Bot API. Long Polling Method Documentation.
+[6]  MySQL 8.0 Reference Manual. Oracle Corporation.
+[7]  PHP 8 Documentation. The PHP Group.
+[8]  CRC32. Ethernet Standard IEEE 802.3 Polynomial.
+[9]  Adafruit. PN532 NFC/RFID Controller. Arduino Library.
+[10]  NFC Forum. NDEF (NFC Data Exchange Format) Specification.
+[11]  ISO/IEC 14443-4. Identification Cards - Contactless Integrated
+     Circuit Cards - Part 4: Protocol, transmission protocol.
+[12]  Android Developers. Host Card Emulation (HCE). Google.
+
+================================================================================
+                                    APPENDIX
+================================================================================
+
+A. FILE STRUCTURE
+----------------
+
+firmware_esp32/
+  ESP32_Node/
+    src/
+      Aquaponic_LoRa_Transmitter.cpp   <- Node firmware (main, WiFi AP config)
+    include/                           <- (SmartPacket.h in shared/)
+    .pio/libdeps/                      <- PlatformIO dependencies
+  ESP32_Node_NFC/
+    src/
+      Aquaponic_LoRa_Transmitter.cpp   <- Node firmware with NFC support
+      NFCConfigReader.cpp              <- NFC configuration reader (PN532 + HCE)
+    include/
+      NFCConfigReader.h                <- NFC reader class header
+    platformio.ini                    <- NFC_CONFIG_ENABLED build flag
+    .pio/libdeps/                      <- PlatformIO dependencies
+      (includes Adafruit PN532 + Adafruit BusIO)
+  ESP32_HQ_Site/
+    src/
+      main.cpp                         <- HQ Gateway firmware
+    include/
+    .pio/libdeps/
+  shared/
+    SmartPacket.h                      <- Shared packet definitions
+
+php/
+  receive_data.php                     <- Main data ingestion API
+  control_queue.php                    <- Relay command queue API
+  dashboard_data.php                   <- Dashboard data provider
+  dashboard.php                        <- Dashboard UI
+  dashboard_app.js                     <- Dashboard JavaScript
+  dashboard.css                        <- Dashboard stylesheet
+  dashboard_store.php                  <- Dashboard data helpers
+  data_policy.php                      <- Data retention policy
+  control_lib.php                      <- Relay command library
+  db.php                               <- Database connection
+  security_config.php                  <- API keys and HMAC secrets
+  telegram_config.example.php          <- Telegram bot config template
+  telegram_config.php                  <- Telegram bot config (gitignored)
+  telegram_lib.php                     <- Telegram API helpers
+  telegram_poll.php                    <- Telegram long-polling runner
+  init.sql                             <- Database schema
+
+B. DATABASE TABLES SUMMARY
+--------------------------
+
+Table                   Purpose
+-----                   -------
+nodes                   Node registry (id, name, location)
+sensor_readings         Main record (priority, mode, RSSI, SNR, lat/lon)
+temperature_data       Temperature sensor readings
+humidity_data          Humidity sensor readings
+water_temp_data        Water temperature readings
+ph_data                pH sensor readings
+tds_data               TDS (dissolved solids) readings
+turbidity_data         Turbidity sensor readings
+rain_data              Rain sensor readings
+invalid_sensor_data    Sensor error log
+sensor_profiles        Calibration and threshold profiles
+alerts                 Alert tracking (active/ack/resolved)
+relay_commands         Relay command queue (pending/sent/done)
+communication_health   Signal quality metrics
+dashboard_settings     System configuration key-value store
+telegram_alert_state   Alert cooldown state
+telegram_bot_state     Telegram polling offset
+
+================================================================================
+                              END OF THESIS DOCUMENT
+================================================================================

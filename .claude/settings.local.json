@@ -4,7 +4,21 @@
       "Read(//c/Users/HAKIMIE/Documents/PlatformIO/Projects/ESP32_HQ_Site/**)",
       "Bash(pio lib:*)",
       "Bash(flutter analyze *)",
-      "mcp__ide__executeCode"
+      "mcp__ide__executeCode",
+      "Bash(cp -r firmware_esp32/ESP32_Node/src/* firmware_esp32/ESP32_Node_NFC/src/)",
+      "Bash(cp -r firmware_esp32/ESP32_Node/include/* firmware_esp32/ESP32_Node_NFC/include/)",
+      "WebSearch",
+      "WebFetch(domain:support.milesight-iot.com)",
+      "mcp__ide__getDiagnostics",
+      "Bash(pio run *)",
+      "Bash(where.exe pio *)",
+      "Bash(Get-Command pio *)",
+      "Bash(Select-Object -ExpandProperty Source)",
+      "Read(//c/Users/HAKIMIE/.platformio/penv/Scripts/**)",
+      "Read(//c/Users/HAKIMIE/.local/bin/**)",
+      "Bash(dir \"C:\\\\Users\\\\HAKIMIE\\\\.platformio\")",
+      "Bash(C:/Users/HAKIMIE/.platformio/penv/Scripts/pio run *)",
+      "Bash(Remove-Item *)"
     ]
   },
   "spinnerTipsEnabled": false,
