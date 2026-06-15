@@ -1,0 +1,228 @@
+================================================================================
+                    SMARTPONIC SYSTEM — END-TO-END FLOWCHART
+================================================================================
+
+  +------------------------------------------------------------------+
+  |                        SENSOR LAYER                              |
+  |  +--------+  +----------+  +----+  +-----+  +---------+  +----+  |
+  |  | DHT22  |  | DS18B20  |  | pH |  | TDS |  |Turbidity|  |Rain|  |
+  |  |(Tmp/Hmd)| |(WaterTmp)|  |    |  |     |  |         |  |    |  |
+  |  +----+---+  +----+-----+  +-+--+  +-+---+  +----+----+  +-+--+  |
+  |       |            |          |        |           |        |     |
+  +-------+------------+----------+--------+-----------+--------+-----+
+          |            |          |        |           |        |
+          |     GPIO (Analog / Digital / 1-Wire / OneWire)
+          |            |          |        |           |        |
+          v            v          v        v           v        v
+  +==================================================================+
+  |                    ESP32 NODE LAYER                              |
+  |                                                                  |
+  |  ========================   ====================================  |
+  |  || 30-PIN NODE (WiFi) ||   || 38-PIN NODE (NFC)             ||  |
+  |  ||                   ||   ||                                ||  |
+  |  || [1] Sample sensors||   || [1] Sample sensors (90s)       ||  |
+  |  ||     (every 5s)    ||   || [2] PriorityEngine classify    ||  |
+  |  || [2] Classify      ||   || [3] Build binary payload       ||  |
+  |  ||     priority      ||   || [4] AES-128-CTR encrypt        ||  |
+  |  || [3] Build packet  ||   || [5] CAD (Listen-Before-Talk)  ||  |
+  |  || [4] AES-128-CTR   ||   || [6] LoRa TX (433 MHz)         ||  |
+  |  || [5] LoRa TX       ||   || [7] Wait for ACK (3 tries)    ||  |
+  |  || [6] Retry queue   ||   || [8] Missed 5 ACKs → re-reg    ||  |
+  |  ||   (max 12 pkts)   ||   || [9] ADR based on HQ RSSI      ||  |
+  |  ||                   ||   ||                                ||  |
+  |  || Config via:       ||   || Config via:                    ||  |
+  |  ||  - WiFi AP        ||   ||  - NFC (PN532) HCE/tag         ||  |
+  |  ||    (192.168.4.1)  ||   ||  - Serial CLI                  ||  |
+  |  ||  - Serial CLI     ||   ||                                ||  |
+  |  ||  - Flutter app    ||   ||  State Machine:                 ||  |
+  |  ||                   ||   ||  REGISTERING → CONNECTED        ||  |
+  |  ========================   ====================================  |
+  |                                                                  |
+  +==================================================================+
+            |                                        |
+            |  LoRa Radio (433 MHz, SF9, 125kHz BW)  |
+            +-------------------+--------------------+
+                                |
+                        LoRa RX Packet
+                    (Magic: "SPF1" 0x31504653)
+                    (Header 23B + Nonce 16B + Payload + CRC32)
+                                |
+                                v
+  +==================================================================+
+  |                 ESP32 HQ GATEWAY (ESP32-S2 Mini)                |
+  |                                                                  |
+  |  +------------------+    +-------------------+                   |
+  |  | LoRaReceiver     |    | RelayController  |                   |
+  |  |  - Validate magic|    |  - Node registry  |                   |
+  |  |  - Check version |    |  - Poll control   |                   |
+  |  |  - Verify CRC32  |    |    queue (5s)     |                   |
+  |  |  - AES-128-CTR   |    |  - LoRa downlink  |                   |
+  |  |    decrypt        |    |    relay cmds     |                   |
+  |  +--------+---------+    +--------+----------+                   |
+  |           |                       |                              |
+  |           |  Is it a "hello"      |  Relay command               |
+  |           |  registration?        |  for specific node            |
+  |           +-------+------+       |                              |
+  |                   |      |       v                              |
+  |              Yes /       \ No    +----------------------------+  |
+  |                v          v      | TelegramBot (on-device)    |  |
+  |  +-----------------+  +--------+ |  - Polls Telegram API      |  |
+  |  | Send "approve"  |  |Send ACK| |  - /status, /readings,    |  |
+  |  | downlink to node|  |downlink| |    /relay, /alerts, etc.  |  |
+  |  +--------+--------+  +---+----+ |  - Freshness monitoring   |  |
+  |           |                |      +----------------------------+  |
+  |           |                |                                      |
+  |           |     +----------+                                      |
+  |           |     |                                                 |
+  |           v     v                                                 |
+  |  +----------------------------+                                   |
+  |  | HttpForwarder              |                                   |
+  |  |  - Build JSON payload      |                                   |
+  |  |  - HMAC-SHA256 sign        |                                   |
+  |  |  - HTTP POST to PHP        |                                   |
+  |  |  - Retry queue on failure  |                                   |
+  |  +-------------+--------------+                                   |
+  |                |                                                  |
+  |         WiFi (HTTP POST)                                          |
+  +==================================================================+
+                    |
+                    v
+  +==================================================================+
+  |                    PHP BACKEND (XAMPP / Apache)                  |
+  |                                                                  |
+  |  +----------------+  +----------------+  +------------------+    |
+  |  | receive_data   |  | control_queue  |  | dashboard_data   |    |
+  |  |  - Validate    |  |  - get_pending |  |  - Nodes list    |    |
+  |  |    HMAC-SHA256 |  |  - mark_sent   |  |  - Summary       |    |
+  |  |  - Check       |  |  - ack         |  |  - Analytics     |    |
+  |  |    timestamp   |  |                |  |  - Sensor history|    |
+  |  |    (5min window)|  |  Relay cmds   |  |  - Signal history|    |
+  |  |  - Auto-       |  |  queued by     |  |  - Alerts        |    |
+  |  |    register    |  |  Telegram bot  |  |  - Comms health  |    |
+  |  |    new nodes   |  |  or dashboard  |  |  - Time ranges   |    |
+  |  |  - Validate    |  +-------+-------+  +--------+---------+    |
+  |  |    sensor vals |          |                    |              |
+  |  |  - Insert to DB|          |                    |              |
+  |  +-------+--------+          |                    |              |
+  |          |                   |                    |              |
+  |          v                   v                    v              |
+  |  +==========================================================+   |
+  |  |              MYSQL DATABASE (18+ tables)                 |   |
+  |  |  sensor_readings  sensor_data  nodes  relay_commands    |   |
+  |  |  temperature_data humidity_data water_temp_data          |   |
+  |  |  ph_data  tds_data  turbidity_data  rain_data            |   |
+  |  |  alerts  communication_health  sensor_profiles           |   |
+  |  |  pending_approvals  telegram_bot_state                   |   |
+  |  |  dashboard_settings  telegram_alert_state                |   |
+  |  +==========================================================+   |
+  |           |                    |                    |           |
+  +-----------+--------------------+--------------------+-----------+
+              |                    |                    |
+              v                    v                    v
+  +============+  +=================+  +=======================+
+  | TELEGRAM   |  | LARAVEL         |  | FLUTTER MOBILE APP   |
+  | BOT (PHP)  |  | DASHBOARD (Web) |  |                      |
+  |            |  |                 |  | [Device Tab]         |
+  | /status    |  | Web-based       |  |  - Live node health  |
+  | /nodes     |  | monitoring UI   |  |  - Sensor matrix     |
+  | /readings  |  | with charts &   |  |  - Diagnostics        |
+  | /alerts    |  | analytics       |  |                      |
+  | /relay     |  |                 |  | [Config Tab]         |
+  | /queue     |  |                 |  |  - Build config      |
+  | /approve   |  |                 |  |  - Deploy via HTTP   |
+  | /cancel    |  |                 |  |    (to node AP)      |
+  |            |  |                 |  |  - Deploy via NFC    |
+  | Freshness  |  |                 |  |    (HCE or tag)      |
+  | monitoring:|  |                 |  |  - GPS location      |
+  | STALE 5min |  |                 |  |  - Security keys     |
+  | OFFLINE 15 |  |                 |  |                      |
+  |            |  |                 |  | [Vault Tab]           |
+  |            |  |                 |  |  - Save/load config  |
+  |            |  |                 |  |    snapshots         |
+  |            |  |                 |  |                      |
+  |            |  |                 |  | [Calibration Tab]    |
+  |            |  |                 |  |  - Sensor thresholds |
+  |            |  |                 |  |  - Calibration coeffs |
+  +============+  +=================+  +=======================+
+
+
+================================================================================
+                    CONTROL / COMMAND FLOW (REVERSE DIRECTION)
+================================================================================
+
+  User sends command
+         |
+         v
+  +=====================+    +======================+
+  | TELEGRAM BOT        |    | FLUTTER APP          |
+  | /relay <node> <on>  |    | (Direct to Node AP)  |
+  +--------+------------+    +----------+-----------+
+           |                          |
+           | HTTP                     | HTTP POST /config
+           v                          | (192.168.4.1)
+  +=====================+            |
+  | control_queue.php   |            v
+  | INSERT relay_command |   +==================+
+  +--------+------------+   | ESP32 NODE (30p) |
+           |                 | Apply config     |
+           | Polled by       +==================+
+           v
+  +=====================+
+  | ESP32 HQ Gateway    |
+  | RelayController     |
+  | polls every 5s      |
+  | GET get_pending     |
+  +--------+------------+
+           |
+           | LoRa Downlink
+           v
+  +=====================+
+  | ESP32 NODE          |
+  | Receives relay cmd  |
+  | Toggles GPIO relay  |
+  | Sends ACK back      |
+  +=====================+
+
+
+================================================================================
+                    NODE REGISTRATION FLOW (38-PIN NFC VARIANT)
+================================================================================
+
+  [1] Node powers on → STATE_REGISTERING
+  [2] Node sends "hello" registration packet via LoRa
+  [3] HQ receives "hello" → validates → sends "approve" downlink
+  [4] Node receives "approve" → STATE_CONNECTED
+  [5] Node begins normal telemetry reporting
+  [6] If 5 consecutive ACKs missed → back to STATE_REGISTERING
+
+
+================================================================================
+                    PRIORITY-BASED REPORTING INTERVALS
+================================================================================
+
+  +----------+-------------------+----------------------------------+
+  | Priority | Reporting Interval | Trigger Conditions               |
+  +----------+-------------------+----------------------------------+
+  | NORMAL   | 60s               | All sensors within safe range    |
+  | ABNORMAL | 30s               | Any sensor outside safe range    |
+  | CRITICAL | 2s                | Any sensor at dangerous level    |
+  +----------+-------------------+----------------------------------+
+
+
+================================================================================
+                    SECURITY LAYERS
+================================================================================
+
+  +------------------------------------------------------------------+
+  | 1. LoRa Packets:  AES-128-CTR encryption + random 16B nonce     |
+  |                    CRC32 integrity check per packet               |
+  | 2. HTTP API:       HMAC-SHA256(timestamp + body + secret)        |
+  |                    Timestamp replay protection (5 min window)     |
+  |                    Shared API key in header                       |
+  | 3. Node Access:    Security key stored in ESP32 Preferences      |
+  |                    Required for config changes                    |
+  | 4. NFC Payloads:   AES-128-CTR encrypted with 16B IV             |
+  | 5. Telegram:       Chat ID allowlist for access control          |
+  +------------------------------------------------------------------+
+
+================================================================================

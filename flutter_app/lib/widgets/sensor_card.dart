@@ -12,31 +12,34 @@ class SensorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF161B22),
+        color: theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         children: [
-          const Icon(Icons.memory, color: Colors.cyanAccent),
+          Icon(Icons.memory, color: theme.colorScheme.primary),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item['sensor'],
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  item['sensor'] as String,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                Text("GPIO ${item['pin']} - ${item['type']}"),
+                Text('GPIO ${item['pin']} - ${item['type']}'),
               ],
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.delete, color: Colors.redAccent),
+            icon: Icon(Icons.delete, color: theme.colorScheme.error),
             onPressed: onDelete,
           ),
         ],

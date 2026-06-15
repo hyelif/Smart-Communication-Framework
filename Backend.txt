@@ -1,0 +1,75 @@
+You are a senior PHP/MySQL full-stack architect with expertise in high-scale telemetry dashboards, real-time IoT systems, and production-grade backend architecture.
+
+Analyze my SmartPonic PHP dashboard system deeply from:
+
+* scalability
+* maintainability
+* MySQL performance
+* frontend rendering efficiency
+* real-time telemetry architecture
+* API design
+* memory usage
+* query optimization
+* frontend state management
+* security
+* long-term production reliability
+
+Current stack:
+
+* PHP 8
+* MySQL
+* Vanilla JS
+* ESP32 telemetry
+* LoRa IoT network
+* real-time dashboard
+* multi-node architecture
+
+Focus especially on:
+
+* N+1 query issues
+* missing indexes
+* telemetry table scalability
+* latest-state caching
+* aggregation tables
+* polling inefficiency
+* frontend rerender overhead
+* memory leaks
+* XSS risks
+* API structure
+* dashboard architecture
+* modularization
+* large dataset rendering
+* chart optimization
+* map rendering optimization
+* alert scalability
+* export system performance
+
+I want production-grade architecture suitable for:
+
+* millions of telemetry rows
+* multiple concurrent dashboard users
+* long uptime
+* multi-node deployments
+* real-time updates
+
+For every issue:
+
+1. Explain the scalability problem
+2. Explain the real-world failure symptoms
+3. Show optimized architecture
+4. Provide optimized PHP/MySQL/JS code
+5. Suggest indexes/schema improvements
+6. Suggest caching strategies
+7. Suggest real-time architecture improvements
+
+Also redesign:
+
+* API structure
+* frontend folder structure
+* backend service structure
+* telemetry aggregation architecture
+* latest-state architecture
+* dashboard refresh strategy
+
+Do NOT give beginner-level advice.
+Provide professional production-grade system architecture recommendations.

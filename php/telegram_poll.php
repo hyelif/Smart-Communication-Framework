@@ -1,508 +1,848 @@
 <?php
-// Run via CLI: php telegram_poll.php --once
-// Or loop:     php telegram_poll.php --loop
+/**
+ * SmartPonic Telegram Bot — Polling Command Handler
+ *
+ * Usage:
+ *   php telegram_poll.php --once     (single poll, for cron)
+ *   php telegram_poll.php --loop     (continuous long-poll)
+ *
+ * Commands (HTML-formatted responses):
+ *   /start               Welcome message
+ *   /help                List commands
+ *   /whoami              Show your chat ID (no auth needed)
+ *   /status              System overview
+ *   /nodes               List all registered nodes
+ *   /readings [hw_id]    Latest sensor values
+ *   /alerts [hw_id]      List active alerts
+ *   /ack <hw_id> <id>    Acknowledge an alert
+ *   /resolve <hw_id> <id> Mark alert as resolved
+ *   /relay <hw_id> <relay_id> <on|off>  Queue a relay command
+ *   /queue [hw_id]       View pending relay commands
+ *   /approve <id>        Approve a pending automation command
+ *   /cancel <id>         Cancel a pending automation command
+ */
 
 require_once __DIR__ . '/telegram_lib.php';
 
-date_default_timezone_set('Asia/Kuala_Lumpur');
+// ──────────────────────────────────────────────
+//  Constants
+// ──────────────────────────────────────────────
+define('FRESHNESS_WARNING_S', 300);   // 5 min — STALE
+define('FRESHNESS_OFFLINE_S', 900);   // 15 min — OFFLINE
+define('APPROVAL_EXPIRY_S', 600);     // 10 min
 
-function argvHas(string $flag): bool
+// ──────────────────────────────────────────────
+//  Command handlers
+// ──────────────────────────────────────────────
+
+function cmdStart(int $chatId): void
 {
-    global $argv;
-    return in_array($flag, $argv, true);
+    $msg = "<b>\xF0\x9F\x8C\xB1 SmartPonic Bot</b>\n\n"
+        . "Welcome! I report your aquaponic sensor data.\n\n"
+        . "Send /help to see available commands.\n"
+        . "Send /whoami to get your chat ID (needed for access).";
+
+    telegramSendMessage($chatId, $msg);
 }
 
-function argvValue(string $prefix, ?string $default = null): ?string
+function cmdHelp(int $chatId): void
 {
-    global $argv;
-    foreach ($argv as $arg) {
-        if (!is_string($arg)) {
-            continue;
-        }
-        if (str_starts_with($arg, $prefix)) {
-            return substr($arg, strlen($prefix));
-        }
-    }
-    return $default;
+    $msg = "<b>Commands</b>\n\n"
+        . "/whoami \xE2\x80\x94 Show your chat ID\n"
+        . "/status \xE2\x80\x94 System overview\n"
+        . "/nodes \xE2\x80\x94 List all nodes\n"
+        . "/readings &lt;hw_id&gt; \xE2\x80\x94 Latest readings\n"
+        . "/alerts &lt;hw_id&gt; \xE2\x80\x94 List active alerts\n"
+        . "/ack &lt;hw_id&gt; &lt;id&gt; \xE2\x80\x94 Acknowledge an alert\n"
+        . "/resolve &lt;hw_id&gt; &lt;id&gt; \xE2\x80\x94 Resolve an alert\n"
+        . "<b>Relay Control</b>\n"
+        . "/relay0 on|off \xE2\x80\x94 Relay 0 (Water Pump)\n"
+        . "/relay1 on|off \xE2\x80\x94 Relay 1 (Backup)\n"
+        . "/relay &lt;hw_id&gt; &lt;id&gt; &lt;on|off&gt; \xE2\x80\x94 Full relay command\n"
+        . "/queue &lt;hw_id&gt; \xE2\x80\x94 View pending relay commands\n"
+        . "/approve &lt;id&gt; \xE2\x80\x94 Approve automation command\n"
+        . "/cancel &lt;id&gt; \xE2\x80\x94 Cancel automation command\n"
+        . "/help \xE2\x80\x94 This message";
+
+    telegramSendMessage($chatId, $msg);
 }
 
-function telegramReply(array $config, int $chatId, string $text): void
+function cmdWhoami(int $chatId): void
 {
-    telegramSendMessage($config, $chatId, $text);
+    $msg = "Your chat ID: <code>$chatId</code>\n\n"
+        . "Give this to the administrator to grant you access.";
+
+    telegramSendMessage($chatId, $msg);
 }
 
-function cmdHelp(): string
+function cmdStatus(int $chatId): void
 {
-    return implode("\n", [
-        "SmartPonic Telegram commands:",
-        "/whoami - show your chat id",
-        "/status [node] - latest node summary",
-        "/readings [node] - latest sensor values",
-        "/alerts [node] - list active/ack/resolved alerts",
-        "/ack <node> <sensor_key> - acknowledge latest active alert",
-        "/resolve <node> <sensor_key> - resolve latest alert",
-        "/relay <node> <relay_id 0-15> <on|off> - queue relay command",
-        "/queue [node] - show pending relay commands",
-    ]);
+    $db = getDb();
+
+    $nodeCount    = $db->query("SELECT COUNT(*) AS cnt FROM nodes")->fetch()['cnt'];
+    $readingCount = $db->query("SELECT COUNT(*) AS cnt FROM sensor_readings")->fetch()['cnt'];
+    $lastReading  = $db->query("SELECT MAX(created_at) AS last FROM sensor_readings")->fetch()['last'];
+    $alertCount   = $db->query("SELECT COUNT(*) AS cnt FROM alerts WHERE status = 'active'")->fetch()['cnt'];
+    $pendingRelay = $db->query("SELECT COUNT(*) AS cnt FROM relay_commands WHERE status IN ('pending','approved')")->fetch()['cnt'];
+
+    $lastStr = $lastReading
+        ? date('Y-m-d H:i:s', strtotime($lastReading))
+        : "\xE2\x80\x94";
+
+    $msg = "<b>\xF0\x9F\x93\x8A System Status</b>\n\n"
+        . "Nodes: <b>$nodeCount</b>\n"
+        . "Total readings: <b>$readingCount</b>\n"
+        . "Active alerts: <b>$alertCount</b>\n"
+        . "Pending relays: <b>$pendingRelay</b>\n"
+        . "Last data: <code>" . telegramEscapeHtml($lastStr) . "</code>";
+
+    telegramSendMessage($chatId, $msg);
 }
 
-function fetchStatus(PDO $pdo, int $nodeId): array
+function cmdNodes(int $chatId): void
 {
-    $stmt = $pdo->prepare("
-        SELECT id, created_at, rssi, snr, priority_level, report_mode, sequence_number, latitude, longitude, distance_m
-        FROM sensor_readings
-        WHERE node_id = :node_id
-        ORDER BY created_at DESC, id DESC
-        LIMIT 1
-    ");
-    $stmt->execute([':node_id' => $nodeId]);
-    $row = $stmt->fetch();
-    return $row ?: [];
-}
+    $db = getDb();
+    $rows = $db->query("SELECT hardware_id, name, location, last_seen FROM nodes ORDER BY hardware_id")->fetchAll();
 
-function formatStatusMessage(PDO $pdo, int $nodeId): string
-{
-    $latest = fetchStatus($pdo, $nodeId);
-    if (!$latest) {
-        return "Node {$nodeId}: no readings yet.";
-    }
-
-    $alerts = getActiveAlerts($pdo, $nodeId);
-    $activeCount = 0;
-    foreach ($alerts as $a) {
-        if (($a['status'] ?? '') === 'active') {
-            $activeCount++;
-        }
-    }
-
-    $loc = [];
-    if ($latest['latitude'] !== null && $latest['longitude'] !== null) {
-        $loc[] = 'Lat ' . (string) $latest['latitude'];
-        $loc[] = 'Lon ' . (string) $latest['longitude'];
-    }
-    if ($latest['distance_m'] !== null) {
-        $loc[] = 'Dist ' . (string) $latest['distance_m'] . ' m';
-    }
-
-    return implode("\n", array_filter([
-        "Node {$nodeId} status",
-        "Last: " . (string) $latest['created_at'],
-        "Priority: " . (string) ($latest['priority_level'] ?? 'LOW') . " | Mode: " . (string) ($latest['report_mode'] ?? 'NORMAL'),
-        "Seq: " . (string) ($latest['sequence_number'] === null ? '-' : $latest['sequence_number']),
-        "RSSI/SNR: " . (string) ($latest['rssi'] === null ? '-' : $latest['rssi']) . " / " . (string) ($latest['snr'] === null ? '-' : $latest['snr']),
-        $loc ? ("Location: " . implode(' | ', $loc)) : null,
-        "Alerts: {$activeCount} active",
-    ]));
-}
-
-function formatAlertsMessage(PDO $pdo, int $nodeId): string
-{
-    $alerts = getActiveAlerts($pdo, $nodeId);
-    if (!$alerts) {
-        return "Node {$nodeId}: no alert history yet.";
-    }
-
-    $lines = ["Node {$nodeId} alerts (latest first):"];
-    $count = 0;
-    foreach ($alerts as $a) {
-        $count++;
-        if ($count > 12) {
-            $lines[] = "...";
-            break;
-        }
-        $lines[] = "#{$a['id']} [" . ($a['status'] ?? '-') . "] " . ($a['sensor_key'] ?? '-') . " - " . ($a['message'] ?? '');
-    }
-    return implode("\n", $lines);
-}
-
-function fetchLatestReading(PDO $pdo, int $nodeId): array
-{
-    $stmt = $pdo->prepare("
-        SELECT id, created_at, rssi, snr, priority_level, report_mode, sequence_number
-        FROM sensor_readings
-        WHERE node_id = :node_id
-        ORDER BY created_at DESC, id DESC
-        LIMIT 1
-    ");
-    $stmt->execute([':node_id' => $nodeId]);
-    $row = $stmt->fetch();
-    return $row ?: [];
-}
-
-function formatReadingsMessage(PDO $pdo, int $nodeId): string
-{
-    $latest = fetchLatestReading($pdo, $nodeId);
-    if (!$latest) {
-        return "Node {$nodeId}: no readings yet.";
-    }
-
-    $readingId = (int) $latest['id'];
-    $defs = sensorDefinitions();
-
-    $lines = [];
-    $lines[] = "Node {$nodeId} readings";
-    $lines[] = "Reading ID {$readingId} @ " . (string) $latest['created_at'];
-    $lines[] = "Priority " . (string) ($latest['priority_level'] ?? 'LOW') . " | Mode " . (string) ($latest['report_mode'] ?? 'NORMAL');
-
-    $sig = [];
-    if ($latest['rssi'] !== null) {
-        $sig[] = 'RSSI ' . (string) $latest['rssi'];
-    }
-    if ($latest['snr'] !== null) {
-        $sig[] = 'SNR ' . (string) $latest['snr'];
-    }
-    if ($sig) {
-        $lines[] = implode(' | ', $sig);
-    }
-
-    $lines[] = "Sensors:";
-    $found = 0;
-    foreach ($defs as $sensorKey => $meta) {
-        $table = $meta['table'];
-        $stmt = $pdo->prepare("
-            SELECT pin_number, value
-            FROM {$table}
-            WHERE node_id = :node_id AND reading_id = :reading_id
-            ORDER BY id ASC
-        ");
-        $stmt->execute([
-            ':node_id' => $nodeId,
-            ':reading_id' => $readingId,
-        ]);
-        $rows = $stmt->fetchAll() ?: [];
-        foreach ($rows as $row) {
-            $found++;
-            $unit = $meta['unit'] !== 'state' ? (' ' . $meta['unit']) : '';
-            $lines[] = "- {$meta['label']} (pin " . (int) $row['pin_number'] . "): " . (string) $row['value'] . $unit;
-            if ($found >= 18) {
-                $lines[] = "...";
-                break 2;
-            }
-        }
-    }
-
-    if ($found === 0) {
-        $lines[] = "- (no sensor rows for latest reading)";
-    }
-
-    return implode("\n", $lines);
-}
-
-function parseCommand(string $text): array
-{
-    $text = trim($text);
-    if ($text === '') {
-        return ['', []];
-    }
-
-    $parts = preg_split('/\s+/', $text);
-    $cmd = strtolower($parts[0] ?? '');
-    $args = array_slice($parts, 1);
-
-    if (str_contains($cmd, '@')) {
-        $cmd = strtolower(explode('@', $cmd, 2)[0]);
-    }
-
-    return [$cmd, $args];
-}
-
-function telegramFreshnessCheck(PDO $pdo, array $config): void
-{
-    $chatId = $config['default_alert_chat_id'] ?? null;
-    if ($chatId === null) {
+    if (empty($rows)) {
+        telegramSendMessage($chatId, "No nodes registered yet.");
         return;
     }
 
-    $warningS = max(30, (int) ($config['freshness_warning_s'] ?? 300));
-    $offlineS = max($warningS, (int) ($config['freshness_offline_s'] ?? 900));
+    $lines = ["<b>\xF0\x9F\x93\xA1 Nodes</b>\n"];
+    foreach ($rows as $r) {
+        $name = $r['name'] ?? "\xE2\x80\x94";
+        $loc  = $r['location'] ?? "\xE2\x80\x94";
+        $hw   = telegramEscapeHtml($r['hardware_id']);
+        $seen = date('Y-m-d H:i', strtotime($r['last_seen']));
 
-    $nodesStmt = $pdo->query("SELECT id FROM nodes ORDER BY id ASC");
-    $nodes = $nodesStmt->fetchAll() ?: [];
+        $lines[] = "<code>$hw</code>"
+                 . " \xE2\x80\x94 " . telegramEscapeHtml($name)
+                 . " (" . telegramEscapeHtml($loc) . ")"
+                 . "\n  Last: $seen";
+    }
+
+    telegramSendMessage($chatId, telegramTruncate(implode("\n", $lines)));
+}
+
+function cmdReadings(int $chatId, ?string $hwId = null): void
+{
+    $db = getDb();
+
+    if ($hwId !== null) {
+        if (!preg_match('/^[A-Za-z0-9]+$/', $hwId)) {
+            telegramSendMessage($chatId, "Invalid hardware ID. Use hex format like <code>A1B2C3D4E5F6A7B8</code>.");
+            return;
+        }
+
+        $stmt = $db->prepare("SELECT name, location FROM nodes WHERE hardware_id = ?");
+        $stmt->execute([$hwId]);
+        $node = $stmt->fetch();
+
+        if (!$node) {
+            telegramSendMessage($chatId, "Node <code>" . telegramEscapeHtml($hwId) . "</code> not found.");
+            return;
+        }
+
+        $stmt = $db->prepare(
+            "SELECT sr.rssi, sr.snr, sr.created_at,
+                    sd.pin, sd.sensor, sd.value
+               FROM sensor_readings sr
+               JOIN sensor_data sd ON sd.reading_id = sr.id
+              WHERE sr.id = (SELECT MAX(id) FROM sensor_readings WHERE hardware_id = ?)
+              ORDER BY sd.pin"
+        );
+        $stmt->execute([$hwId]);
+        $rows = $stmt->fetchAll();
+
+        if (empty($rows)) {
+            telegramSendMessage($chatId, "No readings for node <code>" . telegramEscapeHtml($hwId) . "</code> yet.");
+            return;
+        }
+
+        $name = $node['name'] ? telegramEscapeHtml($node['name']) : $hwId;
+        $time = date('Y-m-d H:i:s', strtotime($rows[0]['created_at']));
+        $rssi = $rows[0]['rssi'] ?? "\xE2\x80\x94";
+        $snr  = $rows[0]['snr']  ?? "\xE2\x80\x94";
+
+        $lines = ["<b>\xF0\x9F\x93\xA1 $name</b>\n"];
+        $lines[] = "\xF0\x9F\x95\x90 $time";
+        $lines[] = "\xF0\x9F\x93\xB6 RSSI: $rssi | SNR: $snr\n";
+
+        foreach ($rows as $r) {
+            $sensor = telegramEscapeHtml($r['sensor']);
+            $value  = telegramEscapeHtml($r['value']);
+            $pin    = $r['pin'];
+            $lines[] = "  GPIO$pin <b>$sensor</b>: $value";
+        }
+
+        telegramSendMessage($chatId, telegramTruncate(implode("\n", $lines)));
+
+    } else {
+        $rows = $db->query(
+            "SELECT sr.hardware_id, sr.rssi, sr.snr, sr.created_at,
+                    sd.pin, sd.sensor, sd.value
+               FROM sensor_readings sr
+               JOIN sensor_data sd ON sd.reading_id = sr.id
+               JOIN (
+                   SELECT hardware_id, MAX(id) AS max_id
+                     FROM sensor_readings
+                    GROUP BY hardware_id
+               ) latest ON latest.max_id = sr.id
+              ORDER BY sr.hardware_id, sd.pin"
+        )->fetchAll();
+
+        if (empty($rows)) {
+            telegramSendMessage($chatId, "No readings yet.");
+            return;
+        }
+
+        $byNode = [];
+        foreach ($rows as $r) {
+            $byNode[$r['hardware_id']][] = $r;
+        }
+
+        $lines = ["<b>\xF0\x9F\x93\x8A Latest Readings</b>\n"];
+        foreach ($byNode as $hwId => $sensors) {
+            $first = $sensors[0];
+            $time  = date('Y-m-d H:i', strtotime($first['created_at']));
+            $lines[] = "\n<code>" . telegramEscapeHtml($hwId) . "</code> \xF0\x9F\x95\x90 $time";
+
+            foreach ($sensors as $s) {
+                $sensor = telegramEscapeHtml($s['sensor']);
+                $value  = telegramEscapeHtml($s['value']);
+                $lines[] = "  \xE2\x94\x9C $sensor: $value";
+            }
+        }
+
+        telegramSendMessage($chatId, telegramTruncate(implode("\n", $lines)));
+    }
+}
+
+// ──────────────────────────────────────────────
+//  /alerts [hw_id]
+// ──────────────────────────────────────────────
+function cmdAlerts(int $chatId, ?string $hwId = null): void
+{
+    $db = getDb();
+
+    if ($hwId !== null) {
+        if (!preg_match('/^[A-Za-z0-9]+$/', $hwId)) {
+            telegramSendMessage($chatId, "Invalid hardware ID.");
+            return;
+        }
+        $stmt = $db->prepare(
+            "SELECT id, sensor_key, severity, message, status, created_at
+               FROM alerts
+              WHERE hardware_id = ?
+              ORDER BY created_at DESC
+              LIMIT 20"
+        );
+        $stmt->execute([$hwId]);
+        $rows = $stmt->fetchAll();
+    } else {
+        $rows = $db->query(
+            "SELECT id, hardware_id, sensor_key, severity, message, status, created_at
+               FROM alerts
+              WHERE status = 'active'
+              ORDER BY created_at DESC
+              LIMIT 20"
+        )->fetchAll();
+    }
+
+    if (empty($rows)) {
+        telegramSendMessage($chatId, "No alerts" . ($hwId ? " for this node" : "") . ".");
+        return;
+    }
+
+    $lines = ["<b>\xF0\x9F\x9A\xA8 Alerts</b>\n"];
+    foreach ($rows as $r) {
+        $hw  = telegramEscapeHtml($r['hardware_id']);
+        $msg = telegramEscapeHtml($r['message']);
+        $time = date('Y-m-d H:i', strtotime($r['created_at']));
+        $statusIcon = $r['status'] === 'active' ? "\xF0\x9F\x94\xB4" : ($r['status'] === 'acknowledged' ? "\xF0\x9F\x9F\xA1" : "\xF0\x9F\x9F\xA2");
+        $lines[] = "$statusIcon #{$r['id']} <code>$hw</code>";
+        $lines[] = "  $msg";
+        $lines[] = "  $time [" . $r['status'] . "]\n";
+    }
+
+    telegramSendMessage($chatId, telegramTruncate(implode("\n", $lines)));
+}
+
+// ──────────────────────────────────────────────
+//  /ack <hw_id> <alert_id>
+// ──────────────────────────────────────────────
+function cmdAck(int $chatId, string $hwId, string $alertIdStr): void
+{
+    $db = getDb();
+    $alertId = (int)$alertIdStr;
+    if ($alertId <= 0) {
+        telegramSendMessage($chatId, "Usage: /ack &lt;hw_id&gt; &lt;alert_id&gt;");
+        return;
+    }
+
+    $stmt = $db->prepare(
+        "UPDATE alerts SET status = 'acknowledged' WHERE id = ? AND hardware_id = ? AND status = 'active'"
+    );
+    $stmt->execute([$alertId, $hwId]);
+
+    if ($stmt->rowCount() > 0) {
+        telegramSendMessage($chatId, "Alert #$alertId acknowledged \xF0\x9F\x9F\xA1");
+    } else {
+        telegramSendMessage($chatId, "Alert #$alertId not found or already resolved.");
+    }
+}
+
+// ──────────────────────────────────────────────
+//  /resolve <hw_id> <alert_id>
+// ──────────────────────────────────────────────
+function cmdResolve(int $chatId, string $hwId, string $alertIdStr): void
+{
+    $db = getDb();
+    $alertId = (int)$alertIdStr;
+    if ($alertId <= 0) {
+        telegramSendMessage($chatId, "Usage: /resolve &lt;hw_id&gt; &lt;alert_id&gt;");
+        return;
+    }
+
+    $stmt = $db->prepare(
+        "UPDATE alerts SET status = 'resolved' WHERE id = ? AND hardware_id = ? AND status != 'resolved'"
+    );
+    $stmt->execute([$alertId, $hwId]);
+
+    if ($stmt->rowCount() > 0) {
+        telegramSendMessage($chatId, "Alert #$alertId resolved \xF0\x9F\x9F\xA2");
+    } else {
+        telegramSendMessage($chatId, "Alert #$alertId not found or already resolved.");
+    }
+}
+
+// ──────────────────────────────────────────────
+//  /relay <hw_id> <relay_id> <on|off>
+// ──────────────────────────────────────────────
+function cmdRelay(int $chatId, string $hwId, string $relayIdStr, string $action): void
+{
+    $db = getDb();
+
+    if (!preg_match('/^[0-9A-F]{16}$/i', $hwId)) {
+        telegramSendMessage($chatId, "Invalid hardware ID format.");
+        return;
+    }
+
+    $relayId = (int)$relayIdStr;
+    if ($relayId < 0 || $relayId > 255) {
+        telegramSendMessage($chatId, "Relay ID must be 0-255.");
+        return;
+    }
+
+    $action = strtoupper($action);
+    if (!in_array($action, ['ON', 'OFF'], true)) {
+        telegramSendMessage($chatId, "Action must be <b>on</b> or <b>off</b>.");
+        return;
+    }
+
+    // Check node exists
+    $stmt = $db->prepare("SELECT hardware_id FROM nodes WHERE hardware_id = ?");
+    $stmt->execute([$hwId]);
+    if (!$stmt->fetch()) {
+        telegramSendMessage($chatId, "Node <code>" . telegramEscapeHtml($hwId) . "</code> not found.");
+        return;
+    }
+
+    $stmt = $db->prepare(
+        "INSERT INTO relay_commands (hardware_id, relay_id, action, status) VALUES (?, ?, ?, 'approved')"
+    );
+    $stmt->execute([$hwId, $relayId, $action]);
+    $cmdId = (int)$db->lastInsertId();
+
+    telegramSendMessage($chatId,
+        "Queued relay command #$cmdId\n"
+        . "Node: <code>" . telegramEscapeHtml($hwId) . "</code>\n"
+        . "Relay: $relayId \xE2\x86\x92 $action\n"
+        . "Status: approved \xE2\x9C\x85\n"
+        . "HQ will pick it up within 4 seconds"
+    );
+}
+
+// ──────────────────────────────────────────────
+//  /queue [hw_id]
+// ──────────────────────────────────────────────
+function cmdQueue(int $chatId, ?string $hwId = null): void
+{
+    $db = getDb();
+
+    if ($hwId !== null) {
+        if (!preg_match('/^[0-9A-F]{16}$/i', $hwId)) {
+            telegramSendMessage($chatId, "Invalid hardware ID format.");
+            return;
+        }
+        $stmt = $db->prepare(
+            "SELECT id, relay_id, action, status, created_at
+               FROM relay_commands
+              WHERE hardware_id = ? AND status IN ('pending','approved','sent')
+              ORDER BY created_at ASC
+              LIMIT 20"
+        );
+        $stmt->execute([$hwId]);
+        $rows = $stmt->fetchAll();
+    } else {
+        $rows = $db->query(
+            "SELECT id, hardware_id, relay_id, action, status, created_at
+               FROM relay_commands
+              WHERE status IN ('pending','approved','sent')
+              ORDER BY created_at ASC
+              LIMIT 20"
+        )->fetchAll();
+    }
+
+    if (empty($rows)) {
+        telegramSendMessage($chatId, "No pending relay commands.");
+        return;
+    }
+
+    $lines = ["<b>\xF0\x9F\x93\x8B Relay Queue</b>\n"];
+    foreach ($rows as $r) {
+        $hw = telegramEscapeHtml($r['hardware_id']);
+        $statusIcon = $r['status'] === 'pending' ? "\xF0\x9F\x95\x99" : ($r['status'] === 'approved' ? "\xE2\x9C\x85" : "\xF0\x9F\x93\xA1");
+        $lines[] = "$statusIcon #{$r['id']} <code>$hw</code> relay {$r['relay_id']} \xE2\x86\x92 {$r['action']}";
+        $lines[] = "  Status: {$r['status']} at " . date('Y-m-d H:i', strtotime($r['created_at']));
+    }
+
+    telegramSendMessage($chatId, telegramTruncate(implode("\n", $lines)));
+}
+
+// ──────────────────────────────────────────────
+//  /approve <approval_id>
+// ──────────────────────────────────────────────
+function cmdApprove(int $chatId, string $idStr): void
+{
+    $db = getDb();
+    $approvalId = (int)$idStr;
+    if ($approvalId <= 0) {
+        telegramSendMessage($chatId, "Usage: /approve &lt;approval_id&gt;");
+        return;
+    }
+
+    // Find pending approval
+    $stmt = $db->prepare(
+        "SELECT * FROM pending_approvals WHERE id = ? AND status = 'pending'"
+    );
+    $stmt->execute([$approvalId]);
+    $approval = $stmt->fetch();
+
+    if (!$approval) {
+        telegramSendMessage($chatId, "Approval #$approvalId not found or already processed.");
+        return;
+    }
+
+    // Check expiry
+    if ($approval['expires_at'] && strtotime($approval['expires_at']) < time()) {
+        $db->prepare("UPDATE pending_approvals SET status = 'expired' WHERE id = ?")->execute([$approvalId]);
+        telegramSendMessage($chatId, "Approval #$approvalId has expired \xF0\x9F\x95\x93");
+        return;
+    }
+
+    $db->beginTransaction();
+    try {
+        // Mark approval as approved
+        $db->prepare("UPDATE pending_approvals SET status = 'approved', chat_id = ? WHERE id = ?")
+           ->execute([$chatId, $approvalId]);
+
+        // Create relay command
+        $stmt = $db->prepare(
+            "INSERT INTO relay_commands (hardware_id, relay_id, action, status) VALUES (?, ?, ?, 'approved')"
+        );
+        $stmt->execute([$approval['hardware_id'], $approval['relay_id'], $approval['action']]);
+        $cmdId = (int)$db->lastInsertId();
+
+        // Link command
+        $db->prepare("UPDATE pending_approvals SET command_id = ? WHERE id = ?")
+           ->execute([$cmdId, $approvalId]);
+
+        $db->commit();
+
+        telegramSendMessage($chatId,
+            "Approved automation command #$approvalId \xE2\x9C\x85\n"
+            . "Relay command #$cmdId created (node <code>" . telegramEscapeHtml($approval['hardware_id'])
+            . "</code> relay {$approval['relay_id']} \xE2\x86\x92 {$approval['action']})"
+        );
+    } catch (Throwable $e) {
+        $db->rollBack();
+        telegramSendMessage($chatId, "Error processing approval: " . $e->getMessage());
+    }
+}
+
+// ──────────────────────────────────────────────
+//  /cancel <approval_id>
+// ──────────────────────────────────────────────
+function cmdCancel(int $chatId, string $idStr): void
+{
+    $db = getDb();
+    $approvalId = (int)$idStr;
+    if ($approvalId <= 0) {
+        telegramSendMessage($chatId, "Usage: /cancel &lt;approval_id&gt;");
+        return;
+    }
+
+    $stmt = $db->prepare(
+        "UPDATE pending_approvals SET status = 'cancelled', chat_id = ? WHERE id = ? AND status = 'pending'"
+    );
+    $stmt->execute([$chatId, $approvalId]);
+
+    if ($stmt->rowCount() > 0) {
+        telegramSendMessage($chatId, "Cancelled automation command #$approvalId \xE2\x9C\x97");
+    } else {
+        telegramSendMessage($chatId, "Approval #$approvalId not found or already processed.");
+    }
+}
+
+// ──────────────────────────────────────────────
+//  Freshness monitoring
+// ──────────────────────────────────────────────
+function telegramFreshnessCheck(): void
+{
+    $db = getDb();
+    $nodes = $db->query("SELECT hardware_id, last_seen FROM nodes")->fetchAll();
+
     foreach ($nodes as $node) {
-        $nodeId = (int) ($node['id'] ?? 0);
-        if ($nodeId <= 0) {
-            continue;
-        }
+        $hwId = $node['hardware_id'];
+        $lastSeen = $node['last_seen'];
 
-        $latestStmt = $pdo->prepare("
-            SELECT created_at
-            FROM sensor_readings
-            WHERE node_id = :node_id
-            ORDER BY created_at DESC, id DESC
-            LIMIT 1
-        ");
-        $latestStmt->execute([':node_id' => $nodeId]);
-        $createdAt = $latestStmt->fetchColumn();
-        if ($createdAt === false || $createdAt === null) {
-            continue;
-        }
+        if (!$lastSeen) continue;
 
-        $lastTs = strtotime((string) $createdAt);
-        if ($lastTs === false) {
-            continue;
-        }
+        $age = time() - strtotime($lastSeen);
 
-        $ageS = time() - $lastTs;
-        $offlineKey = "node:{$nodeId}:offline";
-        $recoveredKey = "node:{$nodeId}:recovered";
+        // Check if node was previously offline (has an active OFFLINE alert)
+        $offlineKey = "freshness:{$hwId}:offline";
+        $stmt = $db->prepare("SELECT last_sent_at FROM telegram_alert_state WHERE state_key = ?");
+        $stmt->execute([$offlineKey]);
+        $offlineState = $stmt->fetch();
+        $wasOffline = ($offlineState !== false);
 
-        if ($ageS >= $offlineS) {
-            if (telegramShouldSendAlert($pdo, $offlineKey, 300)) {
-                $mins = (int) floor($ageS / 60);
-                telegramSendMessage($config, (int) $chatId, "SmartPonic OFFLINE\nNode {$nodeId} has no fresh data for {$mins} min.\nLast: {$createdAt}");
-                telegramMarkAlertSent($pdo, $offlineKey);
-            }
-            continue;
-        }
+        if ($age >= FRESHNESS_OFFLINE_S) {
+            // Send OFFLINE alert (with cooldown)
+            if (telegramShouldSendAlert($offlineKey, 300)) {
+                $msg = "\xF0\x9F\x94\xB4 <b>SmartPonic OFFLINE</b>\n"
+                     . "Node <code>" . telegramEscapeHtml($hwId) . "</code> has not reported for "
+                     . floor($age / 60) . " minutes.\n"
+                     . "Last seen: " . date('Y-m-d H:i:s', strtotime($lastSeen));
 
-        if ($ageS >= $warningS) {
-            $staleKey = "node:{$nodeId}:stale";
-            if (telegramShouldSendAlert($pdo, $staleKey, 300)) {
-                $mins = (int) floor($ageS / 60);
-                telegramSendMessage($config, (int) $chatId, "SmartPonic STALE\nNode {$nodeId} last update {$mins} min ago.\nLast: {$createdAt}");
-                telegramMarkAlertSent($pdo, $staleKey);
-            }
-            continue;
-        }
-
-        $offlineSentAt = telegramGetAlertLastSentAt($pdo, $offlineKey);
-        if ($offlineSentAt !== null && (time() - $offlineSentAt) < 24 * 3600) {
-            if (telegramShouldSendAlert($pdo, $recoveredKey, 600)) {
-                telegramSendMessage($config, (int) $chatId, "SmartPonic RECOVERED\nNode {$nodeId} is back online.\nLast: {$createdAt}");
-                telegramMarkAlertSent($pdo, $recoveredKey);
-            }
-        }
-    }
-}
-
-$config = telegramLoadConfig();
-if ($config === null) {
-    fwrite(STDERR, "Telegram not configured. Create php/telegram_config.php (see php/telegram_config.example.php).\n");
-    exit(2);
-}
-
-$once = argvHas('--once');
-$loop = argvHas('--loop') || !$once;
-$debug = argvHas('--debug');
-$deleteWebhook = argvHas('--delete-webhook');
-$selfTest = argvHas('--self-test');
-$sleepSeconds = 2;
-
-if ($selfTest) {
-    $me = telegramApiRequest($config, 'getMe', []);
-    $hook = telegramApiRequest($config, 'getWebhookInfo', []);
-
-    $meOk = is_array($me) && ($me['ok'] ?? false);
-    $meHttp = is_array($me) && isset($me['http_code']) ? (int) $me['http_code'] : 0;
-    $meDesc = is_array($me) && isset($me['description']) ? (string) $me['description'] : '';
-
-    $hookOk = is_array($hook) && ($hook['ok'] ?? false);
-    $hookHttp = is_array($hook) && isset($hook['http_code']) ? (int) $hook['http_code'] : 0;
-    $hookDesc = is_array($hook) && isset($hook['description']) ? (string) $hook['description'] : '';
-
-    $username = $meOk && isset($me['result']['username']) ? (string) $me['result']['username'] : '';
-    $hookUrl = $hookOk && isset($hook['result']['url']) ? (string) $hook['result']['url'] : '';
-    $pending = $hookOk && isset($hook['result']['pending_update_count']) ? (int) $hook['result']['pending_update_count'] : null;
-
-    echo "Telegram self-test\n";
-    echo "- getMe: " . ($meOk ? "OK" : "FAIL") . " (HTTP {$meHttp})" . ($meDesc !== '' ? " {$meDesc}" : "") . "\n";
-    if ($username !== '') {
-        echo "- bot: @" . $username . "\n";
-    }
-    echo "- getWebhookInfo: " . ($hookOk ? "OK" : "FAIL") . " (HTTP {$hookHttp})" . ($hookDesc !== '' ? " {$hookDesc}" : "") . "\n";
-    echo "- webhook url: " . ($hookUrl !== '' ? $hookUrl : '(none)') . "\n";
-    if ($pending !== null) {
-        echo "- pending updates: {$pending}\n";
-    }
-    echo "- curl available: " . (function_exists('curl_init') ? "yes" : "no") . "\n";
-    exit(($meOk && $hookOk) ? 0 : 1);
-}
-
-if ($deleteWebhook) {
-    $resp = telegramApiRequest($config, 'deleteWebhook', ['drop_pending_updates' => 'true']);
-    $ok = is_array($resp) && ($resp['ok'] ?? false);
-    $httpCode = is_array($resp) && isset($resp['http_code']) ? (int) $resp['http_code'] : 0;
-    $desc = is_array($resp) && isset($resp['description']) ? (string) $resp['description'] : '';
-    fwrite(STDERR, ($ok ? "Webhook deleted" : "Failed to delete webhook") . " (HTTP {$httpCode}). " . $desc . "\n");
-    exit($ok ? 0 : 1);
-}
-
-require_once __DIR__ . '/db.php';
-require_once __DIR__ . '/dashboard_store.php';
-require_once __DIR__ . '/control_lib.php';
-
-try {
-    // Prefer explicit connect for CLI so we get actionable errors.
-    if (function_exists('smartponicConnect')) {
-        $pdo = smartponicConnect(true);
-    }
-    telegramEnsureTables($pdo);
-} catch (PDOException $e) {
-    fwrite(STDERR, "Database error: " . $e->getMessage() . "\n");
-    fwrite(STDERR, "Fix: start MySQL in XAMPP and ensure database `smartponic` exists (see php/db.php).\n");
-    exit(3);
-}
-
-do {
-    if ($once) {
-        echo "Telegram poller: once mode (send /whoami, then run again if needed)\n";
-    } elseif ($debug) {
-        echo "Telegram poller: loop mode (debug enabled)\n";
-    }
-    $offset = telegramGetLastUpdateId($pdo) + 1;
-    $resp = telegramGetUpdates($config, $offset, 25);
-
-    if (!is_array($resp) || !($resp['ok'] ?? false)) {
-        $httpCode = is_array($resp) && isset($resp['http_code']) ? (int) $resp['http_code'] : 0;
-        $desc = is_array($resp) && isset($resp['description']) ? (string) $resp['description'] : '';
-        $err = is_array($resp) && isset($resp['error']) ? (string) $resp['error'] : '';
-        echo "Telegram getUpdates failed (HTTP {$httpCode}). " . ($desc !== '' ? $desc : $err) . "\n";
-        if ($desc !== '' && str_contains(strtolower($desc), 'webhook')) {
-            echo "Tip: your bot may have a webhook set. If so, remove it first.\n";
-        }
-        if ($once) {
-            exit(1);
-        }
-        sleep($sleepSeconds);
-        continue;
-    }
-
-    $updates = is_array($resp['result'] ?? null) ? $resp['result'] : [];
-    if ($debug) {
-        echo "Received updates: " . count($updates) . "\n";
-    }
-    if ($once && count($updates) === 0) {
-        echo "No new Telegram updates received.\n";
-        echo "Tip: send /whoami to the bot FIRST, then run: C:\\xampp\\php\\php.exe .\\php\\telegram_poll.php --once\n";
-    }
-	    foreach ($updates as $update) {
-        $updateId = isset($update['update_id']) ? (int) $update['update_id'] : 0;
-        if ($updateId > 0) {
-            telegramSetLastUpdateId($pdo, $updateId);
-        }
-
-        $message = $update['message'] ?? null;
-        if (!is_array($message)) {
-            continue;
-        }
-
-        $chat = $message['chat'] ?? null;
-        if (!is_array($chat) || !isset($chat['id'])) {
-            continue;
-        }
-
-        $chatId = (int) $chat['id'];
-        $text = isset($message['text']) ? (string) $message['text'] : '';
-        [$cmd, $args] = parseCommand($text);
-
-        if ($debug) {
-            echo "Update {$updateId} chat {$chatId} cmd {$cmd}\n";
-        }
-
-        if ($cmd === '/whoami') {
-            telegramReply($config, $chatId, "Your chat id: {$chatId}");
-            continue;
-        }
-
-        if ($cmd === '/start' || $cmd === '/help') {
-            telegramReply($config, $chatId, cmdHelp());
-            continue;
-        }
-
-        if (!telegramIsAllowedChat($config, $chatId)) {
-            telegramReply($config, $chatId, "Unauthorized chat. Use /whoami and add your chat id to allowed_chat_ids.");
-            continue;
-        }
-
-        if ($cmd === '/status') {
-            $nodeId = isset($args[0]) && ctype_digit($args[0]) ? (int) $args[0] : 1;
-            telegramReply($config, $chatId, formatStatusMessage($pdo, $nodeId));
-            continue;
-        }
-
-        if ($cmd === '/alerts') {
-            $nodeId = isset($args[0]) && ctype_digit($args[0]) ? (int) $args[0] : 1;
-            telegramReply($config, $chatId, formatAlertsMessage($pdo, $nodeId));
-            continue;
-        }
-
-        if ($cmd === '/readings') {
-            $nodeId = isset($args[0]) && ctype_digit($args[0]) ? (int) $args[0] : 1;
-            telegramReply($config, $chatId, formatReadingsMessage($pdo, $nodeId));
-            continue;
-        }
-
-        if ($cmd === '/relay') {
-            $nodeId = isset($args[0]) && ctype_digit($args[0]) ? (int) $args[0] : 0;
-            $relayId = isset($args[1]) && ctype_digit($args[1]) ? (int) $args[1] : -1;
-            $action = isset($args[2]) ? strtoupper(trim((string) $args[2])) : '';
-            $action = $action === 'ON' || $action === 'OFF' ? $action : ($action === '1' ? 'ON' : ($action === '0' ? 'OFF' : $action));
-
-            if ($nodeId <= 0 || $relayId < 0 || $action === '') {
-                telegramReply($config, $chatId, "Usage: /relay <node> <relay_id 0-15> <on|off>");
-                continue;
-            }
-
-            try {
-                $cmdId = createRelayCommand($pdo, $nodeId, $relayId, $action, $chatId, 'telegram');
-                telegramReply($config, $chatId, "Queued relay command #{$cmdId}: node {$nodeId} relay {$relayId} {$action}. (HQ must poll control_queue.php to execute)");
-            } catch (Exception $e) {
-                telegramReply($config, $chatId, "Failed to queue relay command: " . $e->getMessage());
-            }
-            continue;
-        }
-
-        if ($cmd === '/queue') {
-            $nodeId = isset($args[0]) && ctype_digit($args[0]) ? (int) $args[0] : 1;
-            $pending = fetchPendingRelayCommands($pdo, $nodeId, 8);
-            if (!$pending) {
-                telegramReply($config, $chatId, "Node {$nodeId}: no pending relay commands.");
-            } else {
-                $lines = ["Node {$nodeId} pending relay commands:"];
-                foreach ($pending as $c) {
-                    $lines[] = "#{$c['id']} relay " . (int) $c['relay_id'] . " " . (string) $c['action'] . " @ " . (string) $c['created_at'];
+                $chats = unserialize(TELEGRAM_ALLOWED_CHAT_IDS);
+                foreach ($chats as $chatId) {
+                    telegramSendMessage($chatId, $msg);
                 }
-                telegramReply($config, $chatId, implode("\n", $lines));
+                telegramUpdateAlertState($offlineKey);
             }
-            continue;
+        } elseif ($age >= FRESHNESS_WARNING_S) {
+            // Send STALE alert (with cooldown)
+            $staleKey = "freshness:{$hwId}:stale";
+            if (telegramShouldSendAlert($staleKey, 300)) {
+                $msg = "\xF0\x9F\x9F\xA1 <b>SmartPonic STALE</b>\n"
+                     . "Node <code>" . telegramEscapeHtml($hwId) . "</code> last reported "
+                     . floor($age / 60) . " minutes ago.\n"
+                     . "Last seen: " . date('Y-m-d H:i:s', strtotime($lastSeen));
+
+                $chats = unserialize(TELEGRAM_ALLOWED_CHAT_IDS);
+                foreach ($chats as $chatId) {
+                    telegramSendMessage($chatId, $msg);
+                }
+                telegramUpdateAlertState($staleKey);
+            }
+
+            // Clear offline state if was offline
+            if ($wasOffline) {
+                $db->prepare("DELETE FROM telegram_alert_state WHERE state_key = ?")->execute([$offlineKey]);
+                $msg = "\xF0\x9F\x9F\xA2 <b>SmartPonic RECOVERED</b>\n"
+                     . "Node <code>" . telegramEscapeHtml($hwId) . "</code> is back online.\n"
+                     . "Last seen: " . date('Y-m-d H:i:s', strtotime($lastSeen));
+
+                $chats = unserialize(TELEGRAM_ALLOWED_CHAT_IDS);
+                foreach ($chats as $chatId) {
+                    telegramSendMessage($chatId, $msg);
+                }
+            }
+        } else {
+            // Node is healthy — clear any stale/offline state
+            if ($wasOffline) {
+                $db->prepare("DELETE FROM telegram_alert_state WHERE state_key = ?")->execute([$offlineKey]);
+                $msg = "\xF0\x9F\x9F\xA2 <b>SmartPonic RECOVERED</b>\n"
+                     . "Node <code>" . telegramEscapeHtml($hwId) . "</code> is back online.";
+
+                $chats = unserialize(TELEGRAM_ALLOWED_CHAT_IDS);
+                foreach ($chats as $chatId) {
+                    telegramSendMessage($chatId, $msg);
+                }
+            }
         }
+    }
+}
 
-        if ($cmd === '/ack' || $cmd === '/resolve') {
-            $nodeId = isset($args[0]) && ctype_digit($args[0]) ? (int) $args[0] : 0;
-            $sensorKey = isset($args[1]) ? trim((string) $args[1]) : '';
-            if ($nodeId <= 0 || $sensorKey === '') {
-                telegramReply($config, $chatId, "Usage: {$cmd} <node> <sensor_key>");
-                continue;
-            }
+// ──────────────────────────────────────────────
+//  Alert cooldown helpers
+// ──────────────────────────────────────────────
+function telegramShouldSendAlert(string $stateKey, int $cooldownSeconds): bool
+{
+    $db = getDb();
+    $stmt = $db->prepare("SELECT last_sent_at FROM telegram_alert_state WHERE state_key = ?");
+    $stmt->execute([$stateKey]);
+    $row = $stmt->fetch();
 
-            if ($cmd === '/ack') {
-                $r = acknowledgeAlert($pdo, $nodeId, $sensorKey);
-                telegramReply($config, $chatId, "Ack {$sensorKey} on node {$nodeId}: affected {$r['affected']} row(s).");
+    if (!$row || !$row['last_sent_at']) {
+        return true;
+    }
+
+    $elapsed = time() - strtotime($row['last_sent_at']);
+    return $elapsed >= $cooldownSeconds;
+}
+
+function telegramUpdateAlertState(string $stateKey): void
+{
+    $db = getDb();
+    $stmt = $db->prepare(
+        "INSERT INTO telegram_alert_state (state_key, last_sent_at)
+         VALUES (?, NOW())
+         ON DUPLICATE KEY UPDATE last_sent_at = VALUES(last_sent_at)"
+    );
+    $stmt->execute([$stateKey]);
+}
+
+// ──────────────────────────────────────────────
+//  Pending approval expiry
+// ──────────────────────────────────────────────
+function expirePendingApprovals(): void
+{
+    $db = getDb();
+    $db->prepare(
+        "UPDATE pending_approvals SET status = 'expired'
+         WHERE status = 'pending' AND expires_at IS NOT NULL AND expires_at < NOW()"
+    )->execute();
+
+    // Clean up expired records older than 24 hours
+    $db->prepare(
+        "DELETE FROM pending_approvals WHERE status = 'expired' AND created_at < DATE_SUB(NOW(), INTERVAL 24 HOUR)"
+    )->execute();
+}
+
+// ──────────────────────────────────────────────
+//  Helper: get the most recent/default node
+// ──────────────────────────────────────────────
+function getDefaultNode(): ?string
+{
+    $db = getDb();
+    $stmt = $db->query("SELECT hardware_id FROM nodes ORDER BY last_seen DESC LIMIT 1");
+    $row = $stmt->fetch();
+    return $row ? $row['hardware_id'] : null;
+}
+
+// ──────────────────────────────────────────────
+//  Update dispatcher
+// ──────────────────────────────────────────────
+
+function telegramProcessUpdate(array $update): void
+{
+    $msg = $update['message'] ?? $update['callback_query']['message'] ?? null;
+    if (!$msg || !isset($msg['chat']['id'])) {
+        return;
+    }
+
+    $chatId  = $msg['chat']['id'];
+    $text    = trim($msg['text'] ?? '');
+    $parts   = preg_split('/\s+/', $text);
+    $command = $parts[0] ?? '';
+    $arg1    = $parts[1] ?? null;
+    $arg2    = $parts[2] ?? null;
+    $arg3    = $parts[3] ?? null;
+
+    // /whoami is always accessible
+    if ($command === '/whoami') {
+        cmdWhoami($chatId);
+        return;
+    }
+
+    // Shortcut relay commands: /relay0 on, /relay1 off, etc.
+    // Uses the most recently seen node automatically.
+    if (preg_match('/^\/relay(\d+)$/i', $command, $m)) {
+        if (!$arg1 || !in_array(strtoupper($arg1), ['ON', 'OFF'])) {
+            telegramSendMessage($chatId, "Usage: <b>{$command} on|off</b>\nExample: /relay0 on");
+            return;
+        }
+        $relayId = (int)$m[1];
+        $action = strtoupper($arg1);
+        $defaultNode = getDefaultNode();
+        if (!$defaultNode) {
+            telegramSendMessage($chatId, "No nodes found. Register a node first.");
+            return;
+        }
+        cmdRelay($chatId, $defaultNode, (string)$relayId, $action);
+        return;
+    }
+
+    // All other commands require auth
+    if (!telegramIsAllowedChat($chatId)) {
+        telegramSendMessage(
+            $chatId,
+            "You are not authorized. Send /whoami to get your chat ID and ask the administrator to add it."
+        );
+        return;
+    }
+
+    switch ($command) {
+        case '/start':
+            cmdStart($chatId);
+            break;
+
+        case '/help':
+            cmdHelp($chatId);
+            break;
+
+        case '/status':
+            cmdStatus($chatId);
+            break;
+
+        case '/nodes':
+            cmdNodes($chatId);
+            break;
+
+        case '/readings':
+            cmdReadings($chatId, $arg1);
+            break;
+
+        case '/alerts':
+            cmdAlerts($chatId, $arg1);
+            break;
+
+        case '/ack':
+            if ($arg1 && $arg2) {
+                cmdAck($chatId, $arg1, $arg2);
             } else {
-                $r = resolveAlert($pdo, $nodeId, $sensorKey);
-                telegramReply($config, $chatId, "Resolve {$sensorKey} on node {$nodeId}: affected {$r['affected']} row(s).");
+                telegramSendMessage($chatId, "Usage: /ack &lt;hw_id&gt; &lt;alert_id&gt;");
             }
-            continue;
+            break;
+
+        case '/resolve':
+            if ($arg1 && $arg2) {
+                cmdResolve($chatId, $arg1, $arg2);
+            } else {
+                telegramSendMessage($chatId, "Usage: /resolve &lt;hw_id&gt; &lt;alert_id&gt;");
+            }
+            break;
+
+        case '/relay':
+            if ($arg1 && $arg2 && $arg3) {
+                cmdRelay($chatId, $arg1, $arg2, $arg3);
+            } else {
+                telegramSendMessage($chatId, "Usage: /relay &lt;hw_id&gt; &lt;relay_id&gt; &lt;on|off&gt;");
+            }
+            break;
+
+        case '/queue':
+            cmdQueue($chatId, $arg1);
+            break;
+
+        case '/approve':
+            if ($arg1) {
+                cmdApprove($chatId, $arg1);
+            } else {
+                telegramSendMessage($chatId, "Usage: /approve &lt;approval_id&gt;");
+            }
+            break;
+
+        case '/cancel':
+            if ($arg1) {
+                cmdCancel($chatId, $arg1);
+            } else {
+                telegramSendMessage($chatId, "Usage: /cancel &lt;approval_id&gt;");
+            }
+            break;
+
+        default:
+            if (str_starts_with($command, '/')) {
+                telegramSendMessage($chatId, "Unknown command. Send /help for available commands.");
+            }
+            break;
+    }
+}
+
+// ──────────────────────────────────────────────
+//  Poll loop
+// ──────────────────────────────────────────────
+
+function telegramPollOnce(): void
+{
+    $offset = telegramGetLastUpdateId();
+    $updates = telegramGetUpdates($offset);
+
+    if ($updates === null || !is_array($updates)) {
+        return;
+    }
+
+    foreach ($updates as $update) {
+        $updateId = $update['update_id'] ?? 0;
+        if ($updateId > 0) {
+            telegramProcessUpdate($update);
+            telegramSetLastUpdateId($updateId + 1);
         }
+    }
+}
 
-	        if ($cmd !== '') {
-	            telegramReply($config, $chatId, "Unknown command. Send /help");
-	        }
-	    }
+function telegramPollLoop(): void
+{
+    error_log('Telegram bot: starting long-poll loop');
 
-	    if (!$once) {
-	        static $lastFreshnessCheck = 0;
-	        if (time() - $lastFreshnessCheck >= 60) {
-	            $lastFreshnessCheck = time();
-	            try {
-	                telegramFreshnessCheck($pdo, $config);
-	            } catch (Exception $e) {
-	                // ignore
-	            }
-	        }
-	    }
-	
-	    if ($once) {
-	        break;
-	    }
-} while ($loop);
+    $lastFreshnessCheck = 0;
+    $lastApprovalExpiry = 0;
+
+    while (true) {
+        try {
+            $offset = telegramGetLastUpdateId();
+            $updates = telegramGetUpdates($offset, 25);
+
+            if ($updates !== null && is_array($updates)) {
+                foreach ($updates as $update) {
+                    $updateId = $update['update_id'] ?? 0;
+                    if ($updateId > 0) {
+                        telegramProcessUpdate($update);
+                        telegramSetLastUpdateId($updateId + 1);
+                    }
+                }
+            }
+
+            // Freshness monitoring every 60 seconds
+            $now = time();
+            if ($now - $lastFreshnessCheck >= 60) {
+                $lastFreshnessCheck = $now;
+                try {
+                    telegramFreshnessCheck();
+                } catch (Throwable $e) {
+                    error_log('Telegram freshness check error: ' . $e->getMessage());
+                }
+            }
+
+            // Pending approval expiry every 60 seconds
+            if ($now - $lastApprovalExpiry >= 60) {
+                $lastApprovalExpiry = $now;
+                try {
+                    expirePendingApprovals();
+                } catch (Throwable $e) {
+                    error_log('Telegram approval expiry error: ' . $e->getMessage());
+                }
+            }
+
+        } catch (Throwable $e) {
+            error_log('Telegram bot error: ' . $e->getMessage());
+            sleep(5);
+        }
+    }
+}
+
+// ──────────────────────────────────────────────
+//  Entry point
+// ──────────────────────────────────────────────
+
+$args = $argv ?? [];
+
+if (in_array('--loop', $args, true)) {
+    telegramPollLoop();
+} else {
+    telegramPollOnce();
+}

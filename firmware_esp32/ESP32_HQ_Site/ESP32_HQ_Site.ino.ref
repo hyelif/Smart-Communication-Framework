@@ -1,0 +1,604 @@
+#include <Arduino.h>
+#include <SPI.h>
+#include <LoRa.h>
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+#include <time.h>
+#include <vector>
+#include <set>
+#include <Preferences.h>
+#include <mbedtls/aes.h>
+#include <mbedtls/md.h>
+
+// ================= CONFIGURATION =================
+const char* WIFI_SSID     = "Azman_TPLINK";
+const char* WIFI_PASS     = "0193865449";
+const char* API_URL       = "http://192.168.0.247/smartponic/receive_data.php";
+const char* CTRL_URL      = "http://192.168.0.247/smartponic/control_queue.php";
+
+const char* DEFAULT_AES_KEY      = "SmartPonic123456";
+const char* DEFAULT_API_KEY      = "smartponic-hq-key";
+const char* DEFAULT_HMAC_SECRET  = "smartponic-hq-signature-secret";
+const char* DEFAULT_AUTH_KEY     = "AQUA77";
+
+String gAesKey    = DEFAULT_AES_KEY;
+String gApiKey    = DEFAULT_API_KEY;
+String gHmacSecret= DEFAULT_HMAC_SECRET;
+String gAuthKey   = DEFAULT_AUTH_KEY;
+
+const char* PREFS_NS = "hq_secrets";
+
+// LoRa pins (ESP32-S2 Mini)
+#define LORA_SCK        7
+#define LORA_MISO       8
+#define LORA_MOSI       9
+#define LORA_SS         6
+#define LORA_RST        5
+#define LORA_DIO0      -1
+#define LORA_SYNC_WORD  0xB4
+
+// Constants
+constexpr size_t NONCE_SIZE       = 16;
+constexpr size_t HEADER_SIZE      = 14;
+constexpr size_t CRC_SIZE         = 4;
+constexpr uint32_t MAGIC          = 0x31504653UL;
+constexpr uint8_t  VERSION       = 1;
+constexpr size_t MAX_PACKET_BYTES = 255;
+constexpr size_t RELAY_DEDUP_SIZE = 16;
+constexpr unsigned long CTRL_POLL_MS   = 5000UL;
+constexpr unsigned long WIFI_RETRY_MS  = 10000UL;
+
+// State
+bool gLoraReady      = false;
+bool gWifiConnected  = false;
+bool gClockSynced    = false;
+unsigned long gWifiRetryMs = 0;
+std::set<uint32_t> gRelayDedup;
+
+struct NodeInfo { String hardwareId; unsigned long lastSeen; };
+std::vector<NodeInfo> gKnownNodes;
+
+struct HttpJob { String url; String body; };
+std::vector<HttpJob> gHttpQueue;
+
+// ================= CRC32 =================
+uint32_t calcCrc32(const uint8_t* data, size_t len) {
+  uint32_t crc = 0xFFFFFFFF;
+  for (size_t i = 0; i < len; i++) {
+    crc ^= data[i];
+    for (int b = 0; b < 8; b++) {
+      crc = (crc >> 1) ^ (0xEDB88320 & -(crc & 1));
+    }
+  }
+  return ~crc;
+}
+
+// ================= LORA BUILD PACKET =================
+std::vector<uint8_t> buildPacket(const String& payload, uint8_t priority, uint8_t reportMode) {
+  uint8_t nonce[NONCE_SIZE] = {0};
+  uint32_t now = millis();
+  memcpy(nonce + 4, &now, 4);
+  uint32_t r1 = esp_random(), r2 = esp_random();
+  memcpy(nonce + 8, &r1, 4);
+  memcpy(nonce + 12, &r2, 4);
+
+  std::vector<uint8_t> encrypted(payload.length());
+  std::vector<uint8_t> counter(NONCE_SIZE);
+  memcpy(counter.data(), nonce, NONCE_SIZE);
+  size_t ncOff = 0;
+  uint8_t stream[16] = {0};
+
+  mbedtls_aes_context aes;
+  mbedtls_aes_init(&aes);
+  mbedtls_aes_setkey_enc(&aes, (const uint8_t*)gAesKey.c_str(), 128);
+  mbedtls_aes_crypt_ctr(&aes, payload.length(), &ncOff, counter.data(), stream,
+                        (const uint8_t*)payload.c_str(), encrypted.data());
+  mbedtls_aes_free(&aes);
+
+  uint8_t header[HEADER_SIZE] = {0};
+  memcpy(header, &MAGIC, 4);
+  header[4] = VERSION;
+  header[5] = priority;
+  header[6] = reportMode;
+  header[7] = (uint8_t)(encrypted.size());
+  header[8] = (uint8_t)(encrypted.size() >> 8);
+
+  std::vector<uint8_t> packet;
+  packet.insert(packet.end(), header, header + HEADER_SIZE);
+  packet.insert(packet.end(), nonce, nonce + NONCE_SIZE);
+  packet.insert(packet.end(), encrypted.begin(), encrypted.end());
+
+  uint32_t crc = calcCrc32(packet.data(), packet.size());
+  packet.insert(packet.end(), (uint8_t*)&crc, ((uint8_t*)&crc) + 4);
+
+  return packet;
+}
+
+// ================= DECRYPT PACKET =================
+bool decryptPacket(const uint8_t* data, size_t len, String& outPayload,
+                   uint8_t& outPriority, uint8_t& outReportMode) {
+  if (len < 34) return false;
+
+  uint32_t magic = 0;
+  memcpy(&magic, data, 4);
+  if (magic != MAGIC) return false;
+  if (data[4] != VERSION) return false;
+
+  outPriority = data[5];
+  outReportMode = data[6];
+  uint16_t payloadLen = data[7] | ((uint16_t)data[8] << 8);
+
+  size_t expected = HEADER_SIZE + NONCE_SIZE + payloadLen + CRC_SIZE;
+  if (len != expected) return false;
+
+  uint32_t recvCrc = 0;
+  memcpy(&recvCrc, data + len - 4, 4);
+  if (calcCrc32(data, len - 4) != recvCrc) return false;
+
+  const uint8_t* nonce = data + HEADER_SIZE;
+  const uint8_t* ciphertext = data + HEADER_SIZE + NONCE_SIZE;
+
+  std::vector<uint8_t> plaintext(payloadLen);
+  std::vector<uint8_t> counter(NONCE_SIZE);
+  memcpy(counter.data(), nonce, NONCE_SIZE);
+  size_t ncOff = 0;
+  uint8_t stream[16] = {0};
+
+  mbedtls_aes_context aes;
+  mbedtls_aes_init(&aes);
+  mbedtls_aes_setkey_enc(&aes, (const uint8_t*)gAesKey.c_str(), 128);
+  mbedtls_aes_crypt_ctr(&aes, payloadLen, &ncOff, counter.data(), stream, ciphertext, plaintext.data());
+  mbedtls_aes_free(&aes);
+
+  outPayload = "";
+  for (size_t i = 0; i < payloadLen; i++) outPayload += (char)plaintext[i];
+  outPayload.trim();
+
+  return outPayload.length() > 0;
+}
+
+// ================= LORA SEND =================
+bool sendLoRa(const std::vector<uint8_t>& packet) {
+  if (!gLoraReady) return false;
+  if (packet.size() > MAX_PACKET_BYTES) return false;
+
+  LoRa.beginPacket();
+  LoRa.write(packet.data(), packet.size());
+  LoRa.endPacket();
+
+  delay(20);
+  LoRa.receive();
+  return true;
+}
+
+// ================= CONFIGURE RADIO =================
+void configureRadio() {
+  LoRa.setSyncWord(LORA_SYNC_WORD);
+  LoRa.setSpreadingFactor(9);
+  LoRa.setSignalBandwidth(125E3);
+  LoRa.setCodingRate4(5);
+  LoRa.setPreambleLength(12);
+  LoRa.enableCrc();
+  LoRa.setTxPower(20);
+}
+
+// ================= HELPERS =================
+String getField(const String& data, const String& key) {
+  String prefix = key + "=";
+  int start = 0;
+  while (true) {
+    int amp = data.indexOf('&', start);
+    int end = (amp < 0) ? data.length() : amp;
+    String seg = data.substring(start, end);
+    if (seg.startsWith(prefix)) return seg.substring(prefix.length());
+    if (amp < 0) break;
+    start = amp + 1;
+  }
+  return "";
+}
+
+void registerNode(const String& hwId) {
+  for (auto& n : gKnownNodes) {
+    if (n.hardwareId == hwId) { n.lastSeen = millis(); return; }
+  }
+  gKnownNodes.push_back({hwId, millis()});
+  Serial.print("[NODE] registered: ");
+  Serial.println(hwId);
+}
+
+bool isDuplicateRelay(uint32_t cmdId) {
+  return gRelayDedup.find(cmdId) != gRelayDedup.end();
+}
+
+void markRelaySent(uint32_t cmdId) {
+  gRelayDedup.insert(cmdId);
+  if (gRelayDedup.size() > RELAY_DEDUP_SIZE) {
+    gRelayDedup.erase(gRelayDedup.begin());
+  }
+}
+
+void cleanupDedup() {
+  if (gRelayDedup.size() > RELAY_DEDUP_SIZE * 2) {
+    auto it = gRelayDedup.begin();
+    std::advance(it, gRelayDedup.size() / 2);
+    gRelayDedup.erase(gRelayDedup.begin(), it);
+  }
+}
+
+// ================= HTTP =================
+bool httpPost(const char* url, const String& body, String& response) {
+  if (WiFi.status() != WL_CONNECTED) return false;
+
+  HTTPClient http;
+  http.begin(url);
+  http.setTimeout(5000);
+  http.addHeader("Content-Type", "application/json");
+
+  time_t now = time(nullptr);
+  String ts = String((unsigned long)(now > 1700000000 ? now : millis()));
+
+  // Build HMAC-SHA256 signature
+  String input = ts + body + gHmacSecret;
+  mbedtls_md_context_t ctx;
+  mbedtls_md_init(&ctx);
+  mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), 0);
+  mbedtls_md_update(&ctx, (const uint8_t*)input.c_str(), input.length());
+  unsigned char hash[32];
+  mbedtls_md_finish(&ctx, hash);
+  mbedtls_md_free(&ctx);
+
+  String sig = "";
+  for (int i = 0; i < 32; i++) {
+    sig += (hash[i] < 0x10 ? "0" : "");
+    sig += String(hash[i], HEX);
+  }
+
+  http.addHeader("X-API-Key", gApiKey.c_str());
+  http.addHeader("X-Timestamp", ts);
+  http.addHeader("X-Signature", sig);
+
+  int code = http.POST(body);
+  response = http.getString();
+  http.end();
+
+  Serial.print("[HTTP] code=");
+  Serial.println(code);
+  return code >= 200 && code < 300;
+}
+
+// ================= TELEMETRY JSON =================
+String buildTelemetryJson(const String& hwId, int rssi, float snr,
+                          uint8_t priority, uint8_t reportMode, const String& payload) {
+  String json = "{\"hardware_id\":\"" + hwId + "\",";
+  json += "\"rssi\":" + String(rssi) + ",";
+  json += "\"snr\":" + String(snr, 1) + ",";
+
+  const char* pLabel[] = {"LOW", "MEDIUM", "HIGH"};
+  json += "\"priority\":\"" + String(pLabel[priority]) + "\",";
+
+  const char* mLabel[] = {"NORMAL", "ABNORMAL", "CRITICAL"};
+  json += "\"report_mode\":\"" + String(mLabel[reportMode]) + "\",";
+  json += "\"event_type\":\"telemetry\",";
+  json += "\"sensors\":[";
+
+  bool first = true;
+  int start = 0;
+  while (true) {
+    int amp = payload.indexOf('&', start);
+    String seg = (amp < 0) ? payload.substring(start) : payload.substring(start, amp);
+
+    if (seg.startsWith("auth=") || seg.startsWith("hardware_id=") ||
+        seg.startsWith("priority=") || seg.startsWith("mode=") ||
+        seg.startsWith("sample_ms=") || seg.startsWith("report_ms=")) {
+      // skip metadata
+    } else if (seg.length() > 0) {
+      int eq1 = seg.indexOf('=');
+      int eq2 = seg.lastIndexOf('=');
+      if (eq1 > 0 && eq1 != eq2) {
+        String pin = seg.substring(0, eq1);
+        String rest = seg.substring(eq1 + 1);
+        int eq3 = rest.lastIndexOf('=');
+        if (eq3 > 0) {
+          String sensor = rest.substring(0, eq3);
+          String value = rest.substring(eq3 + 1);
+          if (!first) json += ",";
+          json += "{\"pin\":" + pin + ",\"sensor\":\"" + sensor + "\",\"value\":\"" + value + "\"}";
+          first = false;
+        }
+      }
+    }
+
+    if (amp < 0) break;
+    start = amp + 1;
+  }
+
+  json += "]}";
+  return json;
+}
+
+// ================= PERSISTENCE =================
+void loadKeys() {
+  Preferences p; p.begin(PREFS_NS, false);
+  gAesKey    = p.getString("aes_key", DEFAULT_AES_KEY);
+  gApiKey    = p.getString("api_key", DEFAULT_API_KEY);
+  gHmacSecret= p.getString("hmac", DEFAULT_HMAC_SECRET);
+  gAuthKey   = p.getString("auth_key", DEFAULT_AUTH_KEY);
+  p.end();
+  if (gAesKey.length() != 16) gAesKey = DEFAULT_AES_KEY;
+  Serial.println("Keys loaded from flash");
+}
+
+void saveAesKey(const String& v) {
+  if (v.length() != 16) { Serial.println("AES must be 16 chars"); return; }
+  Preferences p; p.begin(PREFS_NS, false);
+  p.putString("aes_key", v); p.end();
+  gAesKey = v; Serial.println("AES key saved");
+}
+
+void saveApiKey(const String& v) {
+  Preferences p; p.begin(PREFS_NS, false);
+  p.putString("api_key", v); p.end();
+  gApiKey = v; Serial.println("API key saved");
+}
+
+void saveHmacSecret(const String& v) {
+  Preferences p; p.begin(PREFS_NS, false);
+  p.putString("hmac", v); p.end();
+  gHmacSecret = v; Serial.println("HMAC secret saved");
+}
+
+void saveAuthKey(const String& v) {
+  if (v.length() == 0) { Serial.println("AUTH empty"); return; }
+  Preferences p; p.begin(PREFS_NS, false);
+  p.putString("auth_key", v); p.end();
+  gAuthKey = v; Serial.println("AUTH key saved");
+}
+
+void clearKeys() {
+  Preferences p; p.begin(PREFS_NS, false);
+  p.remove("aes_key"); p.remove("api_key");
+  p.remove("hmac"); p.remove("auth_key"); p.end();
+  gAesKey = DEFAULT_AES_KEY; gApiKey = DEFAULT_API_KEY;
+  gHmacSecret = DEFAULT_HMAC_SECRET; gAuthKey = DEFAULT_AUTH_KEY;
+  Serial.println("Keys reset");
+}
+
+// ================= SERIAL COMMANDS =================
+void serialCommand(String input) {
+  Serial.println("> " + input);
+  String cmd = input;
+  cmd.toUpperCase();
+
+  if (cmd == "HELP" || cmd == "?") {
+    Serial.println("Commands: HELP, KEYS, SETKEYS, WIFI, NODES, CLEAR, RESET");
+    return;
+  }
+  if (cmd == "KEYS") {
+    Serial.println("AES: " + gAesKey);
+    Serial.println("API: " + gApiKey);
+    Serial.println("AUTH: " + gAuthKey);
+    return;
+  }
+  if (cmd == "WIFI") {
+    Serial.println(WiFi.status() == WL_CONNECTED ? "Connected" : "Disconnected");
+    if (WiFi.status() == WL_CONNECTED) Serial.println(WiFi.localIP().toString());
+    return;
+  }
+  if (cmd == "NODES") {
+    Serial.print("Nodes: ");
+    Serial.println(gKnownNodes.size());
+    for (auto& n : gKnownNodes) Serial.println("  " + n.hardwareId);
+    return;
+  }
+  if (cmd == "CLEAR") { gHttpQueue.clear(); Serial.println("HTTP queue cleared"); return; }
+  if (cmd == "RESET") { clearKeys(); return; }
+
+  if (cmd.startsWith("SETKEYS,")) {
+    String args = input.substring(8);
+    if (args.indexOf("AES=") >= 0) {
+      int s = args.indexOf("AES=") + 4;
+      int e = args.indexOf(",", s);
+      if (e < 0) e = args.length();
+      saveAesKey(args.substring(s, e));
+    }
+    if (args.indexOf("API=") >= 0) {
+      int s = args.indexOf("API=") + 4;
+      int e = args.indexOf(",", s);
+      if (e < 0) e = args.length();
+      saveApiKey(args.substring(s, e));
+    }
+    if (args.indexOf("AUTH=") >= 0) {
+      int s = args.indexOf("AUTH=") + 5;
+      int e = args.indexOf(",", s);
+      if (e < 0) e = args.length();
+      saveAuthKey(args.substring(s, e));
+    }
+    Serial.println("Keys updated");
+    return;
+  }
+}
+
+// ================= SETUP =================
+void setup() {
+  Serial.begin(115200);
+  delay(1500);
+  Serial.println();
+  Serial.println("========================================");
+  Serial.println("SmartPonic HQ Gateway");
+  Serial.println("========================================");
+
+  loadKeys();
+  Serial.println("Keys loaded from flash");
+
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  Serial.print("Connecting to WiFi: ");
+  Serial.println(WIFI_SSID);
+
+  SPI.begin(LORA_SCK, LORA_MISO, LORA_MOSI, LORA_SS);
+  LoRa.setPins(LORA_SS, LORA_RST, LORA_DIO0);
+
+  if (!LoRa.begin(433E6)) {
+    Serial.println("ERROR: LoRa init failed!");
+    gLoraReady = false;
+  } else {
+    gLoraReady = true;
+    configureRadio();
+    LoRa.receive();
+    Serial.println("LoRa RX ready");
+  }
+
+  Serial.println("System initialized");
+  Serial.println("========================================");
+}
+
+// ================= MAIN LOOP =================
+void loop() {
+  // WiFi
+  if (WiFi.status() == WL_CONNECTED) {
+    if (!gWifiConnected) {
+      gWifiConnected = true;
+      Serial.print("WiFi connected: ");
+      Serial.println(WiFi.localIP());
+      configTime(8 * 3600, 0, "pool.ntp.org");
+      delay(1000);
+      time_t now = time(nullptr);
+      if (now > 1700000000) { gClockSynced = true; Serial.println("Clock synchronized"); }
+    }
+  } else {
+    if (gWifiConnected) { gWifiConnected = false; gClockSynced = false; Serial.println("WiFi disconnected"); }
+    if (millis() - gWifiRetryMs > WIFI_RETRY_MS) { gWifiRetryMs = millis(); WiFi.reconnect(); }
+  }
+
+  // LoRa RX
+  if (gLoraReady) {
+    int packetSize = LoRa.parsePacket();
+    if (packetSize > 0) {
+      std::vector<uint8_t> data(packetSize);
+      LoRa.readBytes(data.data(), packetSize);
+      LoRa.receive();
+
+      int rssi = LoRa.packetRssi();
+      float snr = LoRa.packetSnr();
+
+      Serial.print("[RX] size=");
+      Serial.print(packetSize);
+      Serial.print(" rssi=");
+      Serial.println(rssi);
+
+      uint8_t priority = 0, reportMode = 0;
+      String payload;
+      if (!decryptPacket(data.data(), data.size(), payload, priority, reportMode)) {
+        Serial.println("[RX] decrypt/CRC failed - dropped");
+      } else {
+        String auth = getField(payload, "auth");
+        if (auth != gAuthKey) {
+          Serial.println("[RX] auth mismatch - dropped");
+        } else {
+          String hwId = getField(payload, "hardware_id");
+          if (hwId.length() == 0) {
+            Serial.println("[RX] no hardware_id - dropped");
+          } else {
+            registerNode(hwId);
+            Serial.print("[RX] from node: ");
+            Serial.println(hwId);
+
+            String cmd = getField(payload, "cmd");
+            if (cmd == "relay") {
+              uint32_t cmdId = (uint32_t)getField(payload, "command_id").toInt();
+              int relayId = getField(payload, "relay").toInt();
+              int state = getField(payload, "state").toInt();
+              Serial.print("[RX] relay cmd: relay=");
+              Serial.print(relayId);
+              Serial.print(" state=");
+              Serial.println(state);
+
+              String ackPayload = "auth=" + gAuthKey + "&ack=relay&hardware_id=" + hwId
+                                + "&command_id=" + String(cmdId) + "&relay=" + String(relayId)
+                                + "&state=" + String(state) + "&status=done";
+              auto ackPkt = buildPacket(ackPayload, 2, 1);
+              sendLoRa(ackPkt);
+              Serial.println("[ACK] relay sent");
+            } else {
+              Serial.println("[RX] telemetry received");
+              String jsonBody = buildTelemetryJson(hwId, rssi, snr, priority, reportMode, payload);
+              gHttpQueue.push_back({API_URL, jsonBody});
+
+              String ackPayload = "auth=" + gAuthKey + "&ack=telemetry&hardware_id=" + hwId;
+              auto ackPkt = buildPacket(ackPayload, 0, 0);
+              sendLoRa(ackPkt);
+              Serial.println("[ACK] telemetry sent");
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // HTTP queue
+  if (!gHttpQueue.empty() && gWifiConnected) {
+    HttpJob job = gHttpQueue[0];
+    String resp;
+    if (httpPost(job.url.c_str(), job.body, resp)) {
+      Serial.println("[HTTP] sent OK");
+      gHttpQueue.erase(gHttpQueue.begin());
+    }
+  }
+
+  // Relay control polling
+  static unsigned long lastPoll = 0;
+  if (millis() - lastPoll >= CTRL_POLL_MS) {
+    lastPoll = millis();
+    if (gWifiConnected && !gKnownNodes.empty()) {
+      for (auto& node : gKnownNodes) {
+        String resp;
+        String body = "{\"action\":\"get_pending\",\"hardware_id\":\"" + node.hardwareId
+                    + "\",\"limit\":2,\"status_filter\":\"approved\"}";
+        if (!httpPost(CTRL_URL, body, resp)) continue;
+        JsonDocument doc;
+        if (deserializeJson(doc, resp) != DeserializationError::Ok) continue;
+        if (!doc["pending"].is<JsonArray>()) continue;
+        for (JsonObject cmdObj : doc["pending"].as<JsonArray>()) {
+          uint32_t cmdId = (uint32_t)(cmdObj["id"] | 0);
+          int relayId = cmdObj["relay_id"] | 0;
+          String action = cmdObj["action"] | "OFF";
+          action.toUpperCase();
+          if (cmdId > 0) {
+            if (isDuplicateRelay(cmdId)) {
+              Serial.print("[RELAY] duplicate skipped: ");
+              Serial.println(cmdId);
+            } else {
+              String payload = "auth=" + gAuthKey + "&cmd=relay&hardware_id=" + node.hardwareId
+                             + "&command_id=" + String(cmdId) + "&relay=" + String(relayId)
+                             + "&state=" + String(action == "ON" ? 1 : 0);
+              auto packet = buildPacket(payload, 2, 1);
+              if (sendLoRa(packet)) {
+                markRelaySent(cmdId);
+                Serial.print("[RELAY] sent: cmd=");
+                Serial.print(cmdId);
+                Serial.print(" relay=");
+                Serial.print(relayId);
+                Serial.print(" state=");
+                Serial.println(action == "ON" ? 1 : 0);
+                String notify = "{\"action\":\"mark_sent\",\"command_id\":" + String(cmdId) + "}";
+                String r2;
+                httpPost(CTRL_URL, notify, r2);
+              }
+            }
+          }
+        }
+      }
+      cleanupDedup();
+    }
+  }
+
+  // Serial
+  if (Serial.available()) {
+    String input = Serial.readStringUntil('\n');
+    input.trim();
+    if (input.length() > 0) serialCommand(input);
+  }
+
+  delay(5);
+}

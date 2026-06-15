@@ -1,25 +1,37 @@
 import 'package:flutter/material.dart';
 
 class StitchColors {
-  static const background = Color(0xFF10141A);
-  static const surface = Color(0xFF10141A);
-  static const surfaceLowest = Color(0xFF0A0E14);
-  static const surfaceLow = Color(0xFF181C22);
-  static const surfaceContainer = Color(0xFF1C2026);
-  static const surfaceHigh = Color(0xFF262A31);
+  static const background = Color(0xFF0A0D14);
+  static const surface = Color(0xFF0A0D14);
+  static const surfaceLowest = Color(0xFF0E131F);
+  static const surfaceLow = Color(0xFF151B29);
+  static const surfaceContainer = Color(0xFF1D263B);
+  static const surfaceHigh = Color(0xFF2B3754);
 
   static const primary = Color(0xFFFFFFFF);
-  static const primaryContainer = Color(0xFF00FBFB);
-  static const secondary = Color(0xFF9ECAFF);
-  static const secondaryContainer = Color(0xFF1E95F2);
-  static const tertiaryFixed = Color(0xFFFCE442);
+  static const primaryContainer = Color(0xFF00F5FF); // Neon Electric Cyan
+  static const secondary = Color(0xFFB08CFF); // Soft Aurora Purple
+  static const secondaryContainer = Color(0xFF1B60EC); // Quantum Blue
+  static const tertiaryFixed = Color(0xFFFAD02C); // Sol Gold
 
-  static const onSurface = Color(0xFFDFE2EB);
-  static const onSurfaceVariant = Color(0xFFB9CAC9);
-  static const outlineVariant = Color(0xFF3A4A49);
-  static const error = Color(0xFFFFB4AB);
-  static const onSecondaryContainer = Color(0xFF002B4D);
+  static const onSurface = Color(0xFFE2E6F0);
+  static const onSurfaceVariant = Color(0xFFA5B2CD);
+  static const outlineVariant = Color(0xFF334163);
+  static const error = Color(0xFFFF8E8E);
+  static const onSecondaryContainer = Color(0xFFFFFFFF);
 
+  // Glassmorphism
+  static const glassSurface = Color(0x1A1D263B);
+  static const glassBorder = Color(0x1A334163);
+
+  // Shimmer
+  static const shimmerBase = Color(0xFF151B29);
+  static const shimmerHighlight = Color(0xFF1D263B);
+
+  // Trend indicators
+  static const trendUp = Color(0xFF00FF87);
+  static const trendDown = Color(0xFFFF8E8E);
+  static const trendStable = Color(0xFFA5B2CD);
 }
 
 class AppTheme {
@@ -41,29 +53,28 @@ class AppTheme {
       colorScheme: colorScheme,
       scaffoldBackgroundColor: StitchColors.background,
       canvasColor: StitchColors.background,
-      splashFactory: NoSplash.splashFactory,
-      highlightColor: Colors.transparent,
-      splashColor: Colors.transparent,
-      hoverColor: Colors.transparent,
+      splashFactory: InkRipple.splashFactory,
+      highlightColor: StitchColors.outlineVariant.withValues(alpha: 0.15),
+      splashColor: StitchColors.primaryContainer.withValues(alpha: 0.2),
       fontFamily: 'Inter',
       textTheme: const TextTheme(
         displayMedium: TextStyle(
           fontFamily: 'SpaceGrotesk',
-          fontSize: 40,
+          fontSize: 38,
           fontWeight: FontWeight.w800,
           letterSpacing: -1.2,
           color: StitchColors.primary,
         ),
         headlineLarge: TextStyle(
           fontFamily: 'SpaceGrotesk',
-          fontSize: 30,
+          fontSize: 28,
           fontWeight: FontWeight.w800,
           letterSpacing: -0.8,
           color: StitchColors.primary,
         ),
         headlineMedium: TextStyle(
           fontFamily: 'SpaceGrotesk',
-          fontSize: 24,
+          fontSize: 22,
           fontWeight: FontWeight.w700,
           letterSpacing: -0.4,
           color: StitchColors.primary,
@@ -84,10 +95,11 @@ class AppTheme {
           color: StitchColors.onSurfaceVariant,
         ),
         labelLarge: TextStyle(
+          fontFamily: 'SpaceGrotesk',
           fontSize: 12,
           fontWeight: FontWeight.w700,
           letterSpacing: 1.3,
-          color: StitchColors.secondary,
+          color: StitchColors.primaryContainer,
         ),
         labelMedium: TextStyle(
           fontSize: 11,
@@ -101,15 +113,15 @@ class AppTheme {
         fillColor: StitchColors.surfaceLowest,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide.none,
+          borderSide: const BorderSide(color: StitchColors.outlineVariant, width: 1),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide.none,
+          borderSide: const BorderSide(color: StitchColors.outlineVariant, width: 1),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: StitchColors.secondary, width: 1),
+          borderSide: const BorderSide(color: StitchColors.primaryContainer, width: 1.5),
         ),
       ),
       pageTransitionsTheme: const PageTransitionsTheme(
@@ -125,10 +137,66 @@ class AppTheme {
   }
 
   static LinearGradient get ctaGradient => const LinearGradient(
-        colors: [StitchColors.primary, StitchColors.secondaryContainer],
+        colors: [StitchColors.primaryContainer, StitchColors.secondaryContainer],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       );
 
-  static List<BoxShadow> get cyanGlowShadow => const [];
+  static List<BoxShadow> get cyanGlowShadow => [
+        BoxShadow(
+          color: StitchColors.primaryContainer.withValues(alpha: 0.25),
+          blurRadius: 12,
+          spreadRadius: 1,
+        ),
+        BoxShadow(
+          color: StitchColors.secondaryContainer.withValues(alpha: 0.15),
+          blurRadius: 24,
+          spreadRadius: 0,
+        ),
+      ];
+
+  static List<BoxShadow> get glassShadow => [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.3),
+          blurRadius: 20,
+          spreadRadius: 0,
+          offset: const Offset(0, 4),
+        ),
+        BoxShadow(
+          color: StitchColors.primaryContainer.withValues(alpha: 0.06),
+          blurRadius: 40,
+          spreadRadius: 0,
+        ),
+      ];
+
+  static List<BoxShadow> get subtleShadow => [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.2),
+          blurRadius: 8,
+          offset: const Offset(0, 2),
+        ),
+      ];
+
+  // Sensor-specific bar gradients
+  static Gradient get phGradient => const LinearGradient(
+        colors: [
+          Colors.red,
+          Colors.orange,
+          Colors.yellow,
+          Colors.green,
+          Colors.blue,
+          Colors.purple,
+        ],
+      );
+
+  static Gradient get tempGradient => LinearGradient(
+        colors: [
+          StitchColors.secondaryContainer,
+          StitchColors.primaryContainer,
+        ],
+      );
+
+  static Gradient get tdsGradient => const LinearGradient(
+        colors: [Color(0xFF00B4D8), Color(0xFF00FF87)],
+      );
 }

@@ -1,0 +1,3626 @@
+<?xml version="1.0" encoding="utf-8"?>
+<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+  <p:cSld>
+    <p:spTree>
+      <p:nvGrpSpPr>
+        <p:cNvPr id="1" name=""/>
+        <p:cNvGrpSpPr/>
+        <p:nvPr/>
+      </p:nvGrpSpPr>
+      <p:grpSpPr>
+        <a:xfrm>
+          <a:off x="0" y="0"/>
+          <a:ext cx="0" cy="0"/>
+          <a:chOff x="0" y="0"/>
+          <a:chExt cx="0" cy="0"/>
+        </a:xfrm>
+      </p:grpSpPr>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="2" name="object 2"/>
+          <p:cNvSpPr/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm>
+            <a:off x="9508" y="1036459"/>
+            <a:ext cx="12171680" cy="9525"/>
+          </a:xfrm>
+          <a:custGeom>
+            <a:avLst/>
+            <a:gdLst/>
+            <a:ahLst/>
+            <a:cxnLst/>
+            <a:rect l="l" t="t" r="r" b="b"/>
+            <a:pathLst>
+              <a:path w="12171680" h="9525">
+                <a:moveTo>
+                  <a:pt x="12171273" y="9508"/>
+                </a:moveTo>
+                <a:lnTo>
+                  <a:pt x="0" y="9508"/>
+                </a:lnTo>
+                <a:lnTo>
+                  <a:pt x="0" y="0"/>
+                </a:lnTo>
+                <a:lnTo>
+                  <a:pt x="12171273" y="0"/>
+                </a:lnTo>
+                <a:lnTo>
+                  <a:pt x="12171273" y="9508"/>
+                </a:lnTo>
+                <a:close/>
+              </a:path>
+            </a:pathLst>
+          </a:custGeom>
+          <a:solidFill>
+            <a:srgbClr val="CBD5DF"/>
+          </a:solidFill>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr wrap="square" lIns="0" tIns="0" rIns="0" bIns="0" rtlCol="0"/>
+          <a:lstStyle/>
+          <a:p/>
+        </p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="3" name="object 3"/>
+          <p:cNvSpPr txBox="1"/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm>
+            <a:off x="600618" y="204808"/>
+            <a:ext cx="2664460" cy="175260"/>
+          </a:xfrm>
+          <a:prstGeom prst="rect">
+            <a:avLst/>
+          </a:prstGeom>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr wrap="square" lIns="0" tIns="16510" rIns="0" bIns="0" rtlCol="0" vert="horz">
+            <a:spAutoFit/>
+          </a:bodyPr>
+          <a:lstStyle/>
+          <a:p>
+            <a:pPr marL="12700">
+              <a:lnSpc>
+                <a:spcPct val="100000"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="130"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:r>
+              <a:rPr dirty="0" sz="950" spc="150">
+                <a:solidFill>
+                  <a:srgbClr val="708095"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>SYSTEM</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="950" spc="110">
+                <a:solidFill>
+                  <a:srgbClr val="708095"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="950" spc="85">
+                <a:solidFill>
+                  <a:srgbClr val="708095"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>OVERVI</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="950" spc="-145">
+                <a:solidFill>
+                  <a:srgbClr val="708095"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="950" spc="135">
+                <a:solidFill>
+                  <a:srgbClr val="708095"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>EW</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="950" spc="45">
+                <a:solidFill>
+                  <a:srgbClr val="708095"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="950" spc="-60">
+                <a:solidFill>
+                  <a:srgbClr val="708095"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>//</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="950" spc="105">
+                <a:solidFill>
+                  <a:srgbClr val="708095"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="950" spc="125">
+                <a:solidFill>
+                  <a:srgbClr val="708095"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>SMARTPONI</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="950" spc="-145">
+                <a:solidFill>
+                  <a:srgbClr val="708095"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="950" spc="110">
+                <a:solidFill>
+                  <a:srgbClr val="708095"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>C</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="950" spc="105">
+                <a:solidFill>
+                  <a:srgbClr val="708095"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="950" spc="-20">
+                <a:solidFill>
+                  <a:srgbClr val="708095"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>V1</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="950" spc="-160">
+                <a:solidFill>
+                  <a:srgbClr val="708095"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="950" spc="-135">
+                <a:solidFill>
+                  <a:srgbClr val="708095"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>.</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="950" spc="-180">
+                <a:solidFill>
+                  <a:srgbClr val="708095"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="950" spc="20">
+                <a:solidFill>
+                  <a:srgbClr val="708095"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>0</a:t>
+            </a:r>
+            <a:endParaRPr sz="950">
+              <a:latin typeface="Trebuchet MS"/>
+              <a:cs typeface="Trebuchet MS"/>
+            </a:endParaRPr>
+          </a:p>
+        </p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="4" name="object 4" descr="$PPTXTitle"/>
+          <p:cNvSpPr txBox="1">
+            <a:spLocks noGrp="1"/>
+          </p:cNvSpPr>
+          <p:nvPr>
+            <p:ph type="title"/>
+          </p:nvPr>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:prstGeom prst="rect"/>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr wrap="square" lIns="0" tIns="12065" rIns="0" bIns="0" rtlCol="0" vert="horz">
+            <a:spAutoFit/>
+          </a:bodyPr>
+          <a:lstStyle/>
+          <a:p>
+            <a:pPr marL="12700">
+              <a:lnSpc>
+                <a:spcPct val="100000"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="95"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:r>
+              <a:rPr dirty="0" spc="-30"/>
+              <a:t>Abstract</a:t>
+            </a:r>
+          </a:p>
+        </p:txBody>
+      </p:sp>
+      <p:grpSp>
+        <p:nvGrpSpPr>
+          <p:cNvPr id="5" name="object 5"/>
+          <p:cNvGrpSpPr/>
+          <p:nvPr/>
+        </p:nvGrpSpPr>
+        <p:grpSpPr>
+          <a:xfrm>
+            <a:off x="618072" y="1426321"/>
+            <a:ext cx="4384040" cy="1978025"/>
+            <a:chOff x="618072" y="1426321"/>
+            <a:chExt cx="4384040" cy="1978025"/>
+          </a:xfrm>
+        </p:grpSpPr>
+        <p:sp>
+          <p:nvSpPr>
+            <p:cNvPr id="6" name="object 6"/>
+            <p:cNvSpPr/>
+            <p:nvPr/>
+          </p:nvSpPr>
+          <p:spPr>
+            <a:xfrm>
+              <a:off x="618072" y="1426321"/>
+              <a:ext cx="4384040" cy="1978025"/>
+            </a:xfrm>
+            <a:custGeom>
+              <a:avLst/>
+              <a:gdLst/>
+              <a:ahLst/>
+              <a:cxnLst/>
+              <a:rect l="l" t="t" r="r" b="b"/>
+              <a:pathLst>
+                <a:path w="4384040" h="1978025">
+                  <a:moveTo>
+                    <a:pt x="4383560" y="1977831"/>
+                  </a:moveTo>
+                  <a:lnTo>
+                    <a:pt x="0" y="1977831"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="0" y="0"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="4383560" y="0"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="4383560" y="1977831"/>
+                  </a:lnTo>
+                  <a:close/>
+                </a:path>
+              </a:pathLst>
+            </a:custGeom>
+            <a:solidFill>
+              <a:srgbClr val="EBF7FF"/>
+            </a:solidFill>
+          </p:spPr>
+          <p:txBody>
+            <a:bodyPr wrap="square" lIns="0" tIns="0" rIns="0" bIns="0" rtlCol="0"/>
+            <a:lstStyle/>
+            <a:p/>
+          </p:txBody>
+        </p:sp>
+        <p:sp>
+          <p:nvSpPr>
+            <p:cNvPr id="7" name="object 7"/>
+            <p:cNvSpPr/>
+            <p:nvPr/>
+          </p:nvSpPr>
+          <p:spPr>
+            <a:xfrm>
+              <a:off x="618072" y="1426321"/>
+              <a:ext cx="38100" cy="1978025"/>
+            </a:xfrm>
+            <a:custGeom>
+              <a:avLst/>
+              <a:gdLst/>
+              <a:ahLst/>
+              <a:cxnLst/>
+              <a:rect l="l" t="t" r="r" b="b"/>
+              <a:pathLst>
+                <a:path w="38100" h="1978025">
+                  <a:moveTo>
+                    <a:pt x="38035" y="1977831"/>
+                  </a:moveTo>
+                  <a:lnTo>
+                    <a:pt x="0" y="1977831"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="0" y="0"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="38035" y="0"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="38035" y="1977831"/>
+                  </a:lnTo>
+                  <a:close/>
+                </a:path>
+              </a:pathLst>
+            </a:custGeom>
+            <a:solidFill>
+              <a:srgbClr val="3181CD"/>
+            </a:solidFill>
+          </p:spPr>
+          <p:txBody>
+            <a:bodyPr wrap="square" lIns="0" tIns="0" rIns="0" bIns="0" rtlCol="0"/>
+            <a:lstStyle/>
+            <a:p/>
+          </p:txBody>
+        </p:sp>
+      </p:grpSp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="8" name="object 8"/>
+          <p:cNvSpPr txBox="1"/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm>
+            <a:off x="656107" y="1580607"/>
+            <a:ext cx="4345940" cy="1633855"/>
+          </a:xfrm>
+          <a:prstGeom prst="rect">
+            <a:avLst/>
+          </a:prstGeom>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr wrap="square" lIns="0" tIns="15240" rIns="0" bIns="0" rtlCol="0" vert="horz">
+            <a:spAutoFit/>
+          </a:bodyPr>
+          <a:lstStyle/>
+          <a:p>
+            <a:pPr marL="299085" marR="467995">
+              <a:lnSpc>
+                <a:spcPct val="100299"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="120"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:r>
+              <a:rPr dirty="0" sz="2100">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>The</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2100" spc="-95">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2100">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>system</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2100" spc="-85">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2100">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>provides</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2100" spc="-80">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2100">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>a</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2100" spc="-25">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t> secure, </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2100" spc="-70">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>adaptive,</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2100" spc="30">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2100">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>and</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2100" spc="-40">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2100">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>end-</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2100" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>to-</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2100">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>end</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2100" spc="-40">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2100" spc="-25">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>IoT </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2100" spc="-40">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>monitoring</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2100" spc="-105">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2100" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>solution</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2100" spc="-95">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2100" spc="-25">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>for </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2100" spc="-60">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>integrated</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2100" spc="-95">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2100">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>fish</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2100" spc="-85">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2100">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>and</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2100" spc="-95">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2100" spc="-20">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>plant </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2100" spc="-10">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>farming.</a:t>
+            </a:r>
+            <a:endParaRPr sz="2100">
+              <a:latin typeface="Trebuchet MS"/>
+              <a:cs typeface="Trebuchet MS"/>
+            </a:endParaRPr>
+          </a:p>
+        </p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="9" name="object 9"/>
+          <p:cNvSpPr txBox="1"/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm>
+            <a:off x="600618" y="3618470"/>
+            <a:ext cx="1383030" cy="175260"/>
+          </a:xfrm>
+          <a:prstGeom prst="rect">
+            <a:avLst/>
+          </a:prstGeom>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr wrap="square" lIns="0" tIns="16510" rIns="0" bIns="0" rtlCol="0" vert="horz">
+            <a:spAutoFit/>
+          </a:bodyPr>
+          <a:lstStyle/>
+          <a:p>
+            <a:pPr marL="12700">
+              <a:lnSpc>
+                <a:spcPct val="100000"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="130"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:r>
+              <a:rPr dirty="0" sz="950" spc="75">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>EXECUTIVE</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="950" spc="65">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="950" spc="114">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>SUMMARY</a:t>
+            </a:r>
+            <a:endParaRPr sz="950">
+              <a:latin typeface="Trebuchet MS"/>
+              <a:cs typeface="Trebuchet MS"/>
+            </a:endParaRPr>
+          </a:p>
+        </p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="10" name="object 10"/>
+          <p:cNvSpPr txBox="1"/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm>
+            <a:off x="600618" y="3815545"/>
+            <a:ext cx="3874770" cy="871855"/>
+          </a:xfrm>
+          <a:prstGeom prst="rect">
+            <a:avLst/>
+          </a:prstGeom>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr wrap="square" lIns="0" tIns="17145" rIns="0" bIns="0" rtlCol="0" vert="horz">
+            <a:spAutoFit/>
+          </a:bodyPr>
+          <a:lstStyle/>
+          <a:p>
+            <a:pPr marL="12700" marR="5080">
+              <a:lnSpc>
+                <a:spcPct val="136300"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="135"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:r>
+              <a:rPr dirty="0" sz="1350">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>A</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-80">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-45">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>high-</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-50">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>level</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-80">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-70">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>summary</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-80">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>of</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-80">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-60">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>the</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-80">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-60">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>entire</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-80">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-10">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>SmartPonic </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-65">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>system,</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-75">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-50">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>detailing</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-70">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-60">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>the</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-70">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>convergence</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-75">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>of</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-70">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-45">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>hardware, </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-50">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>security,</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-65">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-45">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>and</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-60">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-55">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>adaptive</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-65">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-45">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>control</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-60">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-10">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>logic.</a:t>
+            </a:r>
+            <a:endParaRPr sz="1350">
+              <a:latin typeface="Verdana"/>
+              <a:cs typeface="Verdana"/>
+            </a:endParaRPr>
+          </a:p>
+        </p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="11" name="object 11"/>
+          <p:cNvSpPr txBox="1"/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm>
+            <a:off x="622826" y="4949334"/>
+            <a:ext cx="4374515" cy="1588135"/>
+          </a:xfrm>
+          <a:prstGeom prst="rect">
+            <a:avLst/>
+          </a:prstGeom>
+          <a:solidFill>
+            <a:srgbClr val="FFFFFF"/>
+          </a:solidFill>
+          <a:ln w="9508">
+            <a:solidFill>
+              <a:srgbClr val="E2E7F0"/>
+            </a:solidFill>
+          </a:ln>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr wrap="square" lIns="0" tIns="44450" rIns="0" bIns="0" rtlCol="0" vert="horz">
+            <a:spAutoFit/>
+          </a:bodyPr>
+          <a:lstStyle/>
+          <a:p>
+            <a:pPr>
+              <a:lnSpc>
+                <a:spcPct val="100000"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="350"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:endParaRPr sz="1350">
+              <a:latin typeface="Times New Roman"/>
+              <a:cs typeface="Times New Roman"/>
+            </a:endParaRPr>
+          </a:p>
+          <a:p>
+            <a:pPr marL="227965">
+              <a:lnSpc>
+                <a:spcPct val="100000"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="5"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:r>
+              <a:rPr dirty="0" sz="1500" spc="180">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Microsoft Sans Serif"/>
+                <a:cs typeface="Microsoft Sans Serif"/>
+              </a:rPr>
+              <a:t></a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1500" spc="70">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Microsoft Sans Serif"/>
+                <a:cs typeface="Microsoft Sans Serif"/>
+              </a:rPr>
+              <a:t>  </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1450">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>Core</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1450" spc="-65">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1450" spc="-10">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>Architecture</a:t>
+            </a:r>
+            <a:endParaRPr sz="1450">
+              <a:latin typeface="Trebuchet MS"/>
+              <a:cs typeface="Trebuchet MS"/>
+            </a:endParaRPr>
+          </a:p>
+          <a:p>
+            <a:pPr marL="227965" marR="459105">
+              <a:lnSpc>
+                <a:spcPct val="135200"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="835"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:r>
+              <a:rPr dirty="0" sz="1200" spc="-35">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>Combines</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1200" spc="-70">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1200" spc="-25">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>ESP32</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1200" spc="-70">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1200" spc="-35">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>nodes,</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1200" spc="-65">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1200" spc="-35">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>LoRa</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1200" spc="-70">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1200" spc="-10">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>433MHz </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1200" spc="-50">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>communication,</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1200" spc="-60">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1200" spc="-45">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>and</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1200" spc="-55">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1200" spc="-65">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>a</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1200" spc="-60">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1200" spc="-45">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>robust</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1200" spc="-55">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1200" spc="-20">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>PHP/MySQL</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1200" spc="-55">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1200" spc="-10">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>backend </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1200" spc="-35">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>for</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1200" spc="-55">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1200" spc="-45">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>persistent</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1200" spc="-55">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> data</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1200" spc="-50">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1200" spc="-10">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>management.</a:t>
+            </a:r>
+            <a:endParaRPr sz="1200">
+              <a:latin typeface="Verdana"/>
+              <a:cs typeface="Verdana"/>
+            </a:endParaRPr>
+          </a:p>
+        </p:txBody>
+      </p:sp>
+      <p:grpSp>
+        <p:nvGrpSpPr>
+          <p:cNvPr id="12" name="object 12"/>
+          <p:cNvGrpSpPr/>
+          <p:nvPr/>
+        </p:nvGrpSpPr>
+        <p:grpSpPr>
+          <a:xfrm>
+            <a:off x="5305914" y="1426321"/>
+            <a:ext cx="3052445" cy="2482215"/>
+            <a:chOff x="5305914" y="1426321"/>
+            <a:chExt cx="3052445" cy="2482215"/>
+          </a:xfrm>
+        </p:grpSpPr>
+        <p:sp>
+          <p:nvSpPr>
+            <p:cNvPr id="13" name="object 13"/>
+            <p:cNvSpPr/>
+            <p:nvPr/>
+          </p:nvSpPr>
+          <p:spPr>
+            <a:xfrm>
+              <a:off x="5305914" y="1426321"/>
+              <a:ext cx="3052445" cy="2482215"/>
+            </a:xfrm>
+            <a:custGeom>
+              <a:avLst/>
+              <a:gdLst/>
+              <a:ahLst/>
+              <a:cxnLst/>
+              <a:rect l="l" t="t" r="r" b="b"/>
+              <a:pathLst>
+                <a:path w="3052445" h="2482215">
+                  <a:moveTo>
+                    <a:pt x="3052327" y="2481798"/>
+                  </a:moveTo>
+                  <a:lnTo>
+                    <a:pt x="0" y="2481798"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="0" y="0"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="3052327" y="0"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="3052327" y="2481798"/>
+                  </a:lnTo>
+                  <a:close/>
+                </a:path>
+              </a:pathLst>
+            </a:custGeom>
+            <a:solidFill>
+              <a:srgbClr val="FFFFFF"/>
+            </a:solidFill>
+          </p:spPr>
+          <p:txBody>
+            <a:bodyPr wrap="square" lIns="0" tIns="0" rIns="0" bIns="0" rtlCol="0"/>
+            <a:lstStyle/>
+            <a:p/>
+          </p:txBody>
+        </p:sp>
+        <p:sp>
+          <p:nvSpPr>
+            <p:cNvPr id="14" name="object 14"/>
+            <p:cNvSpPr/>
+            <p:nvPr/>
+          </p:nvSpPr>
+          <p:spPr>
+            <a:xfrm>
+              <a:off x="5543634" y="1664041"/>
+              <a:ext cx="304800" cy="304800"/>
+            </a:xfrm>
+            <a:custGeom>
+              <a:avLst/>
+              <a:gdLst/>
+              <a:ahLst/>
+              <a:cxnLst/>
+              <a:rect l="l" t="t" r="r" b="b"/>
+              <a:pathLst>
+                <a:path w="304800" h="304800">
+                  <a:moveTo>
+                    <a:pt x="287785" y="304281"/>
+                  </a:moveTo>
+                  <a:lnTo>
+                    <a:pt x="16495" y="304281"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="14069" y="303798"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="0" y="287785"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="0" y="285264"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="0" y="16495"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="16495" y="0"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="287785" y="0"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="304281" y="16495"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="304281" y="287785"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="290211" y="303798"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="287785" y="304281"/>
+                  </a:lnTo>
+                  <a:close/>
+                </a:path>
+              </a:pathLst>
+            </a:custGeom>
+            <a:solidFill>
+              <a:srgbClr val="1A365C"/>
+            </a:solidFill>
+          </p:spPr>
+          <p:txBody>
+            <a:bodyPr wrap="square" lIns="0" tIns="0" rIns="0" bIns="0" rtlCol="0"/>
+            <a:lstStyle/>
+            <a:p/>
+          </p:txBody>
+        </p:sp>
+        <p:pic>
+          <p:nvPicPr>
+            <p:cNvPr id="15" name="object 15"/>
+            <p:cNvPicPr/>
+            <p:nvPr/>
+          </p:nvPicPr>
+          <p:blipFill>
+            <a:blip r:embed="rId2" cstate="print"/>
+            <a:stretch>
+              <a:fillRect/>
+            </a:stretch>
+          </p:blipFill>
+          <p:spPr>
+            <a:xfrm>
+              <a:off x="5630754" y="1746251"/>
+              <a:ext cx="126999" cy="133349"/>
+            </a:xfrm>
+            <a:prstGeom prst="rect">
+              <a:avLst/>
+            </a:prstGeom>
+          </p:spPr>
+        </p:pic>
+      </p:grpSp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="16" name="object 16"/>
+          <p:cNvSpPr txBox="1"/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm>
+            <a:off x="5310668" y="1431075"/>
+            <a:ext cx="3042920" cy="2472690"/>
+          </a:xfrm>
+          <a:prstGeom prst="rect">
+            <a:avLst/>
+          </a:prstGeom>
+          <a:ln w="9508">
+            <a:solidFill>
+              <a:srgbClr val="E2E7F0"/>
+            </a:solidFill>
+          </a:ln>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr wrap="square" lIns="0" tIns="60325" rIns="0" bIns="0" rtlCol="0" vert="horz">
+            <a:spAutoFit/>
+          </a:bodyPr>
+          <a:lstStyle/>
+          <a:p>
+            <a:pPr>
+              <a:lnSpc>
+                <a:spcPct val="100000"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="475"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:endParaRPr sz="1350">
+              <a:latin typeface="Times New Roman"/>
+              <a:cs typeface="Times New Roman"/>
+            </a:endParaRPr>
+          </a:p>
+          <a:p>
+            <a:pPr marL="649605">
+              <a:lnSpc>
+                <a:spcPct val="100000"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="5"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:r>
+              <a:rPr dirty="0" sz="1450" spc="-10">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>Security</a:t>
+            </a:r>
+            <a:endParaRPr sz="1450">
+              <a:latin typeface="Trebuchet MS"/>
+              <a:cs typeface="Trebuchet MS"/>
+            </a:endParaRPr>
+          </a:p>
+          <a:p>
+            <a:pPr marL="231140" marR="290830">
+              <a:lnSpc>
+                <a:spcPct val="136100"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="1050"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-55">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>Implements</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>AES-</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-25">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>128-</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>CTR</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-20">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>encryption for</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-50">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>all</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-45">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-20">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>LoRa</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-45">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-35">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>transmissions,</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-50">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-10">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>ensuring </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-35">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>data</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-60">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-40">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>integrity</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-60">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>across</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-55">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-45">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>the</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-60">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-10">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>wireless</a:t>
+            </a:r>
+            <a:endParaRPr sz="1100">
+              <a:latin typeface="Verdana"/>
+              <a:cs typeface="Verdana"/>
+            </a:endParaRPr>
+          </a:p>
+          <a:p>
+            <a:pPr marL="231140">
+              <a:lnSpc>
+                <a:spcPct val="100000"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="555"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-10">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>mesh.</a:t>
+            </a:r>
+            <a:endParaRPr sz="1100">
+              <a:latin typeface="Verdana"/>
+              <a:cs typeface="Verdana"/>
+            </a:endParaRPr>
+          </a:p>
+        </p:txBody>
+      </p:sp>
+      <p:grpSp>
+        <p:nvGrpSpPr>
+          <p:cNvPr id="17" name="object 17"/>
+          <p:cNvGrpSpPr/>
+          <p:nvPr/>
+        </p:nvGrpSpPr>
+        <p:grpSpPr>
+          <a:xfrm>
+            <a:off x="8510382" y="1426321"/>
+            <a:ext cx="3052445" cy="2482215"/>
+            <a:chOff x="8510382" y="1426321"/>
+            <a:chExt cx="3052445" cy="2482215"/>
+          </a:xfrm>
+        </p:grpSpPr>
+        <p:sp>
+          <p:nvSpPr>
+            <p:cNvPr id="18" name="object 18"/>
+            <p:cNvSpPr/>
+            <p:nvPr/>
+          </p:nvSpPr>
+          <p:spPr>
+            <a:xfrm>
+              <a:off x="8510382" y="1426321"/>
+              <a:ext cx="3052445" cy="2482215"/>
+            </a:xfrm>
+            <a:custGeom>
+              <a:avLst/>
+              <a:gdLst/>
+              <a:ahLst/>
+              <a:cxnLst/>
+              <a:rect l="l" t="t" r="r" b="b"/>
+              <a:pathLst>
+                <a:path w="3052445" h="2482215">
+                  <a:moveTo>
+                    <a:pt x="3052327" y="2481798"/>
+                  </a:moveTo>
+                  <a:lnTo>
+                    <a:pt x="0" y="2481798"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="0" y="0"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="3052327" y="0"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="3052327" y="2481798"/>
+                  </a:lnTo>
+                  <a:close/>
+                </a:path>
+              </a:pathLst>
+            </a:custGeom>
+            <a:solidFill>
+              <a:srgbClr val="FFFFFF"/>
+            </a:solidFill>
+          </p:spPr>
+          <p:txBody>
+            <a:bodyPr wrap="square" lIns="0" tIns="0" rIns="0" bIns="0" rtlCol="0"/>
+            <a:lstStyle/>
+            <a:p/>
+          </p:txBody>
+        </p:sp>
+        <p:sp>
+          <p:nvSpPr>
+            <p:cNvPr id="19" name="object 19"/>
+            <p:cNvSpPr/>
+            <p:nvPr/>
+          </p:nvSpPr>
+          <p:spPr>
+            <a:xfrm>
+              <a:off x="8748102" y="1664041"/>
+              <a:ext cx="304800" cy="304800"/>
+            </a:xfrm>
+            <a:custGeom>
+              <a:avLst/>
+              <a:gdLst/>
+              <a:ahLst/>
+              <a:cxnLst/>
+              <a:rect l="l" t="t" r="r" b="b"/>
+              <a:pathLst>
+                <a:path w="304800" h="304800">
+                  <a:moveTo>
+                    <a:pt x="287786" y="304281"/>
+                  </a:moveTo>
+                  <a:lnTo>
+                    <a:pt x="16495" y="304281"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="14069" y="303798"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="0" y="287785"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="0" y="285264"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="0" y="16495"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="16495" y="0"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="287786" y="0"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="304281" y="16495"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="304281" y="287785"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="290211" y="303798"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="287786" y="304281"/>
+                  </a:lnTo>
+                  <a:close/>
+                </a:path>
+              </a:pathLst>
+            </a:custGeom>
+            <a:solidFill>
+              <a:srgbClr val="3181CD"/>
+            </a:solidFill>
+          </p:spPr>
+          <p:txBody>
+            <a:bodyPr wrap="square" lIns="0" tIns="0" rIns="0" bIns="0" rtlCol="0"/>
+            <a:lstStyle/>
+            <a:p/>
+          </p:txBody>
+        </p:sp>
+        <p:pic>
+          <p:nvPicPr>
+            <p:cNvPr id="20" name="object 20"/>
+            <p:cNvPicPr/>
+            <p:nvPr/>
+          </p:nvPicPr>
+          <p:blipFill>
+            <a:blip r:embed="rId3" cstate="print"/>
+            <a:stretch>
+              <a:fillRect/>
+            </a:stretch>
+          </p:blipFill>
+          <p:spPr>
+            <a:xfrm>
+              <a:off x="8835168" y="1746251"/>
+              <a:ext cx="133349" cy="136524"/>
+            </a:xfrm>
+            <a:prstGeom prst="rect">
+              <a:avLst/>
+            </a:prstGeom>
+          </p:spPr>
+        </p:pic>
+      </p:grpSp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="21" name="object 21"/>
+          <p:cNvSpPr txBox="1"/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm>
+            <a:off x="8515136" y="1431075"/>
+            <a:ext cx="3042920" cy="2472690"/>
+          </a:xfrm>
+          <a:prstGeom prst="rect">
+            <a:avLst/>
+          </a:prstGeom>
+          <a:ln w="9508">
+            <a:solidFill>
+              <a:srgbClr val="E2E7F0"/>
+            </a:solidFill>
+          </a:ln>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr wrap="square" lIns="0" tIns="60325" rIns="0" bIns="0" rtlCol="0" vert="horz">
+            <a:spAutoFit/>
+          </a:bodyPr>
+          <a:lstStyle/>
+          <a:p>
+            <a:pPr>
+              <a:lnSpc>
+                <a:spcPct val="100000"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="475"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:endParaRPr sz="1350">
+              <a:latin typeface="Times New Roman"/>
+              <a:cs typeface="Times New Roman"/>
+            </a:endParaRPr>
+          </a:p>
+          <a:p>
+            <a:pPr marL="234315" indent="417830">
+              <a:lnSpc>
+                <a:spcPct val="100000"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="5"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:r>
+              <a:rPr dirty="0" sz="1450" spc="-20">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>Adaptive</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1450" spc="-60">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1450" spc="-20">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>Logic</a:t>
+            </a:r>
+            <a:endParaRPr sz="1450">
+              <a:latin typeface="Trebuchet MS"/>
+              <a:cs typeface="Trebuchet MS"/>
+            </a:endParaRPr>
+          </a:p>
+          <a:p>
+            <a:pPr marL="234315" marR="281940">
+              <a:lnSpc>
+                <a:spcPct val="136100"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="1050"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>Communication </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-35">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>intervals</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-25">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-10">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>adjust </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>dynamically</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-55">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-125">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>(15,</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-50">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-75">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>5,</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-50">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>or</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-50">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-245">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>1</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-50">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-65">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>minute)</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-55">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-10">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>based on</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-65">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>real-</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-40">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>time</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-60">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-20">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>sensor</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-60">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-35">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>data</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-60">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-10">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>priority.</a:t>
+            </a:r>
+            <a:endParaRPr sz="1100">
+              <a:latin typeface="Verdana"/>
+              <a:cs typeface="Verdana"/>
+            </a:endParaRPr>
+          </a:p>
+        </p:txBody>
+      </p:sp>
+      <p:grpSp>
+        <p:nvGrpSpPr>
+          <p:cNvPr id="22" name="object 22"/>
+          <p:cNvGrpSpPr/>
+          <p:nvPr/>
+        </p:nvGrpSpPr>
+        <p:grpSpPr>
+          <a:xfrm>
+            <a:off x="5305914" y="4060260"/>
+            <a:ext cx="3052445" cy="2482215"/>
+            <a:chOff x="5305914" y="4060260"/>
+            <a:chExt cx="3052445" cy="2482215"/>
+          </a:xfrm>
+        </p:grpSpPr>
+        <p:sp>
+          <p:nvSpPr>
+            <p:cNvPr id="23" name="object 23"/>
+            <p:cNvSpPr/>
+            <p:nvPr/>
+          </p:nvSpPr>
+          <p:spPr>
+            <a:xfrm>
+              <a:off x="5305914" y="4060260"/>
+              <a:ext cx="3052445" cy="2482215"/>
+            </a:xfrm>
+            <a:custGeom>
+              <a:avLst/>
+              <a:gdLst/>
+              <a:ahLst/>
+              <a:cxnLst/>
+              <a:rect l="l" t="t" r="r" b="b"/>
+              <a:pathLst>
+                <a:path w="3052445" h="2482215">
+                  <a:moveTo>
+                    <a:pt x="3052327" y="2481798"/>
+                  </a:moveTo>
+                  <a:lnTo>
+                    <a:pt x="0" y="2481798"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="0" y="0"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="3052327" y="0"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="3052327" y="2481798"/>
+                  </a:lnTo>
+                  <a:close/>
+                </a:path>
+              </a:pathLst>
+            </a:custGeom>
+            <a:solidFill>
+              <a:srgbClr val="FFFFFF"/>
+            </a:solidFill>
+          </p:spPr>
+          <p:txBody>
+            <a:bodyPr wrap="square" lIns="0" tIns="0" rIns="0" bIns="0" rtlCol="0"/>
+            <a:lstStyle/>
+            <a:p/>
+          </p:txBody>
+        </p:sp>
+        <p:sp>
+          <p:nvSpPr>
+            <p:cNvPr id="24" name="object 24"/>
+            <p:cNvSpPr/>
+            <p:nvPr/>
+          </p:nvSpPr>
+          <p:spPr>
+            <a:xfrm>
+              <a:off x="5543634" y="4297980"/>
+              <a:ext cx="304800" cy="304800"/>
+            </a:xfrm>
+            <a:custGeom>
+              <a:avLst/>
+              <a:gdLst/>
+              <a:ahLst/>
+              <a:cxnLst/>
+              <a:rect l="l" t="t" r="r" b="b"/>
+              <a:pathLst>
+                <a:path w="304800" h="304800">
+                  <a:moveTo>
+                    <a:pt x="287785" y="304281"/>
+                  </a:moveTo>
+                  <a:lnTo>
+                    <a:pt x="16495" y="304281"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="14069" y="303798"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="0" y="287785"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="0" y="285264"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="0" y="16495"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="16495" y="0"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="287785" y="0"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="304281" y="16495"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="304281" y="287785"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="290211" y="303798"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="287785" y="304281"/>
+                  </a:lnTo>
+                  <a:close/>
+                </a:path>
+              </a:pathLst>
+            </a:custGeom>
+            <a:solidFill>
+              <a:srgbClr val="3181CD"/>
+            </a:solidFill>
+          </p:spPr>
+          <p:txBody>
+            <a:bodyPr wrap="square" lIns="0" tIns="0" rIns="0" bIns="0" rtlCol="0"/>
+            <a:lstStyle/>
+            <a:p/>
+          </p:txBody>
+        </p:sp>
+        <p:pic>
+          <p:nvPicPr>
+            <p:cNvPr id="25" name="object 25"/>
+            <p:cNvPicPr/>
+            <p:nvPr/>
+          </p:nvPicPr>
+          <p:blipFill>
+            <a:blip r:embed="rId4" cstate="print"/>
+            <a:stretch>
+              <a:fillRect/>
+            </a:stretch>
+          </p:blipFill>
+          <p:spPr>
+            <a:xfrm>
+              <a:off x="5619259" y="4380190"/>
+              <a:ext cx="152399" cy="136524"/>
+            </a:xfrm>
+            <a:prstGeom prst="rect">
+              <a:avLst/>
+            </a:prstGeom>
+          </p:spPr>
+        </p:pic>
+      </p:grpSp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="26" name="object 26"/>
+          <p:cNvSpPr txBox="1"/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm>
+            <a:off x="5310668" y="4065015"/>
+            <a:ext cx="3042920" cy="2472690"/>
+          </a:xfrm>
+          <a:prstGeom prst="rect">
+            <a:avLst/>
+          </a:prstGeom>
+          <a:ln w="9508">
+            <a:solidFill>
+              <a:srgbClr val="E2E7F0"/>
+            </a:solidFill>
+          </a:ln>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr wrap="square" lIns="0" tIns="60325" rIns="0" bIns="0" rtlCol="0" vert="horz">
+            <a:spAutoFit/>
+          </a:bodyPr>
+          <a:lstStyle/>
+          <a:p>
+            <a:pPr>
+              <a:lnSpc>
+                <a:spcPct val="100000"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="475"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:endParaRPr sz="1350">
+              <a:latin typeface="Times New Roman"/>
+              <a:cs typeface="Times New Roman"/>
+            </a:endParaRPr>
+          </a:p>
+          <a:p>
+            <a:pPr marL="649605">
+              <a:lnSpc>
+                <a:spcPct val="100000"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="5"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:r>
+              <a:rPr dirty="0" sz="1450">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>User</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1450" spc="35">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1450" spc="-10">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>Interface</a:t>
+            </a:r>
+            <a:endParaRPr sz="1450">
+              <a:latin typeface="Trebuchet MS"/>
+              <a:cs typeface="Trebuchet MS"/>
+            </a:endParaRPr>
+          </a:p>
+          <a:p>
+            <a:pPr marL="231140" marR="351790">
+              <a:lnSpc>
+                <a:spcPct val="139000"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="1015"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-35">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>Features</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-55">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-40">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>a</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-50">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-40">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>Telegram</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-50">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-25">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>bot</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-50">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-20">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>for</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-50">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-10">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>instant </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-35">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>alerts</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-50">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>and</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-45">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-40">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>a</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-50">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-45">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>Laravel+Vue </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-10">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>dashboard </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-20">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>for</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-65">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-10">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>advanced</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-65">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>real-</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-40">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>time</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-65">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1100" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>visualization.</a:t>
+            </a:r>
+            <a:endParaRPr sz="1100">
+              <a:latin typeface="Verdana"/>
+              <a:cs typeface="Verdana"/>
+            </a:endParaRPr>
+          </a:p>
+        </p:txBody>
+      </p:sp>
+      <p:grpSp>
+        <p:nvGrpSpPr>
+          <p:cNvPr id="27" name="object 27"/>
+          <p:cNvGrpSpPr/>
+          <p:nvPr/>
+        </p:nvGrpSpPr>
+        <p:grpSpPr>
+          <a:xfrm>
+            <a:off x="8510382" y="4060260"/>
+            <a:ext cx="3052445" cy="2482215"/>
+            <a:chOff x="8510382" y="4060260"/>
+            <a:chExt cx="3052445" cy="2482215"/>
+          </a:xfrm>
+        </p:grpSpPr>
+        <p:sp>
+          <p:nvSpPr>
+            <p:cNvPr id="28" name="object 28"/>
+            <p:cNvSpPr/>
+            <p:nvPr/>
+          </p:nvSpPr>
+          <p:spPr>
+            <a:xfrm>
+              <a:off x="8510382" y="4060260"/>
+              <a:ext cx="3052445" cy="2482215"/>
+            </a:xfrm>
+            <a:custGeom>
+              <a:avLst/>
+              <a:gdLst/>
+              <a:ahLst/>
+              <a:cxnLst/>
+              <a:rect l="l" t="t" r="r" b="b"/>
+              <a:pathLst>
+                <a:path w="3052445" h="2482215">
+                  <a:moveTo>
+                    <a:pt x="3052327" y="2481798"/>
+                  </a:moveTo>
+                  <a:lnTo>
+                    <a:pt x="0" y="2481798"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="0" y="0"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="3052327" y="0"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="3052327" y="2481798"/>
+                  </a:lnTo>
+                  <a:close/>
+                </a:path>
+              </a:pathLst>
+            </a:custGeom>
+            <a:solidFill>
+              <a:srgbClr val="FFFFFF"/>
+            </a:solidFill>
+          </p:spPr>
+          <p:txBody>
+            <a:bodyPr wrap="square" lIns="0" tIns="0" rIns="0" bIns="0" rtlCol="0"/>
+            <a:lstStyle/>
+            <a:p/>
+          </p:txBody>
+        </p:sp>
+        <p:sp>
+          <p:nvSpPr>
+            <p:cNvPr id="29" name="object 29"/>
+            <p:cNvSpPr/>
+            <p:nvPr/>
+          </p:nvSpPr>
+          <p:spPr>
+            <a:xfrm>
+              <a:off x="8748102" y="4297980"/>
+              <a:ext cx="304800" cy="304800"/>
+            </a:xfrm>
+            <a:custGeom>
+              <a:avLst/>
+              <a:gdLst/>
+              <a:ahLst/>
+              <a:cxnLst/>
+              <a:rect l="l" t="t" r="r" b="b"/>
+              <a:pathLst>
+                <a:path w="304800" h="304800">
+                  <a:moveTo>
+                    <a:pt x="287786" y="304281"/>
+                  </a:moveTo>
+                  <a:lnTo>
+                    <a:pt x="16495" y="304281"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="14069" y="303798"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="0" y="287785"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="0" y="285264"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="0" y="16495"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="16495" y="0"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="287786" y="0"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="304281" y="16495"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="304281" y="287785"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="290211" y="303798"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="287786" y="304281"/>
+                  </a:lnTo>
+                  <a:close/>
+                </a:path>
+              </a:pathLst>
+            </a:custGeom>
+            <a:solidFill>
+              <a:srgbClr val="1A365C"/>
+            </a:solidFill>
+          </p:spPr>
+          <p:txBody>
+            <a:bodyPr wrap="square" lIns="0" tIns="0" rIns="0" bIns="0" rtlCol="0"/>
+            <a:lstStyle/>
+            <a:p/>
+          </p:txBody>
+        </p:sp>
+        <p:pic>
+          <p:nvPicPr>
+            <p:cNvPr id="30" name="object 30"/>
+            <p:cNvPicPr/>
+            <p:nvPr/>
+          </p:nvPicPr>
+          <p:blipFill>
+            <a:blip r:embed="rId5" cstate="print"/>
+            <a:stretch>
+              <a:fillRect/>
+            </a:stretch>
+          </p:blipFill>
+          <p:spPr>
+            <a:xfrm>
+              <a:off x="8849838" y="4380190"/>
+              <a:ext cx="104774" cy="136524"/>
+            </a:xfrm>
+            <a:prstGeom prst="rect">
+              <a:avLst/>
+            </a:prstGeom>
+          </p:spPr>
+        </p:pic>
+      </p:grpSp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="31" name="object 31"/>
+          <p:cNvSpPr txBox="1"/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm>
+            <a:off x="8515136" y="4065015"/>
+            <a:ext cx="3042920" cy="2472690"/>
+          </a:xfrm>
+          <a:prstGeom prst="rect">
+            <a:avLst/>
+          </a:prstGeom>
+          <a:ln w="9508">
+            <a:solidFill>
+              <a:srgbClr val="E2E7F0"/>
+            </a:solidFill>
+          </a:ln>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr wrap="square" lIns="0" tIns="60325" rIns="0" bIns="0" rtlCol="0" vert="horz">
+            <a:spAutoFit/>
+          </a:bodyPr>
+          <a:lstStyle/>
+          <a:p>
+            <a:pPr>
+              <a:lnSpc>
+                <a:spcPct val="100000"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="475"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:endParaRPr sz="1350">
+              <a:latin typeface="Times New Roman"/>
+              <a:cs typeface="Times New Roman"/>
+            </a:endParaRPr>
+          </a:p>
+          <a:p>
+            <a:pPr marL="652780">
+              <a:lnSpc>
+                <a:spcPct val="100000"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="5"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:r>
+              <a:rPr dirty="0" sz="1450">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>Advanced</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1450" spc="100">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1450" spc="-10">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Trebuchet MS"/>
+                <a:cs typeface="Trebuchet MS"/>
+              </a:rPr>
+              <a:t>Features</a:t>
+            </a:r>
+            <a:endParaRPr sz="1450">
+              <a:latin typeface="Trebuchet MS"/>
+              <a:cs typeface="Trebuchet MS"/>
+            </a:endParaRPr>
+          </a:p>
+          <a:p>
+            <a:pPr marL="384810" marR="618490" indent="-151130">
+              <a:lnSpc>
+                <a:spcPct val="124800"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="1190"/>
+              </a:spcBef>
+              <a:buClr>
+                <a:srgbClr val="3181CD"/>
+              </a:buClr>
+              <a:buChar char="•"/>
+              <a:tabLst>
+                <a:tab pos="384810" algn="l"/>
+              </a:tabLst>
+            </a:pPr>
+            <a:r>
+              <a:rPr dirty="0" sz="1050" spc="-40">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>Bidirectional</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1050" spc="-35">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1050" spc="-50">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>relay</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1050" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1050" spc="-35">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>control</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1050" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1050" spc="-100">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>&amp;</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1050" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1050" spc="-25">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>NFC </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1050" spc="-10">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>configuration.</a:t>
+            </a:r>
+            <a:endParaRPr sz="1050">
+              <a:latin typeface="Verdana"/>
+              <a:cs typeface="Verdana"/>
+            </a:endParaRPr>
+          </a:p>
+          <a:p>
+            <a:pPr marL="384810" marR="279400" indent="-151130">
+              <a:lnSpc>
+                <a:spcPct val="124800"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="600"/>
+              </a:spcBef>
+              <a:buClr>
+                <a:srgbClr val="3181CD"/>
+              </a:buClr>
+              <a:buChar char="•"/>
+              <a:tabLst>
+                <a:tab pos="384810" algn="l"/>
+              </a:tabLst>
+            </a:pPr>
+            <a:r>
+              <a:rPr dirty="0" sz="1050" spc="-55">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>Event-</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1050" spc="-35">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>driven</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1050" spc="-75">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1050" spc="-55">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>automation</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1050" spc="-75">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1050" spc="-40">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>with</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1050" spc="-75">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1050" spc="-45">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>human-</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1050" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>in-</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1050" spc="-35">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>the-</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1050" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>loop</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1050" spc="-20">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1050" spc="-10">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Verdana"/>
+                <a:cs typeface="Verdana"/>
+              </a:rPr>
+              <a:t>safety.</a:t>
+            </a:r>
+            <a:endParaRPr sz="1050">
+              <a:latin typeface="Verdana"/>
+              <a:cs typeface="Verdana"/>
+            </a:endParaRPr>
+          </a:p>
+        </p:txBody>
+      </p:sp>
+    </p:spTree>
+  </p:cSld>
+  <p:clrMapOvr>
+    <a:masterClrMapping/>
+  </p:clrMapOvr>
+</p:sld>

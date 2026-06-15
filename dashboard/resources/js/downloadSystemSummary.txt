@@ -1,0 +1,42 @@
+﻿const downloadSystemSummary = async () => {
+  const period = selectedRange.value
+  try {
+    const res = await fetch(`/api/dashboard/system-summary?period=${encodeURIComponent(period)}`)
+    if (!res.ok) throw new Error("Failed to fetch")
+    const data = await res.json()
+    
+    let report = "=== SYSTEM SUMMARY REPORT ===\n\n"
+    report += `Date: ${data.date}\n`
+    report += `Period: Last ${data.period}\n\n`
+    report += `Total Records: ${data.total_records}\n`
+    report += `Normal: ${data.counts.NORMAL} (${data.percentages.NORMAL}%)\n`
+    report += `Abnormal: ${data.counts.ABNORMAL} (${data.percentages.ABNORMAL}%)\n`
+    report += `Critical: ${data.counts.CRITICAL} (${data.percentages.CRITICAL}%)\n\n`
+    
+    for (const [sensor, stats] of Object.entries(data.sensor_stats || {})) {
+      const label = sensor === "WaterTemp" ? "Water Temp" : sensor
+      report += `${label}: Max ${stats.max.toFixed(1)}, Min ${stats.min.toFixed(1)}, Avg ${stats.avg.toFixed(1)}\n`
+    }
+    
+    if (data.critical_events && data.critical_events.length > 0) {
+      report += "\nCritical Events:\n"
+      data.critical_events.slice(0, 10).forEach(e => {
+        report += `  ${e.time} -> ${e.sensor} ${e.value}\n`
+      })
+    }
+    
+    report += `\nSystem Status: ${data.system_status}\n`
+    report += "\n---------------------------------------\n"
+    
+    const blob = new Blob([report], { type: "text/plain" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `system-summary-${data.date}.txt`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    console.error("Failed:", e)
+  }
+}
+

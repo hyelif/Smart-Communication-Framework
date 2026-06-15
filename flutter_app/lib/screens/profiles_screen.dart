@@ -1,3 +1,4 @@
+import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -113,25 +114,27 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                'Vault',
-                                style: Theme.of(context).textTheme.displayMedium,
-                              ),
+                            AutoSizeText(
+                              'Vault',
+                              style: Theme.of(context).textTheme.displayMedium,
+                              maxLines: 1,
+                              minFontSize: 20,
                             ),
                             const SizedBox(height: 10),
-                            Text(
+                            AutoSizeText(
                               'Secure profile storage for your node snapshots.',
                               style: Theme.of(context).textTheme.bodyMedium,
+                              maxLines: 2,
+                              minFontSize: 11,
                             ),
                           ],
                         ),
                       ),
-                      Text(
+                      AutoSizeText(
                         'STORAGE UNIT 01',
                         style: Theme.of(context).textTheme.labelMedium,
+                        maxLines: 1,
+                        minFontSize: 9,
                       ),
                     ],
                   ),
@@ -212,28 +215,34 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
+                                    AutoSizeText(
                                       item['name']?.toString() ??
                                           'Unnamed Profile',
                                       style:
                                           Theme.of(context).textTheme.titleLarge,
+                                      maxLines: 1,
+                                      minFontSize: 13,
                                     ),
                                     const SizedBox(height: 6),
                                     Wrap(
                                       spacing: 8,
                                       runSpacing: 6,
                                       children: [
-                                        Text(
+                                        AutoSizeText(
                                           '${cfg.length} SENSORS',
                                           style: Theme.of(context)
                                               .textTheme
                                               .labelLarge,
+                                          maxLines: 1,
+                                          minFontSize: 9,
                                         ),
-                                        Text(
+                                        AutoSizeText(
                                           _formatTime(item['time']?.toString()),
                                           style: Theme.of(context)
                                               .textTheme
                                               .labelMedium,
+                                          maxLines: 1,
+                                          minFontSize: 9,
                                         ),
                                       ],
                                     ),
@@ -256,17 +265,25 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              IconButton(
-                                onPressed: () async {
+                              StitchBounce(
+                                onTap: () async {
                                   final updated = List<Map<String, dynamic>>.from(
                                     profiles,
                                   )..removeAt(index);
                                   setState(() => profiles = updated);
                                   await StorageService.deleteProfile(index);
                                 },
-                                icon: const Icon(
-                                  Icons.delete_outline_rounded,
-                                  color: StitchColors.error,
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: StitchColors.error.withValues(alpha: 0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.delete_outline_rounded,
+                                    color: StitchColors.error,
+                                    size: 18,
+                                  ),
                                 ),
                               ),
                             ],
@@ -295,14 +312,19 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(label, style: Theme.of(context).textTheme.labelMedium),
+          AutoSizeText(
+            label,
+            style: Theme.of(context).textTheme.labelMedium,
+            maxLines: 1,
+            minFontSize: 9,
+          ),
           const SizedBox(height: 6),
           if (showPulse)
             const Row(
               children: [
                 StitchStatusDot(size: 6),
                 SizedBox(width: 6),
-                Text(
+                AutoSizeText(
                   'LIVE',
                   style: TextStyle(
                     color: StitchColors.primaryContainer,
@@ -310,19 +332,19 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                     fontWeight: FontWeight.w800,
                     letterSpacing: 1.1,
                   ),
+                  maxLines: 1,
+                  minFontSize: 8,
                 ),
               ],
             ),
           if (showPulse) const SizedBox(height: 6),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              value,
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontSize: 17,
-                  ),
-            ),
+          AutoSizeText(
+            value,
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontSize: 17,
+                ),
+            maxLines: 1,
+            minFontSize: 12,
           ),
         ],
       ),

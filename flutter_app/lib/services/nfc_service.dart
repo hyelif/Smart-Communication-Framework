@@ -1,13 +1,16 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:nfc_manager/ndef_record.dart';
 import 'package:nfc_manager/nfc_manager.dart';
+import 'package:ndef_record/ndef_record.dart';
 import 'package:nfc_manager/nfc_manager_android.dart';
 import 'package:nfc_manager/nfc_manager_ios.dart';
 
 import 'nfc_payload_service.dart';
+
+typedef NfcDiscoveredCallback = void Function(Map<String, dynamic> data);
 
 class NfcWriteResult {
   final int bytesWritten;
@@ -18,6 +21,21 @@ class NfcWriteResult {
 
 class NfcService {
   static const MethodChannel _hceChannel = MethodChannel('smartponic/hce');
+  static const MethodChannel _nfcDispatchChannel = MethodChannel('smartponic/nfc_dispatch');
+
+  static NfcDiscoveredCallback? _onNfcDiscovered;
+
+  static void initNfcDispatch({NfcDiscoveredCallback? onDiscovered}) {
+    _onNfcDiscovered = onDiscovered;
+    _nfcDispatchChannel.setMethodCallHandler((call) async {
+      if (call.method == 'onNfcDiscovered') {
+        final args = call.arguments as Map<String, dynamic>?;
+        if (args != null && _onNfcDiscovered != null) {
+          _onNfcDiscovered!(args);
+        }
+      }
+    });
+  }
 
   static Future<bool> isAvailable() async {
     if (kIsWeb ||
@@ -67,7 +85,7 @@ class NfcService {
     );
     if (encryptedPayload.length > NfcPayloadService.maxDirectHcePayloadLength) {
       throw NfcException(
-        'Direct NFC config is ${encryptedPayload.length} bytes; max is ${NfcPayloadService.maxDirectHcePayloadLength}.',
+        'Direct NFC config is ${encryptedPayload.length} bytes; max is ${NfcPayloadService.maxDirectHcePayloadLength} bytes.',
       );
     }
 
@@ -150,6 +168,14 @@ class NfcService {
   }
 
   static NdefMessage _buildMessage(Uint8List encryptedPayload) {
+    final aarPayload = Uint8List.fromList(utf8.encode('com.example.smartponic_v2'));
+    final aarRecord = NdefRecord(
+      typeNameFormat: TypeNameFormat.wellKnown,
+      type: Uint8List.fromList([0x61]),
+      identifier: Uint8List(0),
+      payload: aarPayload,
+    );
+
     return NdefMessage(
       records: [
         NdefRecord(
@@ -158,6 +184,7 @@ class NfcService {
           identifier: Uint8List(0),
           payload: encryptedPayload,
         ),
+        aarRecord,
       ],
     );
   }

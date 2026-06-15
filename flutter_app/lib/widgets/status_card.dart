@@ -14,11 +14,12 @@ class StatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF161B22),
+        color: theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -26,13 +27,18 @@ class StatusCard extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                "SYSTEM STATUS",
-                style: TextStyle(fontSize: 11, color: Colors.white54),
+              Text(
+                'SYSTEM STATUS',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
               ),
               Text(
-                "$count Active Devices",
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                '$count Active Devices',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ],
           ),
@@ -46,7 +52,7 @@ class StatusCard extends StatelessWidget {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.cloud_upload),
-            label: const Text("Deploy"),
+            label: const Text('Deploy'),
           ),
         ],
       ),

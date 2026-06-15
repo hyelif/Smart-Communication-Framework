@@ -1,8 +1,7 @@
+import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:permission_handler/permission_handler.dart';
 
-import '../services/location_service.dart';
 import '../services/storage_service.dart';
 import '../widgets/app_theme.dart';
 import '../widgets/custom_ui.dart';
@@ -27,12 +26,6 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
   bool _isSaving = false;
   bool _hasLoadedOnce = false;
   String? _errorMessage;
-
-  // Node location state
-  double? _latitude;
-  double? _longitude;
-  double? _distanceM;
-  bool _isFetchingLocation = false;
 
   static const List<String> _sensorOrder = [
     'temperature',
@@ -101,35 +94,6 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
     }
   }
 
-  Future<void> _fetchCurrentLocation() async {
-    setState(() => _isFetchingLocation = true);
-    try {
-      final hasPerm = await LocationService.hasPermission();
-      if (!hasPerm) {
-        final status = await LocationService.requestPermission();
-        if (!mounted) return;
-        if (status != PermissionStatus.granted) {
-          showStitchMessage(context, 'Location permission denied', isError: true);
-          return;
-        }
-      }
-
-      final position = await LocationService.getCurrentLocation();
-      if (!mounted) return;
-
-      if (position != null) {
-        setState(() {
-          _latitude = position.latitude;
-          _longitude = position.longitude;
-        });
-        showStitchMessage(context, 'GPS location captured');
-      } else {
-        showStitchMessage(context, 'Failed to get GPS location', isError: true);
-      }
-    } finally {
-      if (mounted) setState(() => _isFetchingLocation = false);
-    }
-  }
 
   Future<void> _saveAll() async {
     setState(() => _isSaving = true);
@@ -258,247 +222,6 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
     );
   }
 
-  Widget _buildLocationCard() {
-    return StitchPanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: StitchColors.primaryContainer.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.pin_drop_rounded,
-                  color: StitchColors.primaryContainer,
-                  size: 18,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Node Location (GPS)',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
-                      ),
-                    ),
-                    Text(
-                      'Captured from phone GPS',
-                      style: TextStyle(
-                        color: StitchColors.onSurfaceVariant,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Latitude',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: StitchColors.onSurfaceVariant,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    TextField(
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                      style: const TextStyle(
-                        color: StitchColors.primary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'Auto or manual',
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: StitchColors.outlineVariant),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: StitchColors.outlineVariant),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: StitchColors.primaryContainer, width: 1.5),
-                        ),
-                        filled: true,
-                        fillColor: StitchColors.surfaceLow,
-                        suffixIcon: const Icon(Icons.location_on_outlined, size: 18),
-                      ),
-                      controller: TextEditingController(
-                        text: _latitude?.toStringAsFixed(6) ?? '',
-                      ),
-                      onChanged: (v) {
-                        setState(() {
-                          _latitude = double.tryParse(v);
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Longitude',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: StitchColors.onSurfaceVariant,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    TextField(
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                      style: const TextStyle(
-                        color: StitchColors.primary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'Auto or manual',
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: StitchColors.outlineVariant),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: StitchColors.outlineVariant),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: StitchColors.primaryContainer, width: 1.5),
-                        ),
-                        filled: true,
-                        fillColor: StitchColors.surfaceLow,
-                        suffixIcon: const Icon(Icons.location_on_outlined, size: 18),
-                      ),
-                      controller: TextEditingController(
-                        text: _longitude?.toStringAsFixed(6) ?? '',
-                      ),
-                      onChanged: (v) {
-                        setState(() {
-                          _longitude = double.tryParse(v);
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Distance (m)',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: StitchColors.onSurfaceVariant,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    TextField(
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      style: const TextStyle(
-                        color: StitchColors.primary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'Optional',
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: StitchColors.outlineVariant),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: StitchColors.outlineVariant),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: StitchColors.primaryContainer, width: 1.5),
-                        ),
-                        filled: true,
-                        fillColor: StitchColors.surfaceLow,
-                        suffixIcon: const Icon(Icons.straighten_outlined, size: 18),
-                      ),
-                      controller: TextEditingController(
-                        text: _distanceM?.toStringAsFixed(1) ?? '',
-                      ),
-                      onChanged: (v) {
-                        setState(() {
-                          _distanceM = double.tryParse(v);
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: SizedBox(
-                  height: 46,
-                  child: StitchPrimaryButton(
-                    onPressed: _isFetchingLocation ? null : _fetchCurrentLocation,
-                    child: _isFetchingLocation
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: StitchColors.onSecondaryContainer,
-                            ),
-                          )
-                        : const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.my_location_rounded, size: 16),
-                              SizedBox(width: 6),
-                              Text('CAPTURE GPS'),
-                            ],
-                          ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildProfileList() {
     return RefreshIndicator(
@@ -512,30 +235,31 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
         cacheExtent: 600,
         padding: const EdgeInsets.fromLTRB(20, 24, 20, 200),
         children: [
-          // Node Location GPS Card - at the very top
-          _buildLocationCard(),
-          const SizedBox(height: 24),
           Row(
             children: [
               const Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    AutoSizeText(
                       'Sensor Calibration',
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w800,
                         letterSpacing: -0.5,
                       ),
+                      maxLines: 1,
+                      minFontSize: 16,
                     ),
                     SizedBox(height: 6),
-                    Text(
+                    AutoSizeText(
                       'Threshold ranges and calibration coefficients are saved locally and deployed to the node when you deploy config.',
                       style: TextStyle(
                         color: StitchColors.onSurfaceVariant,
                         fontSize: 13,
                       ),
+                      maxLines: 3,
+                      minFontSize: 10,
                     ),
                   ],
                 ),
@@ -544,10 +268,10 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: StitchColors.primaryContainer.withValues(alpha: 0.15),
+                  color: StitchColors.surfaceContainer,
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: Text(
+                child: AutoSizeText(
                   '${_profiles.length} SENSORS',
                   style: const TextStyle(
                     fontSize: 10,
@@ -555,6 +279,8 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
                     color: StitchColors.primaryContainer,
                     letterSpacing: 1,
                   ),
+                  maxLines: 1,
+                  minFontSize: 8,
                 ),
               ),
             ],
@@ -578,6 +304,9 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
     final calB = profile?['calibration_b'] ?? 0.0;
     final calC = profile?['calibration_c'] ?? 0.0;
 
+    final isCalActive = calA != 1.0 || calB != 0.0 || calC != 0.0;
+    final isLimitsSet = tMin != null || tMax != null;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: StitchPanel(
@@ -590,8 +319,11 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: StitchColors.primaryContainer.withValues(alpha: 0.12),
+                    color: StitchColors.surfaceContainer,
                     borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: StitchColors.outlineVariant.withValues(alpha: 0.5),
+                    ),
                   ),
                   child: const Icon(
                     Icons.tune_rounded,
@@ -604,24 +336,72 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      AutoSizeText(
                         label,
                         style: const TextStyle(
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w800,
                           fontSize: 15,
                         ),
+                        maxLines: 1,
+                        minFontSize: 12,
                       ),
                       if (unit.isNotEmpty)
-                        Text(
+                        AutoSizeText(
                           'Unit: $unit',
                           style: const TextStyle(
                             color: StitchColors.onSurfaceVariant,
                             fontSize: 11,
+                            fontWeight: FontWeight.w600,
                           ),
+                          maxLines: 1,
+                          minFontSize: 9,
                         ),
                     ],
                   ),
                 ),
+                const SizedBox(width: 8),
+                if (isCalActive)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: StitchColors.primaryContainer.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: StitchColors.primaryContainer.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: const Text(
+                      'CAL ACTIVE',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900,
+                        color: StitchColors.primaryContainer,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ),
+                if (isLimitsSet) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: StitchColors.secondary.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: StitchColors.secondary.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: const Text(
+                      'LIMITS SET',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900,
+                        color: StitchColors.secondary,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 16),
@@ -713,7 +493,7 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
           style: const TextStyle(
             color: StitchColors.primary,
             fontSize: 13,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
           ),
           decoration: InputDecoration(
             hintText: hint ?? '',
@@ -732,7 +512,7 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
               borderSide: const BorderSide(color: StitchColors.primaryContainer, width: 1.5),
             ),
             filled: true,
-            fillColor: StitchColors.surfaceLow,
+            fillColor: StitchColors.surfaceLowest,
           ),
           onChanged: (v) {
             final parsed = double.tryParse(v);

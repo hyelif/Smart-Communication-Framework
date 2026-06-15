@@ -1,0 +1,2134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" showMasterSp="0">
+  <p:cSld>
+    <p:spTree>
+      <p:nvGrpSpPr>
+        <p:cNvPr id="1" name=""/>
+        <p:cNvGrpSpPr/>
+        <p:nvPr/>
+      </p:nvGrpSpPr>
+      <p:grpSpPr>
+        <a:xfrm>
+          <a:off x="0" y="0"/>
+          <a:ext cx="0" cy="0"/>
+          <a:chOff x="0" y="0"/>
+          <a:chExt cx="0" cy="0"/>
+        </a:xfrm>
+      </p:grpSpPr>
+      <p:grpSp>
+        <p:nvGrpSpPr>
+          <p:cNvPr id="2" name="object 2"/>
+          <p:cNvGrpSpPr/>
+          <p:nvPr/>
+        </p:nvGrpSpPr>
+        <p:grpSpPr>
+          <a:xfrm>
+            <a:off x="9508" y="0"/>
+            <a:ext cx="12169775" cy="6837045"/>
+            <a:chOff x="9508" y="0"/>
+            <a:chExt cx="12169775" cy="6837045"/>
+          </a:xfrm>
+        </p:grpSpPr>
+        <p:pic>
+          <p:nvPicPr>
+            <p:cNvPr id="3" name="object 3"/>
+            <p:cNvPicPr/>
+            <p:nvPr/>
+          </p:nvPicPr>
+          <p:blipFill>
+            <a:blip r:embed="rId2" cstate="print"/>
+            <a:stretch>
+              <a:fillRect/>
+            </a:stretch>
+          </p:blipFill>
+          <p:spPr>
+            <a:xfrm>
+              <a:off x="9508" y="0"/>
+              <a:ext cx="12169692" cy="6836832"/>
+            </a:xfrm>
+            <a:prstGeom prst="rect">
+              <a:avLst/>
+            </a:prstGeom>
+          </p:spPr>
+        </p:pic>
+        <p:pic>
+          <p:nvPicPr>
+            <p:cNvPr id="4" name="object 4"/>
+            <p:cNvPicPr/>
+            <p:nvPr/>
+          </p:nvPicPr>
+          <p:blipFill>
+            <a:blip r:embed="rId3" cstate="print"/>
+            <a:stretch>
+              <a:fillRect/>
+            </a:stretch>
+          </p:blipFill>
+          <p:spPr>
+            <a:xfrm>
+              <a:off x="9508" y="0"/>
+              <a:ext cx="12169691" cy="6836832"/>
+            </a:xfrm>
+            <a:prstGeom prst="rect">
+              <a:avLst/>
+            </a:prstGeom>
+          </p:spPr>
+        </p:pic>
+      </p:grpSp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="5" name="object 5"/>
+          <p:cNvSpPr txBox="1"/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm>
+            <a:off x="922354" y="1597479"/>
+            <a:ext cx="2633980" cy="247650"/>
+          </a:xfrm>
+          <a:prstGeom prst="rect">
+            <a:avLst/>
+          </a:prstGeom>
+          <a:solidFill>
+            <a:srgbClr val="1A365C"/>
+          </a:solidFill>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr wrap="square" lIns="0" tIns="46990" rIns="0" bIns="0" rtlCol="0" vert="horz">
+            <a:spAutoFit/>
+          </a:bodyPr>
+          <a:lstStyle/>
+          <a:p>
+            <a:pPr marL="109220">
+              <a:lnSpc>
+                <a:spcPct val="100000"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="370"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:r>
+              <a:rPr dirty="0" sz="900">
+                <a:solidFill>
+                  <a:srgbClr val="FFFFFF"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>FINAL</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="900" spc="45">
+                <a:solidFill>
+                  <a:srgbClr val="FFFFFF"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="900" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="FFFFFF"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>YEAR</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="900" spc="50">
+                <a:solidFill>
+                  <a:srgbClr val="FFFFFF"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="900" spc="-50">
+                <a:solidFill>
+                  <a:srgbClr val="FFFFFF"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>PROJECT</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="900" spc="50">
+                <a:solidFill>
+                  <a:srgbClr val="FFFFFF"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="900" spc="-10">
+                <a:solidFill>
+                  <a:srgbClr val="FFFFFF"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>PRESENTATION</a:t>
+            </a:r>
+            <a:endParaRPr sz="900">
+              <a:latin typeface="Arial Black"/>
+              <a:cs typeface="Arial Black"/>
+            </a:endParaRPr>
+          </a:p>
+        </p:txBody>
+      </p:sp>
+      <p:grpSp>
+        <p:nvGrpSpPr>
+          <p:cNvPr id="6" name="object 6"/>
+          <p:cNvGrpSpPr/>
+          <p:nvPr/>
+        </p:nvGrpSpPr>
+        <p:grpSpPr>
+          <a:xfrm>
+            <a:off x="9508" y="0"/>
+            <a:ext cx="12171680" cy="4488180"/>
+            <a:chOff x="9508" y="0"/>
+            <a:chExt cx="12171680" cy="4488180"/>
+          </a:xfrm>
+        </p:grpSpPr>
+        <p:sp>
+          <p:nvSpPr>
+            <p:cNvPr id="7" name="object 7"/>
+            <p:cNvSpPr/>
+            <p:nvPr/>
+          </p:nvSpPr>
+          <p:spPr>
+            <a:xfrm>
+              <a:off x="922354" y="4098295"/>
+              <a:ext cx="8082915" cy="9525"/>
+            </a:xfrm>
+            <a:custGeom>
+              <a:avLst/>
+              <a:gdLst/>
+              <a:ahLst/>
+              <a:cxnLst/>
+              <a:rect l="l" t="t" r="r" b="b"/>
+              <a:pathLst>
+                <a:path w="8082915" h="9525">
+                  <a:moveTo>
+                    <a:pt x="8082486" y="9508"/>
+                  </a:moveTo>
+                  <a:lnTo>
+                    <a:pt x="0" y="9508"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="0" y="0"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="8082486" y="0"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="8082486" y="9508"/>
+                  </a:lnTo>
+                  <a:close/>
+                </a:path>
+              </a:pathLst>
+            </a:custGeom>
+            <a:solidFill>
+              <a:srgbClr val="E4E7EB"/>
+            </a:solidFill>
+          </p:spPr>
+          <p:txBody>
+            <a:bodyPr wrap="square" lIns="0" tIns="0" rIns="0" bIns="0" rtlCol="0"/>
+            <a:lstStyle/>
+            <a:p/>
+          </p:txBody>
+        </p:sp>
+        <p:sp>
+          <p:nvSpPr>
+            <p:cNvPr id="8" name="object 8"/>
+            <p:cNvSpPr/>
+            <p:nvPr/>
+          </p:nvSpPr>
+          <p:spPr>
+            <a:xfrm>
+              <a:off x="9499" y="12"/>
+              <a:ext cx="12171680" cy="4488180"/>
+            </a:xfrm>
+            <a:custGeom>
+              <a:avLst/>
+              <a:gdLst/>
+              <a:ahLst/>
+              <a:cxnLst/>
+              <a:rect l="l" t="t" r="r" b="b"/>
+              <a:pathLst>
+                <a:path w="12171680" h="4488180">
+                  <a:moveTo>
+                    <a:pt x="912850" y="637082"/>
+                  </a:moveTo>
+                  <a:lnTo>
+                    <a:pt x="456425" y="637082"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="456425" y="646595"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="912850" y="646595"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="912850" y="637082"/>
+                  </a:lnTo>
+                  <a:close/>
+                </a:path>
+                <a:path w="12171680" h="4488180">
+                  <a:moveTo>
+                    <a:pt x="988923" y="4412081"/>
+                  </a:moveTo>
+                  <a:lnTo>
+                    <a:pt x="912850" y="4412081"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="912850" y="4488154"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="988923" y="4488154"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="988923" y="4412081"/>
+                  </a:lnTo>
+                  <a:close/>
+                </a:path>
+                <a:path w="12171680" h="4488180">
+                  <a:moveTo>
+                    <a:pt x="11781409" y="2160130"/>
+                  </a:moveTo>
+                  <a:lnTo>
+                    <a:pt x="11629276" y="2160130"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="11629276" y="2179142"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="11781409" y="2179142"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="11781409" y="2160130"/>
+                  </a:lnTo>
+                  <a:close/>
+                </a:path>
+                <a:path w="12171680" h="4488180">
+                  <a:moveTo>
+                    <a:pt x="12171274" y="0"/>
+                  </a:moveTo>
+                  <a:lnTo>
+                    <a:pt x="0" y="0"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="0" y="38023"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="12171274" y="38023"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="12171274" y="0"/>
+                  </a:lnTo>
+                  <a:close/>
+                </a:path>
+              </a:pathLst>
+            </a:custGeom>
+            <a:solidFill>
+              <a:srgbClr val="3181CD"/>
+            </a:solidFill>
+          </p:spPr>
+          <p:txBody>
+            <a:bodyPr wrap="square" lIns="0" tIns="0" rIns="0" bIns="0" rtlCol="0"/>
+            <a:lstStyle/>
+            <a:p/>
+          </p:txBody>
+        </p:sp>
+        <p:sp>
+          <p:nvSpPr>
+            <p:cNvPr id="9" name="object 9"/>
+            <p:cNvSpPr/>
+            <p:nvPr/>
+          </p:nvSpPr>
+          <p:spPr>
+            <a:xfrm>
+              <a:off x="11638780" y="2464415"/>
+              <a:ext cx="76200" cy="19050"/>
+            </a:xfrm>
+            <a:custGeom>
+              <a:avLst/>
+              <a:gdLst/>
+              <a:ahLst/>
+              <a:cxnLst/>
+              <a:rect l="l" t="t" r="r" b="b"/>
+              <a:pathLst>
+                <a:path w="76200" h="19050">
+                  <a:moveTo>
+                    <a:pt x="76070" y="19017"/>
+                  </a:moveTo>
+                  <a:lnTo>
+                    <a:pt x="0" y="19017"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="0" y="0"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="76070" y="0"/>
+                  </a:lnTo>
+                  <a:lnTo>
+                    <a:pt x="76070" y="19017"/>
+                  </a:lnTo>
+                  <a:close/>
+                </a:path>
+              </a:pathLst>
+            </a:custGeom>
+            <a:solidFill>
+              <a:srgbClr val="1A365C"/>
+            </a:solidFill>
+          </p:spPr>
+          <p:txBody>
+            <a:bodyPr wrap="square" lIns="0" tIns="0" rIns="0" bIns="0" rtlCol="0"/>
+            <a:lstStyle/>
+            <a:p/>
+          </p:txBody>
+        </p:sp>
+      </p:grpSp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="10" name="object 10" descr="$PPTXTitle"/>
+          <p:cNvSpPr txBox="1">
+            <a:spLocks noGrp="1"/>
+          </p:cNvSpPr>
+          <p:nvPr>
+            <p:ph type="title"/>
+          </p:nvPr>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm>
+            <a:off x="904899" y="2107763"/>
+            <a:ext cx="7252970" cy="1531620"/>
+          </a:xfrm>
+          <a:prstGeom prst="rect"/>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr wrap="square" lIns="0" tIns="17145" rIns="0" bIns="0" rtlCol="0" vert="horz">
+            <a:spAutoFit/>
+          </a:bodyPr>
+          <a:lstStyle/>
+          <a:p>
+            <a:pPr marL="12700">
+              <a:lnSpc>
+                <a:spcPct val="100000"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="135"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:r>
+              <a:rPr dirty="0" sz="7450" spc="-790">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>SmartPonic</a:t>
+            </a:r>
+            <a:endParaRPr sz="7450">
+              <a:latin typeface="Arial Black"/>
+              <a:cs typeface="Arial Black"/>
+            </a:endParaRPr>
+          </a:p>
+          <a:p>
+            <a:pPr marL="12700">
+              <a:lnSpc>
+                <a:spcPct val="100000"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="5"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:r>
+              <a:rPr dirty="0" sz="2400" spc="-135">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>An</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2400" spc="-150">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2400" spc="-125">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>Adaptive</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2400" spc="-150">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2400" spc="-170">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>IoT</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2400" spc="-150">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2400" spc="-155">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>Aquaponics</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2400" spc="-150">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2400" spc="-65">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>Monitoring</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2400" spc="-150">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="2400" spc="-120">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>System</a:t>
+            </a:r>
+            <a:endParaRPr sz="2400">
+              <a:latin typeface="Arial Black"/>
+              <a:cs typeface="Arial Black"/>
+            </a:endParaRPr>
+          </a:p>
+        </p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="11" name="object 11"/>
+          <p:cNvSpPr txBox="1"/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm>
+            <a:off x="1285252" y="4357547"/>
+            <a:ext cx="4404995" cy="862330"/>
+          </a:xfrm>
+          <a:prstGeom prst="rect">
+            <a:avLst/>
+          </a:prstGeom>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr wrap="square" lIns="0" tIns="7620" rIns="0" bIns="0" rtlCol="0" vert="horz">
+            <a:spAutoFit/>
+          </a:bodyPr>
+          <a:lstStyle/>
+          <a:p>
+            <a:pPr marL="12700" marR="5080">
+              <a:lnSpc>
+                <a:spcPct val="136300"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="60"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-10">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Lucida Sans Unicode"/>
+                <a:cs typeface="Lucida Sans Unicode"/>
+              </a:rPr>
+              <a:t>SmartPonic</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-60">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Lucida Sans Unicode"/>
+                <a:cs typeface="Lucida Sans Unicode"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-55">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Lucida Sans Unicode"/>
+                <a:cs typeface="Lucida Sans Unicode"/>
+              </a:rPr>
+              <a:t>is</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-60">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Lucida Sans Unicode"/>
+                <a:cs typeface="Lucida Sans Unicode"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Lucida Sans Unicode"/>
+                <a:cs typeface="Lucida Sans Unicode"/>
+              </a:rPr>
+              <a:t>an</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-60">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Lucida Sans Unicode"/>
+                <a:cs typeface="Lucida Sans Unicode"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-20">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Lucida Sans Unicode"/>
+                <a:cs typeface="Lucida Sans Unicode"/>
+              </a:rPr>
+              <a:t>adaptive</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-55">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Lucida Sans Unicode"/>
+                <a:cs typeface="Lucida Sans Unicode"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-20">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Lucida Sans Unicode"/>
+                <a:cs typeface="Lucida Sans Unicode"/>
+              </a:rPr>
+              <a:t>IoT</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-60">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Lucida Sans Unicode"/>
+                <a:cs typeface="Lucida Sans Unicode"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Lucida Sans Unicode"/>
+                <a:cs typeface="Lucida Sans Unicode"/>
+              </a:rPr>
+              <a:t>solution</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-60">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Lucida Sans Unicode"/>
+                <a:cs typeface="Lucida Sans Unicode"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-20">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Lucida Sans Unicode"/>
+                <a:cs typeface="Lucida Sans Unicode"/>
+              </a:rPr>
+              <a:t>for</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-55">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Lucida Sans Unicode"/>
+                <a:cs typeface="Lucida Sans Unicode"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-10">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Lucida Sans Unicode"/>
+                <a:cs typeface="Lucida Sans Unicode"/>
+              </a:rPr>
+              <a:t>sustainable </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Lucida Sans Unicode"/>
+                <a:cs typeface="Lucida Sans Unicode"/>
+              </a:rPr>
+              <a:t>aquaponics,</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-35">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Lucida Sans Unicode"/>
+                <a:cs typeface="Lucida Sans Unicode"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-20">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Lucida Sans Unicode"/>
+                <a:cs typeface="Lucida Sans Unicode"/>
+              </a:rPr>
+              <a:t>integrating</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-35">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Lucida Sans Unicode"/>
+                <a:cs typeface="Lucida Sans Unicode"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-20">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Lucida Sans Unicode"/>
+                <a:cs typeface="Lucida Sans Unicode"/>
+              </a:rPr>
+              <a:t>advanced</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Lucida Sans Unicode"/>
+                <a:cs typeface="Lucida Sans Unicode"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-25">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Lucida Sans Unicode"/>
+                <a:cs typeface="Lucida Sans Unicode"/>
+              </a:rPr>
+              <a:t>communication</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-35">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Lucida Sans Unicode"/>
+                <a:cs typeface="Lucida Sans Unicode"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-25">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Lucida Sans Unicode"/>
+                <a:cs typeface="Lucida Sans Unicode"/>
+              </a:rPr>
+              <a:t>and </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1350" spc="-10">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Lucida Sans Unicode"/>
+                <a:cs typeface="Lucida Sans Unicode"/>
+              </a:rPr>
+              <a:t>security.</a:t>
+            </a:r>
+            <a:endParaRPr sz="1350">
+              <a:latin typeface="Lucida Sans Unicode"/>
+              <a:cs typeface="Lucida Sans Unicode"/>
+            </a:endParaRPr>
+          </a:p>
+        </p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="12" name="object 12"/>
+          <p:cNvSpPr txBox="1"/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm>
+            <a:off x="904899" y="5799898"/>
+            <a:ext cx="2084705" cy="429895"/>
+          </a:xfrm>
+          <a:prstGeom prst="rect">
+            <a:avLst/>
+          </a:prstGeom>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr wrap="square" lIns="0" tIns="66675" rIns="0" bIns="0" rtlCol="0" vert="horz">
+            <a:spAutoFit/>
+          </a:bodyPr>
+          <a:lstStyle/>
+          <a:p>
+            <a:pPr marL="12700">
+              <a:lnSpc>
+                <a:spcPct val="100000"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="525"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:r>
+              <a:rPr dirty="0" sz="750">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Lucida Sans Unicode"/>
+                <a:cs typeface="Lucida Sans Unicode"/>
+              </a:rPr>
+              <a:t>PROJECT</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="395">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Lucida Sans Unicode"/>
+                <a:cs typeface="Lucida Sans Unicode"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="50">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Lucida Sans Unicode"/>
+                <a:cs typeface="Lucida Sans Unicode"/>
+              </a:rPr>
+              <a:t>FRAMEWORK</a:t>
+            </a:r>
+            <a:endParaRPr sz="750">
+              <a:latin typeface="Lucida Sans Unicode"/>
+              <a:cs typeface="Lucida Sans Unicode"/>
+            </a:endParaRPr>
+          </a:p>
+          <a:p>
+            <a:pPr marL="12700">
+              <a:lnSpc>
+                <a:spcPct val="100000"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="595"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:r>
+              <a:rPr dirty="0" sz="1050" spc="-70">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>Sustainable</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1050" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1050" spc="-80">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>IoT</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1050" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1050" spc="-95">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>Ecosystem</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1050" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="1050" spc="-45">
+                <a:solidFill>
+                  <a:srgbClr val="1A365C"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>v1.0</a:t>
+            </a:r>
+            <a:endParaRPr sz="1050">
+              <a:latin typeface="Arial Black"/>
+              <a:cs typeface="Arial Black"/>
+            </a:endParaRPr>
+          </a:p>
+        </p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="13" name="object 13"/>
+          <p:cNvSpPr txBox="1"/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm>
+            <a:off x="8216727" y="5901778"/>
+            <a:ext cx="938530" cy="311150"/>
+          </a:xfrm>
+          <a:prstGeom prst="rect">
+            <a:avLst/>
+          </a:prstGeom>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr wrap="square" lIns="0" tIns="40640" rIns="0" bIns="0" rtlCol="0" vert="horz">
+            <a:spAutoFit/>
+          </a:bodyPr>
+          <a:lstStyle/>
+          <a:p>
+            <a:pPr marL="69215">
+              <a:lnSpc>
+                <a:spcPct val="100000"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="320"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:r>
+              <a:rPr dirty="0" sz="750">
+                <a:solidFill>
+                  <a:srgbClr val="82B2E0"/>
+                </a:solidFill>
+                <a:latin typeface="Courier New"/>
+                <a:cs typeface="Courier New"/>
+              </a:rPr>
+              <a:t>LAT:</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-35">
+                <a:solidFill>
+                  <a:srgbClr val="82B2E0"/>
+                </a:solidFill>
+                <a:latin typeface="Courier New"/>
+                <a:cs typeface="Courier New"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750">
+                <a:solidFill>
+                  <a:srgbClr val="82B2E0"/>
+                </a:solidFill>
+                <a:latin typeface="Courier New"/>
+                <a:cs typeface="Courier New"/>
+              </a:rPr>
+              <a:t>35.6895°</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="82B2E0"/>
+                </a:solidFill>
+                <a:latin typeface="Courier New"/>
+                <a:cs typeface="Courier New"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-50">
+                <a:solidFill>
+                  <a:srgbClr val="82B2E0"/>
+                </a:solidFill>
+                <a:latin typeface="Courier New"/>
+                <a:cs typeface="Courier New"/>
+              </a:rPr>
+              <a:t>N</a:t>
+            </a:r>
+            <a:endParaRPr sz="750">
+              <a:latin typeface="Courier New"/>
+              <a:cs typeface="Courier New"/>
+            </a:endParaRPr>
+          </a:p>
+          <a:p>
+            <a:pPr marL="12700">
+              <a:lnSpc>
+                <a:spcPct val="100000"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="225"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:r>
+              <a:rPr dirty="0" sz="750">
+                <a:solidFill>
+                  <a:srgbClr val="82B2E0"/>
+                </a:solidFill>
+                <a:latin typeface="Courier New"/>
+                <a:cs typeface="Courier New"/>
+              </a:rPr>
+              <a:t>LON:</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-35">
+                <a:solidFill>
+                  <a:srgbClr val="82B2E0"/>
+                </a:solidFill>
+                <a:latin typeface="Courier New"/>
+                <a:cs typeface="Courier New"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750">
+                <a:solidFill>
+                  <a:srgbClr val="82B2E0"/>
+                </a:solidFill>
+                <a:latin typeface="Courier New"/>
+                <a:cs typeface="Courier New"/>
+              </a:rPr>
+              <a:t>139.6917°</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-35">
+                <a:solidFill>
+                  <a:srgbClr val="82B2E0"/>
+                </a:solidFill>
+                <a:latin typeface="Courier New"/>
+                <a:cs typeface="Courier New"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-50">
+                <a:solidFill>
+                  <a:srgbClr val="82B2E0"/>
+                </a:solidFill>
+                <a:latin typeface="Courier New"/>
+                <a:cs typeface="Courier New"/>
+              </a:rPr>
+              <a:t>E</a:t>
+            </a:r>
+            <a:endParaRPr sz="750">
+              <a:latin typeface="Courier New"/>
+              <a:cs typeface="Courier New"/>
+            </a:endParaRPr>
+          </a:p>
+        </p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="14" name="object 14"/>
+          <p:cNvSpPr txBox="1"/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm>
+            <a:off x="10052075" y="5901778"/>
+            <a:ext cx="1224280" cy="311150"/>
+          </a:xfrm>
+          <a:prstGeom prst="rect">
+            <a:avLst/>
+          </a:prstGeom>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr wrap="square" lIns="0" tIns="40640" rIns="0" bIns="0" rtlCol="0" vert="horz">
+            <a:spAutoFit/>
+          </a:bodyPr>
+          <a:lstStyle/>
+          <a:p>
+            <a:pPr marL="12700">
+              <a:lnSpc>
+                <a:spcPct val="100000"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="320"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:r>
+              <a:rPr dirty="0" sz="750">
+                <a:solidFill>
+                  <a:srgbClr val="82B2E0"/>
+                </a:solidFill>
+                <a:latin typeface="Courier New"/>
+                <a:cs typeface="Courier New"/>
+              </a:rPr>
+              <a:t>CORE_FREQ:</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-50">
+                <a:solidFill>
+                  <a:srgbClr val="82B2E0"/>
+                </a:solidFill>
+                <a:latin typeface="Courier New"/>
+                <a:cs typeface="Courier New"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-10">
+                <a:solidFill>
+                  <a:srgbClr val="82B2E0"/>
+                </a:solidFill>
+                <a:latin typeface="Courier New"/>
+                <a:cs typeface="Courier New"/>
+              </a:rPr>
+              <a:t>2.4GHZ</a:t>
+            </a:r>
+            <a:endParaRPr sz="750">
+              <a:latin typeface="Courier New"/>
+              <a:cs typeface="Courier New"/>
+            </a:endParaRPr>
+          </a:p>
+          <a:p>
+            <a:pPr marL="12700">
+              <a:lnSpc>
+                <a:spcPct val="100000"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="225"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:r>
+              <a:rPr dirty="0" sz="750">
+                <a:solidFill>
+                  <a:srgbClr val="82B2E0"/>
+                </a:solidFill>
+                <a:latin typeface="Courier New"/>
+                <a:cs typeface="Courier New"/>
+              </a:rPr>
+              <a:t>SEC_PROTOCOL:</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-45">
+                <a:solidFill>
+                  <a:srgbClr val="82B2E0"/>
+                </a:solidFill>
+                <a:latin typeface="Courier New"/>
+                <a:cs typeface="Courier New"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-10">
+                <a:solidFill>
+                  <a:srgbClr val="82B2E0"/>
+                </a:solidFill>
+                <a:latin typeface="Courier New"/>
+                <a:cs typeface="Courier New"/>
+              </a:rPr>
+              <a:t>AES-</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-25">
+                <a:solidFill>
+                  <a:srgbClr val="82B2E0"/>
+                </a:solidFill>
+                <a:latin typeface="Courier New"/>
+                <a:cs typeface="Courier New"/>
+              </a:rPr>
+              <a:t>256</a:t>
+            </a:r>
+            <a:endParaRPr sz="750">
+              <a:latin typeface="Courier New"/>
+              <a:cs typeface="Courier New"/>
+            </a:endParaRPr>
+          </a:p>
+        </p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="15" name="object 15"/>
+          <p:cNvSpPr txBox="1"/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm>
+            <a:off x="448477" y="453231"/>
+            <a:ext cx="2106930" cy="139700"/>
+          </a:xfrm>
+          <a:prstGeom prst="rect">
+            <a:avLst/>
+          </a:prstGeom>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr wrap="square" lIns="0" tIns="12065" rIns="0" bIns="0" rtlCol="0" vert="horz">
+            <a:spAutoFit/>
+          </a:bodyPr>
+          <a:lstStyle/>
+          <a:p>
+            <a:pPr marL="12700">
+              <a:lnSpc>
+                <a:spcPct val="100000"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="95"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-135">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>S</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="45">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-130">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>Y</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="45">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-135">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>S</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="45">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-10">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>T</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-55">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-125">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>E</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="45">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>M</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="290">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-135">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>S</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="45">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-110">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>T</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-5">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-85">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>A</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-5">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-10">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>T</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="15">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>U</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="15">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-135">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>S</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="45">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>:</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="459">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>A</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="10">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>D</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="5">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>A</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="15">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>P</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="10">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-10">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>T</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="15">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>I</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="15">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-10">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>V</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="15">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-50">
+                <a:solidFill>
+                  <a:srgbClr val="3181CD"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>E</a:t>
+            </a:r>
+            <a:endParaRPr sz="750">
+              <a:latin typeface="Arial Black"/>
+              <a:cs typeface="Arial Black"/>
+            </a:endParaRPr>
+          </a:p>
+        </p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="16" name="object 16"/>
+          <p:cNvSpPr txBox="1"/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm>
+            <a:off x="11574447" y="3212420"/>
+            <a:ext cx="154940" cy="1762760"/>
+          </a:xfrm>
+          <a:prstGeom prst="rect">
+            <a:avLst/>
+          </a:prstGeom>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr wrap="square" lIns="0" tIns="19050" rIns="0" bIns="0" rtlCol="0" vert="vert">
+            <a:spAutoFit/>
+          </a:bodyPr>
+          <a:lstStyle/>
+          <a:p>
+            <a:pPr marL="12700">
+              <a:lnSpc>
+                <a:spcPct val="100000"/>
+              </a:lnSpc>
+              <a:spcBef>
+                <a:spcPts val="150"/>
+              </a:spcBef>
+            </a:pPr>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-75">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>P</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-100">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>R</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-125">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>E</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-120">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>C</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>I</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-65">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-135">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>S</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>I</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-40">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>O</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-35">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>N</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="375">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>M</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-35">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>O</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-35">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>N</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-35">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>I</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-35">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-114">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>T</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-45">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>O</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-35">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-100">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>R</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-30">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>I</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-35">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>N</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-35">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t> </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr dirty="0" sz="750" spc="-50">
+                <a:solidFill>
+                  <a:srgbClr val="1A202B"/>
+                </a:solidFill>
+                <a:latin typeface="Arial Black"/>
+                <a:cs typeface="Arial Black"/>
+              </a:rPr>
+              <a:t>G</a:t>
+            </a:r>
+            <a:endParaRPr sz="750">
+              <a:latin typeface="Arial Black"/>
+              <a:cs typeface="Arial Black"/>
+            </a:endParaRPr>
+          </a:p>
+        </p:txBody>
+      </p:sp>
+    </p:spTree>
+  </p:cSld>
+  <p:clrMapOvr>
+    <a:masterClrMapping/>
+  </p:clrMapOvr>
+</p:sld>

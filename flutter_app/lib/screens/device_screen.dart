@@ -1,7 +1,9 @@
 import 'dart:convert';
 
+import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../services/api_service.dart';
 import '../services/storage_service.dart';
@@ -25,7 +27,8 @@ class DeviceScreen extends StatefulWidget {
   State<DeviceScreen> createState() => _DeviceScreenState();
 }
 
-class _DeviceScreenState extends State<DeviceScreen> {
+class _DeviceScreenState extends State<DeviceScreen>
+    with SingleTickerProviderStateMixin {
   List<Map<String, dynamic>> deviceConfig = [];
   Map<String, dynamic>? _nodeHealth;
   String? _healthMessage;
@@ -33,9 +36,20 @@ class _DeviceScreenState extends State<DeviceScreen> {
   bool _isRefreshing = false;
   bool _hasLoadedOnce = false;
 
+  late final AnimationController _entranceController;
+  late final Animation<double> _entranceAnimation;
+
   @override
   void initState() {
     super.initState();
+    _entranceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _entranceAnimation = CurvedAnimation(
+      parent: _entranceController,
+      curve: Curves.easeOutCubic,
+    );
     widget.activeTabListenable.addListener(_handleActiveTabChanged);
     if (widget.activeTabListenable.value == widget.tabIndex) {
       _loadCurrentConfig(showLoader: true);
@@ -46,6 +60,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
   @override
   void dispose() {
+    _entranceController.dispose();
     widget.activeTabListenable.removeListener(_handleActiveTabChanged);
     super.dispose();
   }
@@ -64,6 +79,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
     _isRefreshing = true;
     try {
+      HapticFeedback.mediumImpact();
+
       final configFuture = StorageService.loadConfig();
       final healthFuture = ApiService.fetchHealth();
 
@@ -100,6 +117,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
           _healthMessage = nextHealthMessage;
           loading = false;
         });
+        _entranceController.forward(from: 0.0);
       }
       _hasLoadedOnce = true;
     } finally {
@@ -111,6 +129,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
   }
 
   bool get _nodeOnline => _nodeHealth?['status'] == 'ok';
+
+  bool get _isOffline => !_nodeOnline && _hasLoadedOnce;
 
   String _healthString(String key, String fallback) {
     final value = _nodeHealth?[key];
@@ -197,7 +217,11 @@ class _DeviceScreenState extends State<DeviceScreen> {
         builder: (ctx) => AlertDialog(
           backgroundColor: StitchColors.surfaceContainer,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: const Text('Save Live Profile'),
+          title: const AutoSizeText(
+            'Save Live Profile',
+            maxLines: 1,
+            minFontSize: 16,
+          ),
           content: TextField(
             controller: nameCtrl,
             decoration: const InputDecoration(
@@ -208,7 +232,11 @@ class _DeviceScreenState extends State<DeviceScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('CANCEL'),
+              child: const AutoSizeText(
+                'CANCEL',
+                maxLines: 1,
+                minFontSize: 10,
+              ),
             ),
             StitchPrimaryButton(
               onPressed: () async {
@@ -216,6 +244,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                     ? 'Live Node Snapshot'
                     : nameCtrl.text.trim();
                 await StorageService.saveProfile(name, deviceConfig);
+                HapticFeedback.lightImpact();
                 if (ctx.mounted) {
                   Navigator.pop(ctx);
                 }
@@ -223,9 +252,11 @@ class _DeviceScreenState extends State<DeviceScreen> {
                   showStitchMessage(context, 'Live node saved to Vault.');
                 }
               },
-              child: const Text(
+              child: const AutoSizeText(
                 'SAVE',
                 style: TextStyle(fontWeight: FontWeight.w900),
+                maxLines: 1,
+                minFontSize: 10,
               ),
             ),
           ],
@@ -238,17 +269,6 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final stats = [
-      {
-        'label': 'HEAP',
-        'value': _nodeOnline ? '${_healthString('heapKb', '--')} KB' : '--',
-      },
-      {
-        'label': 'UPTIME',
-        'value': _nodeOnline ? _formatUptime(_healthInt('uptimeSec')) : '--',
-      },
-    ];
-
     return StitchScaffold(
       floatingActionButton: deviceConfig.isEmpty
           ? null
@@ -262,7 +282,11 @@ class _DeviceScreenState extends State<DeviceScreen> {
                 onPressed: _saveCurrent,
                 backgroundColor: Colors.transparent,
                 elevation: 0,
-                label: const Text('SAVE TO VAULT'),
+                label: const AutoSizeText(
+                  'SAVE TO VAULT',
+                  maxLines: 1,
+                  minFontSize: 10,
+                ),
                 icon: const Icon(Icons.save_alt_rounded),
               ),
             ),
@@ -286,205 +310,269 @@ class _DeviceScreenState extends State<DeviceScreen> {
           ),
           Expanded(
             child: loading
-                ? const Center(
-                    child: CircularProgressIndicator(
-                      color: StitchColors.secondaryContainer,
-                    ),
-                  )
-                : RefreshIndicator(
-                    color: StitchColors.secondaryContainer,
-                    backgroundColor: StitchColors.surfaceHigh,
-                    onRefresh: _loadCurrentConfig,
-                    child: ListView(
-                      physics: const BouncingScrollPhysics(
-                        parent: AlwaysScrollableScrollPhysics(),
-                      ),
-                      cacheExtent: 600,
-                      padding: const EdgeInsets.fromLTRB(20, 24, 20, 120),
-                      children: [
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            final compact = constraints.maxWidth < 380;
-
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    StitchStatusDot(
-                                      color: _nodeOnline
-                                          ? StitchColors.primaryContainer
-                                          : StitchColors.error,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      _nodeStatusLabel,
-                                      style: TextStyle(
-                                        color: _nodeOnline
-                                            ? StitchColors.primaryContainer
-                                            : StitchColors.error,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: 2.0,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                if (compact)
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        alignment: Alignment.centerLeft,
-                                        child: Text(
-                                          _nodeTitle,
-                                          maxLines: 1,
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .headlineLarge
-                                              ?.copyWith(fontSize: 24),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        _nodeSubtitle,
-                                        style: Theme.of(context).textTheme.bodyMedium,
-                                      ),
-                                      const SizedBox(height: 16),
-                                      Row(
-                                        children: stats
-                                            .map(
-                                              (item) => Expanded(
-                                                child: Padding(
-                                                  padding: EdgeInsets.only(
-                                                    right: item == stats.first ? 10 : 0,
-                                                  ),
-                                                  child: StitchPanel(
-                                                    padding: const EdgeInsets.all(16),
-                                                    child: Column(
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment.start,
-                                                      children: [
-                                                        Text(
-                                                          item['label']!,
-                                                          style: Theme.of(context)
-                                                              .textTheme
-                                                              .labelMedium,
-                                                        ),
-                                                        const SizedBox(height: 8),
-                                                        Text(
-                                                          item['value']!,
-                                                          style: Theme.of(context)
-                                                              .textTheme
-                                                              .titleLarge
-                                                              ?.copyWith(fontSize: 20),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            )
-                                            .toList(),
-                                      ),
-                                    ],
-                                  )
-                                else
-                                  Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            FittedBox(
-                                              fit: BoxFit.scaleDown,
-                                              alignment: Alignment.centerLeft,
-                                              child: Text(
-                                                _nodeTitle,
-                                                maxLines: 1,
-                                                style: Theme.of(context)
-                                                    .textTheme
-                                                    .headlineLarge
-                                                    ?.copyWith(fontSize: 26),
-                                              ),
-                                            ),
-                                            const SizedBox(height: 8),
-                                            Text(
-                                              _nodeSubtitle,
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .bodyMedium,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(width: 14),
-                                      Row(
-                                        children: stats
-                                            .map(
-                                              (item) => Padding(
-                                                padding: EdgeInsets.only(
-                                                  left: item == stats.first ? 0 : 10,
-                                                ),
-                                                child: SizedBox(
-                                                  width: 118,
-                                                  child: StitchPanel(
-                                                    padding: const EdgeInsets.all(16),
-                                                    child: Column(
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment.start,
-                                                      children: [
-                                                        Text(
-                                                          item['label']!,
-                                                          style: Theme.of(context)
-                                                              .textTheme
-                                                              .labelMedium,
-                                                        ),
-                                                        const SizedBox(height: 8),
-                                                        Text(
-                                                          item['value']!,
-                                                          style: Theme.of(context)
-                                                              .textTheme
-                                                              .titleLarge
-                                                              ?.copyWith(fontSize: 20),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            )
-                                            .toList(),
-                                      ),
-                                    ],
-                                  ),
-                              ],
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 24),
-                        _buildConnectivityPanel(context),
-                        const SizedBox(height: 16),
-                        _buildDiagnosticsPanel(context),
-                        const SizedBox(height: 16),
-                        _buildSmartCommPanel(context),
-                        const SizedBox(height: 16),
-                        RepaintBoundary(
-                          child: SensorMatrix(
-                            deviceConfig: deviceConfig,
-                            onLoad: widget.onLoadToConfig,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                ? _buildSkeleton()
+                : _buildContent(context),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSkeleton() {
+    return ListView(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 120),
+      children: [
+        const StitchShimmer(width: 100, height: 11, borderRadius: 4),
+        const SizedBox(height: 12),
+        const StitchSkeletonPanel(height: 100, lineCount: 3, showIcon: false),
+        const SizedBox(height: 24),
+        const StitchSkeletonPanel(height: 200, lineCount: 5, showIcon: false),
+        const SizedBox(height: 16),
+        const StitchSkeletonPanel(height: 100, lineCount: 3, showIcon: false),
+        const SizedBox(height: 16),
+        ...List.generate(2, (i) => Padding(
+          padding: EdgeInsets.only(bottom: i < 1 ? 12 : 0),
+          child: const StitchSkeletonPanel(height: 80, lineCount: 2),
+        )),
+      ],
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
+    final compact = MediaQuery.of(context).size.width < 380;
+
+    return RefreshIndicator(
+      color: StitchColors.secondaryContainer,
+      backgroundColor: StitchColors.surfaceHigh,
+      onRefresh: _loadCurrentConfig,
+      child: ListView(
+        physics: const BouncingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
+        ),
+        cacheExtent: 600,
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 120),
+        children: [
+          Row(
+            children: [
+              if (_nodeOnline)
+                const StitchPulseDot(
+                  color: StitchColors.primaryContainer,
+                  size: 10,
+                )
+              else
+                const StitchStatusDot(
+                  color: StitchColors.error,
+                  size: 10,
+                ),
+              const SizedBox(width: 8),
+              AutoSizeText(
+                _nodeStatusLabel,
+                style: TextStyle(
+                  color: _nodeOnline
+                      ? StitchColors.primaryContainer
+                      : StitchColors.error,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 2.0,
+                ),
+                maxLines: 1,
+                minFontSize: 9,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          FadeTransition(
+            opacity: _entranceAnimation,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 0.08),
+                end: Offset.zero,
+              ).animate(_entranceAnimation),
+              child: AnimatedOpacity(
+                opacity: _isOffline ? 0.5 : 1.0,
+                duration: const Duration(milliseconds: 400),
+                child: Column(
+                  children: [
+                    _buildNodeInfo(context, compact),
+                    const SizedBox(height: 24),
+                    Container(
+                      height: 1,
+                      color: StitchColors.outlineVariant.withValues(alpha: 0.3),
+                    ),
+                    const SizedBox(height: 24),
+                    _buildConnectivityPanel(context),
+                    const SizedBox(height: 16),
+                    _buildSmartCommPanel(context),
+                    const SizedBox(height: 16),
+                    _buildDiagnosticsPanel(context),
+                    const SizedBox(height: 16),
+                    RepaintBoundary(
+                      child: SensorMatrix(
+                        deviceConfig: deviceConfig,
+                        onLoad: widget.onLoadToConfig,
+                        loading: false,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (_isOffline) ...[
+            const SizedBox(height: 16),
+            const StitchPanel.glass(
+              child: Row(
+                children: [
+                  Icon(Icons.wifi_off_rounded, size: 18, color: StitchColors.error),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: AutoSizeText(
+                      'Node offline -- showing cached data. Pull to refresh.',
+                      style: TextStyle(
+                        color: StitchColors.onSurfaceVariant,
+                        fontSize: 12,
+                      ),
+                      maxLines: 2,
+                      minFontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNodeInfo(BuildContext context, bool compact) {
+    final heapValue = _nodeOnline ? '${_healthString('heapKb', '--')} KB' : '--';
+    final uptimeValue = _nodeOnline ? _formatUptime(_healthInt('uptimeSec')) : '--';
+
+    if (compact) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: AutoSizeText(
+              _nodeTitle,
+              maxLines: 1,
+              style: Theme.of(context)
+                  .textTheme
+                  .headlineLarge
+                  ?.copyWith(fontSize: 24),
+              minFontSize: 18,
+            ),
+          ),
+          const SizedBox(height: 8),
+          AutoSizeText(
+            _nodeSubtitle,
+            style: Theme.of(context).textTheme.bodyMedium,
+            maxLines: 2,
+            minFontSize: 11,
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: StitchPanel(
+                    padding: const EdgeInsets.all(16),
+                    child: _buildMetricColumn('HEAP', heapValue, Icons.memory_rounded),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: StitchPanel(
+                  padding: const EdgeInsets.all(16),
+                  child: _buildMetricColumn('UPTIME', uptimeValue, Icons.timer_outlined),
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: AutoSizeText(
+                  _nodeTitle,
+                  maxLines: 1,
+                  style: Theme.of(context)
+                      .textTheme
+                      .headlineLarge
+                      ?.copyWith(fontSize: 26),
+                  minFontSize: 18,
+                ),
+              ),
+              const SizedBox(height: 8),
+              AutoSizeText(
+                _nodeSubtitle,
+                style: Theme.of(context).textTheme.bodyMedium,
+                maxLines: 2,
+                minFontSize: 11,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 14),
+        Row(
+          children: [
+            StitchPanel(
+              padding: const EdgeInsets.all(16),
+              child: _buildMetricColumn('HEAP', heapValue, Icons.memory_rounded),
+            ),
+            const SizedBox(width: 10),
+            StitchPanel(
+              padding: const EdgeInsets.all(16),
+              child: _buildMetricColumn('UPTIME', uptimeValue, Icons.timer_outlined),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMetricColumn(String label, String value, IconData icon) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 12, color: StitchColors.primaryContainer),
+            const SizedBox(width: 4),
+            AutoSizeText(
+              label,
+              style: Theme.of(context).textTheme.labelMedium,
+              maxLines: 1,
+              minFontSize: 9,
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        AutoSizeText(
+          value,
+          style: Theme.of(context)
+              .textTheme
+              .titleLarge
+              ?.copyWith(fontSize: 20),
+          maxLines: 1,
+          minFontSize: 14,
+        ),
+      ],
     );
   }
 
@@ -498,22 +586,32 @@ class _DeviceScreenState extends State<DeviceScreen> {
         : '--';
 
     return StitchPanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const StitchSectionLabel('Connectivity', icon: Icons.wifi_rounded),
-          const SizedBox(height: 18),
-          _metaRow('Node Status', _nodeOnline ? 'ONLINE' : 'OFFLINE'),
-          _metaRow('Board', _healthString('board', '--')),
-          _metaRow('Chip', _healthString('chipModel', '--')),
-          _metaRow('SSID', ssid),
-          _metaRow('AP IP', accessPointIp),
-          _metaRow('Clients', clients),
-          _metaRow('Saved Nodes', configCount),
-          _metaRow('Security', lockStatus),
-          if (_healthMessage != null)
-            _metaRow('Note', _healthMessage!, multiline: true),
-        ],
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            _leftAccent(StitchColors.primaryContainer),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const StitchSectionLabel('Connectivity', icon: Icons.wifi_rounded),
+                  const SizedBox(height: 18),
+                  _metaRow('Node Status', _nodeOnline ? 'ONLINE' : 'OFFLINE'),
+                  _metaRow('Board', _healthString('board', '--')),
+                  _metaRow('Chip', _healthString('chipModel', '--')),
+                  _metaRow('SSID', ssid),
+                  _metaRow('AP IP', accessPointIp),
+                  _metaRow('Clients', clients),
+                  _metaRow('Saved Nodes', configCount),
+                  _metaRow('Security', lockStatus),
+                  if (_healthMessage != null)
+                    _metaRow('Note', _healthMessage!, multiline: true),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -537,26 +635,36 @@ class _DeviceScreenState extends State<DeviceScreen> {
         priorityColor = StitchColors.primaryContainer;
     }
 
-    return StitchPanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const StitchSectionLabel('Smart Communication', icon: Icons.radar_rounded),
-          const SizedBox(height: 18),
-          _metaRow('Node ID', nodeId),
-          _metaRow('Distance', distance != '--' ? '$distance m' : '--'),
-          _metaRow(
-            'Priority',
-            priority != '--'
-                ? priority.toUpperCase()
-                : '--',
-            valueColor: priority != '--' ? priorityColor : null,
-          ),
-          _metaRow('Report Mode', reportMode != '--' ? reportMode.toUpperCase() : '--'),
-          _metaRow('Retry Queue', '$pendingQueue / 12'),
-          if (_healthMessage != null)
-            _metaRow('Note', _healthMessage!, multiline: true),
-        ],
+    return StitchPanel.glass(
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            _leftAccent(StitchColors.secondary),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const StitchSectionLabel('Smart Communication', icon: Icons.radar_rounded),
+                  const SizedBox(height: 18),
+                  _metaRow('Node ID', nodeId),
+                  _metaRow('Distance', distance != '--' ? '$distance m' : '--'),
+                  _metaRow(
+                    'Priority',
+                    priority != '--'
+                        ? priority.toUpperCase()
+                        : '--',
+                    valueColor: priority != '--' ? priorityColor : null,
+                  ),
+                  _metaRow('Report Mode', reportMode != '--' ? reportMode.toUpperCase() : '--'),
+                  _metaRow('Retry Queue', '$pendingQueue / 12'),
+                  if (_healthMessage != null)
+                    _metaRow('Note', _healthMessage!, multiline: true),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -574,28 +682,56 @@ class _DeviceScreenState extends State<DeviceScreen> {
             '[local] Cached layout has ${deviceConfig.length} configured sensor node(s).',
           ];
 
-    return StitchPanel(
-      color: StitchColors.surfaceLowest,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const StitchSectionLabel('Diagnostics'),
-          const SizedBox(height: 14),
-          ...lines.map(
-            (line) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Text(
-                line,
-                style: const TextStyle(
-                  color: StitchColors.onSurfaceVariant,
-                  fontFamily: 'monospace',
-                  fontSize: 11,
-                  height: 1.45,
-                ),
+    return StitchPanel.glass(
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            _leftAccent(StitchColors.tertiaryFixed),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const StitchSectionLabel('Diagnostics'),
+                  const SizedBox(height: 14),
+                  ...lines.map(
+                    (line) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: AutoSizeText(
+                        line,
+                        style: const TextStyle(
+                          color: StitchColors.onSurfaceVariant,
+                          fontFamily: 'monospace',
+                          fontSize: 11,
+                          height: 1.45,
+                        ),
+                        maxLines: 2,
+                        minFontSize: 9,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-        ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _leftAccent(Color color) {
+    return Container(
+      width: 3,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            color.withValues(alpha: 0.6),
+            color.withValues(alpha: 0.0),
+          ],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        borderRadius: BorderRadius.circular(2),
       ),
     );
   }
@@ -614,23 +750,26 @@ class _DeviceScreenState extends State<DeviceScreen> {
         children: [
           SizedBox(
             width: 96,
-            child: Text(
+            child: AutoSizeText(
               label,
               style: const TextStyle(color: StitchColors.onSurfaceVariant),
+              maxLines: 1,
+              minFontSize: 9,
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
+            child: AutoSizeText(
               value,
               textAlign: TextAlign.right,
               softWrap: multiline,
-              maxLines: multiline ? null : 1,
+              maxLines: multiline ? 3 : 1,
               overflow: multiline ? TextOverflow.visible : TextOverflow.ellipsis,
               style: TextStyle(
                 color: valueColor ?? StitchColors.primary,
                 fontWeight: FontWeight.w600,
               ),
+              minFontSize: 10,
             ),
           ),
         ],

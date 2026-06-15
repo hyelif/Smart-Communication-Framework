@@ -6,6 +6,11 @@ class ApiService {
   static const String baseUrl = 'http://192.168.4.1';
   static const String _nodeKeyHeader = 'X-Node-Key';
 
+  static final http.Client _client = http.Client();
+
+  static const int _maxRetries = 2;
+  static const Duration _retryDelay = Duration(milliseconds: 500);
+
   static String friendlyConnectionMessage([Object? error]) {
     final message = error?.toString().toLowerCase() ?? '';
     if (message.contains('socketexception') ||
@@ -38,21 +43,40 @@ class ApiService {
     return 'ESP32 is unavailable right now. Try again in a moment.';
   }
 
+  static Future<http.Response> _withRetry(
+    Future<http.Response> Function() request,
+  ) async {
+    http.Response? lastResponse;
+    for (var attempt = 0; attempt < _maxRetries; attempt++) {
+      try {
+        lastResponse = await request().timeout(const Duration(seconds: 5));
+        if (lastResponse.statusCode < 500) {
+          return lastResponse;
+        }
+      } catch (_) {
+        // Retry on network errors
+      }
+      if (attempt < _maxRetries - 1) {
+        await Future.delayed(_retryDelay);
+      }
+    }
+    return lastResponse!;
+  }
+
   static Future<Map<String, dynamic>> sendConfig(
     List<Map<String, dynamic>> config,
     String securityKey,
   ) async {
     final uri = Uri.parse('$baseUrl/config');
 
-    final response = await http.post(
+    final response = await _withRetry(() => _client.post(
           uri,
           headers: {
             'Content-Type': 'application/json',
             _nodeKeyHeader: securityKey,
           },
           body: jsonEncode({'config': config}),
-        )
-        .timeout(const Duration(seconds: 5));
+        ));
 
     if (response.statusCode == 200) {
       return {
@@ -71,10 +95,10 @@ class ApiService {
 
   static Future<Map<String, dynamic>> fetchConfig(String securityKey) async {
     final uri = Uri.parse('$baseUrl/config');
-    final response = await http.get(
-      uri,
-      headers: {_nodeKeyHeader: securityKey},
-    ).timeout(const Duration(seconds: 5));
+    final response = await _withRetry(() => _client.get(
+          uri,
+          headers: {_nodeKeyHeader: securityKey},
+        ));
 
     if (response.statusCode != 200) {
       return {
@@ -106,15 +130,14 @@ class ApiService {
     String securityKey,
   ) async {
     final uri = Uri.parse('$baseUrl/config');
-    final response = await http.post(
+    final response = await _withRetry(() => _client.post(
           uri,
           headers: {
             'Content-Type': 'application/json',
             _nodeKeyHeader: securityKey,
           },
           body: jsonEncode(configWithMetadata),
-        )
-        .timeout(const Duration(seconds: 5));
+        ));
 
     if (response.statusCode == 200) {
       return {
@@ -133,9 +156,7 @@ class ApiService {
 
   static Future<Map<String, dynamic>> fetchHealth() async {
     final uri = Uri.parse('$baseUrl/health');
-    final response = await http
-        .get(uri)
-        .timeout(const Duration(seconds: 5));
+    final response = await _withRetry(() => _client.get(uri));
 
     if (response.statusCode != 200) {
       return {

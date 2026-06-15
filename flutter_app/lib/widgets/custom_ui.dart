@@ -1,6 +1,76 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 
 import 'app_theme.dart';
+
+class StitchBounce extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+
+  const StitchBounce({
+    super.key,
+    required this.child,
+    this.onTap,
+  });
+
+  @override
+  State<StitchBounce> createState() => _StitchBounceState();
+}
+
+class _StitchBounceState extends State<StitchBounce> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 80),
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.96).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOutCubic),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onTapDown(TapDownDetails _) {
+    if (widget.onTap != null) _controller.forward();
+  }
+
+  void _onTapUp(TapUpDetails _) {
+    if (widget.onTap != null) _controller.reverse();
+  }
+
+  void _onTapCancel() {
+    if (widget.onTap != null) _controller.reverse();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: _onTapDown,
+      onTapUp: _onTapUp,
+      onTapCancel: _onTapCancel,
+      onTap: widget.onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedBuilder(
+        animation: _scaleAnimation,
+        builder: (context, child) => Transform.scale(
+          scale: _scaleAnimation.value,
+          child: child,
+        ),
+        child: widget.child,
+      ),
+    );
+  }
+}
 
 class StitchScaffold extends StatelessWidget {
   final Widget body;
@@ -19,15 +89,8 @@ class StitchScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          const _ScaffoldBackdrop(),
-          RepaintBoundary(
-            child: SafeArea(bottom: false, child: body),
-          ),
-        ],
-      ),
+      backgroundColor: StitchColors.background,
+      body: SafeArea(bottom: false, child: body),
       floatingActionButton: floatingActionButton,
       floatingActionButtonLocation: floatingActionButtonLocation,
       bottomNavigationBar: bottomNavigationBar,
@@ -53,10 +116,10 @@ class StitchTopBar extends StatelessWidget {
       child: Container(
         height: 64,
         padding: const EdgeInsets.symmetric(horizontal: 20),
-        decoration: BoxDecoration(
-          color: StitchColors.surfaceHigh.withValues(alpha: 0.94),
+        decoration: const BoxDecoration(
+          color: StitchColors.surfaceLowest,
           border: Border(
-            bottom: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
+            bottom: BorderSide(color: StitchColors.outlineVariant),
           ),
         ),
         child: Row(
@@ -68,68 +131,38 @@ class StitchTopBar extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                'ESP32 ARCHITECT',
+                'SMARTPONIC v2',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w900,
                       letterSpacing: -0.4,
+                      color: StitchColors.primary,
                     ),
               ),
             ),
-            Text(
-              section.toUpperCase(),
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: StitchColors.surfaceLow,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: StitchColors.outlineVariant),
+              ),
+              child: Text(
+                section.toUpperCase(),
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: StitchColors.primaryContainer,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.8,
+                    ),
+              ),
+            ),
+            if (trailing != null || trailingIcon != null) ...[
+              const SizedBox(width: 12),
+              trailing ??
+                  Icon(
+                    trailingIcon ?? Icons.battery_charging_full_rounded,
                     color: StitchColors.primaryContainer,
                   ),
-            ),
-            const SizedBox(width: 12),
-            trailing ??
-                Icon(
-                  trailingIcon ?? Icons.battery_charging_full_rounded,
-                  color: StitchColors.primaryContainer,
-                ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ScaffoldBackdrop extends StatelessWidget {
-  const _ScaffoldBackdrop();
-
-  @override
-  Widget build(BuildContext context) {
-    return const RepaintBoundary(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              StitchColors.surfaceLowest,
-              StitchColors.background,
-              StitchColors.surface,
             ],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-        ),
-        child: Stack(
-          children: [
-            Positioned(
-              top: -100,
-              right: -60,
-              child: _GlowOrb(
-                size: 220,
-                color: Color(0x0F00FBFB),
-              ),
-            ),
-            Positioned(
-              top: 260,
-              left: -90,
-              child: _GlowOrb(
-                size: 180,
-                color: Color(0x0D1E95F2),
-              ),
-            ),
           ],
         ),
       ),
@@ -158,42 +191,55 @@ class StitchBottomNavigation extends StatelessWidget {
   Widget build(BuildContext context) {
     return RepaintBoundary(
       child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 18),
-        decoration: BoxDecoration(
-          color: StitchColors.surfaceHigh.withValues(alpha: 0.96),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        decoration: const BoxDecoration(
+          color: StitchColors.surfaceLowest,
           border: Border(
-            top: BorderSide(color: Colors.white.withValues(alpha: 0.04)),
+            top: BorderSide(color: StitchColors.outlineVariant),
           ),
         ),
         child: SafeArea(
           top: false,
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: List.generate(_items.length, (index) {
               final item = _items[index];
               final selected = index == currentIndex;
-              return GestureDetector(
-                onTap: () => onTap(index),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
+              return Expanded(
+                child: StitchBounce(
+                  onTap: () => onTap(index),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 8,
+                    ),
                   decoration: BoxDecoration(
                     color: selected
-                        ? StitchColors.primaryContainer.withValues(alpha: 0.10)
+                        ? StitchColors.surfaceContainer
                         : Colors.transparent,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: selected
+                          ? StitchColors.outlineVariant.withValues(alpha: 0.5)
+                          : Colors.transparent,
+                      width: 1,
+                    ),
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        item.icon,
-                        color: selected
-                            ? StitchColors.primaryContainer
-                            : StitchColors.onSurfaceVariant,
-                        size: 22,
+                      AnimatedScale(
+                        scale: selected ? 1.12 : 1.0,
+                        duration: const Duration(milliseconds: 180),
+                        curve: Curves.easeOutBack,
+                        child: Icon(
+                          item.icon,
+                          color: selected
+                              ? StitchColors.primaryContainer
+                              : StitchColors.onSurfaceVariant,
+                          size: 22,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -202,12 +248,15 @@ class StitchBottomNavigation extends StatelessWidget {
                               color: selected
                                   ? StitchColors.primaryContainer
                                   : StitchColors.onSurfaceVariant,
+                              fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                              letterSpacing: 1.0,
                             ),
                       ),
                     ],
                   ),
                 ),
-              );
+              ),
+            );
             }),
           ),
         ),
@@ -228,6 +277,7 @@ class StitchPanel extends StatelessWidget {
   final EdgeInsetsGeometry padding;
   final Color? color;
   final bool glow;
+  final bool glass;
   final BorderRadius? borderRadius;
 
   const StitchPanel({
@@ -236,19 +286,54 @@ class StitchPanel extends StatelessWidget {
     this.padding = const EdgeInsets.all(20),
     this.color,
     this.glow = false,
+    this.glass = false,
     this.borderRadius,
   });
 
+  const StitchPanel.glass({
+    Key? key,
+    required Widget child,
+    EdgeInsetsGeometry padding = const EdgeInsets.all(20),
+    BorderRadius? borderRadius,
+  }) : this(
+         key: key,
+         child: child,
+         padding: padding,
+         glass: true,
+         borderRadius: borderRadius,
+         color: StitchColors.glassSurface,
+       );
+
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final panel = Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: color ?? StitchColors.surfaceLow,
-        borderRadius: borderRadius ?? BorderRadius.circular(24),
-        boxShadow: glow ? AppTheme.cyanGlowShadow : null,
+        color: glass
+            ? StitchColors.glassSurface
+            : (color ?? StitchColors.surfaceLow),
+        borderRadius: borderRadius ?? BorderRadius.circular(20),
+        border: Border.all(
+          color: glass
+              ? StitchColors.glassBorder
+              : StitchColors.outlineVariant.withValues(alpha: 0.8),
+          width: 1,
+        ),
+        boxShadow: glow
+            ? AppTheme.cyanGlowShadow
+            : (glass ? AppTheme.glassShadow : AppTheme.subtleShadow),
       ),
       child: child,
+    );
+
+    if (!glass) return panel;
+
+    return ClipRRect(
+      borderRadius: borderRadius ?? BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: panel,
+      ),
     );
   }
 }
@@ -261,18 +346,24 @@ class StitchSectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.labelMedium?.copyWith(
+    final style = Theme.of(context).textTheme.labelLarge?.copyWith(
           color: StitchColors.primaryContainer,
+          fontWeight: FontWeight.w800,
         );
 
     return Row(
-      mainAxisSize: MainAxisSize.min,
       children: [
         if (icon != null) ...[
           Icon(icon, size: 14, color: StitchColors.primaryContainer),
           const SizedBox(width: 6),
         ],
-        Text(text.toUpperCase(), style: style),
+        Flexible(
+          child: Text(
+            text.toUpperCase(),
+            style: style,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
       ],
     );
   }
@@ -292,18 +383,25 @@ class StitchPrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: AppTheme.ctaGradient,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: AppTheme.cyanGlowShadow,
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
+    return StitchBounce(
+      onTap: onPressed,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: AppTheme.ctaGradient,
           borderRadius: BorderRadius.circular(12),
-          onTap: onPressed,
-          child: Padding(padding: padding, child: child),
+          boxShadow: AppTheme.cyanGlowShadow,
+        ),
+        child: Padding(
+          padding: padding,
+          child: DefaultTextStyle.merge(
+            style: const TextStyle(
+              color: Colors.black,
+              fontWeight: FontWeight.w900,
+              fontSize: 13,
+              letterSpacing: 0.5,
+            ),
+            child: Center(child: child),
+          ),
         ),
       ),
     );
@@ -322,17 +420,28 @@ class StitchGhostButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return OutlinedButton(
-      onPressed: onPressed,
-      style: OutlinedButton.styleFrom(
-        side: BorderSide(
-          color: StitchColors.outlineVariant.withValues(alpha: 0.3),
-        ),
-        foregroundColor: StitchColors.secondary,
+    return StitchBounce(
+      onTap: onPressed,
+      child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        decoration: BoxDecoration(
+          color: StitchColors.surfaceLow,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: StitchColors.outlineVariant,
+            width: 1,
+          ),
+        ),
+        child: DefaultTextStyle.merge(
+          style: const TextStyle(
+            color: StitchColors.secondary,
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+            letterSpacing: 0.5,
+          ),
+          child: Center(child: child),
+        ),
       ),
-      child: child,
     );
   }
 }
@@ -362,10 +471,10 @@ class StitchRefreshButton extends StatelessWidget {
               const SizedBox(
                 width: 14,
                 height: 14,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: CircularProgressIndicator(strokeWidth: 2, color: StitchColors.secondary),
               )
             else
-              const Icon(Icons.refresh_rounded, size: 18),
+              const Icon(Icons.refresh_rounded, size: 16),
             const SizedBox(width: 8),
             Text(busy ? 'REFRESHING...' : label),
           ],
@@ -385,22 +494,42 @@ void showStitchMessage(
     ..hideCurrentSnackBar()
     ..showSnackBar(
       SnackBar(
-        content: Text(
-          message,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: isError ? StitchColors.primary : StitchColors.onSurface,
-            fontWeight: FontWeight.w600,
-          ),
+        content: Row(
+          children: [
+            Icon(
+              isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
+              color: isError ? StitchColors.error : StitchColors.primaryContainer,
+              size: 20,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                message,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ],
         ),
         behavior: SnackBarBehavior.floating,
-        duration: Duration(milliseconds: isError ? 1800 : 1200),
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 18),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        backgroundColor: isError
-            ? const Color(0xFF2A3038)
-            : StitchColors.surfaceHigh,
+        duration: Duration(milliseconds: isError ? 2200 : 1600),
+        margin: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: isError
+                ? StitchColors.error.withValues(alpha: 0.3)
+                : StitchColors.primaryContainer.withValues(alpha: 0.3),
+            width: 1,
+          ),
+        ),
+        backgroundColor: StitchColors.surfaceContainer,
       ),
     );
 }
@@ -423,6 +552,220 @@ class StitchStatusDot extends StatelessWidget {
       decoration: BoxDecoration(
         color: color,
         shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.4),
+            blurRadius: 6,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class StitchPulseDot extends StatefulWidget {
+  final Color color;
+  final double size;
+  final double pulseRadius;
+  final Duration pulseDuration;
+
+  const StitchPulseDot({
+    super.key,
+    this.color = StitchColors.primaryContainer,
+    this.size = 10,
+    this.pulseRadius = 16,
+    this.pulseDuration = const Duration(milliseconds: 1500),
+  });
+
+  @override
+  State<StitchPulseDot> createState() => _StitchPulseDotState();
+}
+
+class _StitchPulseDotState extends State<StitchPulseDot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: widget.pulseDuration)
+      ..repeat(reverse: true);
+    _pulse = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOutSine),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _pulse,
+      builder: (context, child) {
+        return SizedBox(
+          width: widget.pulseRadius * 2,
+          height: widget.pulseRadius * 2,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                width: widget.pulseRadius * 2 * (0.4 + 0.6 * _pulse.value),
+                height: widget.pulseRadius * 2 * (0.4 + 0.6 * _pulse.value),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: widget.color.withValues(alpha: 0.15 * (1.0 - _pulse.value)),
+                ),
+              ),
+              Container(
+                width: widget.size,
+                height: widget.size,
+                decoration: BoxDecoration(
+                  color: widget.color,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: widget.color.withValues(alpha: 0.4 + 0.3 * _pulse.value),
+                      blurRadius: 6 + 4 * _pulse.value,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class StitchShimmer extends StatefulWidget {
+  final double width;
+  final double height;
+  final double borderRadius;
+  final Color? baseColor;
+  final Color? highlightColor;
+
+  const StitchShimmer({
+    super.key,
+    this.width = double.infinity,
+    required this.height,
+    this.borderRadius = 12,
+    this.baseColor,
+    this.highlightColor,
+  });
+
+  @override
+  State<StitchShimmer> createState() => _StitchShimmerState();
+}
+
+class _StitchShimmerState extends State<StitchShimmer>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _shift;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat();
+    _shift = Tween<double>(begin: -1.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOutSine),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _shift,
+      builder: (context, _) {
+        return Container(
+          width: widget.width,
+          height: widget.height,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(widget.borderRadius),
+            gradient: LinearGradient(
+              colors: [
+                widget.baseColor ?? StitchColors.shimmerBase,
+                widget.highlightColor ?? StitchColors.shimmerHighlight,
+                widget.baseColor ?? StitchColors.shimmerBase,
+              ],
+              stops: const [0.0, 0.5, 1.0],
+              begin: Alignment(_shift.value, 0.0),
+              end: Alignment(-_shift.value, 0.0),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class StitchSkeletonPanel extends StatelessWidget {
+  final double height;
+  final int lineCount;
+  final bool showIcon;
+
+  const StitchSkeletonPanel({
+    super.key,
+    this.height = 120,
+    this.lineCount = 3,
+    this.showIcon = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: StitchColors.surfaceLow,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: StitchColors.outlineVariant.withValues(alpha: 0.8),
+        ),
+      ),
+      child: Row(
+        children: [
+          if (showIcon)
+            const Padding(
+              padding: EdgeInsets.only(right: 14),
+              child: StitchShimmer(
+                width: 46,
+                height: 46,
+                borderRadius: 12,
+              ),
+            ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: List.generate(lineCount, (i) {
+                return Padding(
+                  padding: EdgeInsets.only(bottom: i < lineCount - 1 ? 10 : 0),
+                  child: StitchShimmer(
+                    height: 12,
+                    width: i == 0 ? 0.6 : (i == lineCount - 1 ? 0.4 : 0.8),
+                    borderRadius: 6,
+                  ),
+                );
+              }),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -453,7 +796,9 @@ class StitchEmptyState extends StatelessWidget {
             const SizedBox(height: 14),
             Text(
               title,
-              style: Theme.of(context).textTheme.headlineMedium,
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 10),
@@ -469,25 +814,3 @@ class StitchEmptyState extends StatelessWidget {
   }
 }
 
-class _GlowOrb extends StatelessWidget {
-  final double size;
-  final Color color;
-
-  const _GlowOrb({required this.size, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: RadialGradient(
-            colors: [color, Colors.transparent],
-          ),
-        ),
-      ),
-    );
-  }
-}

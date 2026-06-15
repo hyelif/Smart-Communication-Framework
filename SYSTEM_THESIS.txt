@@ -36,6 +36,8 @@ Chapter 4 - LoRa Radio Communication
   4.2  Binary Packet Structure
   4.3  Encryption (AES-CTR)
   4.4  CRC32 Integrity Validation
+  4.5  Channel Activity Detection (CAD)
+  4.6  Adaptive Data Rate (ADR)
 
 Chapter 5 - HQ Gateway (ESP32)
   5.1  LoRa Packet Reception
@@ -160,13 +162,28 @@ The primary objectives of this project are:
 1.4 SCOPE AND LIMITATIONS
 -------------------------
 
-This implementation covers:
-- Up to 15 GPIO sensors per ESP32 node
+This implementation supports two ESP32 node variants:
+
+ESP32 Node (30-pin variant):
+- WiFi AP mode configuration (SSID: AQUA_NODE)
+- Up to 15 GPIO-configurable sensor ports
+- Web server for remote configuration updates
+- Suitable for permanent installations with network access
+
+ESP32 Node_38Pin (38-pin variant):
+- NFC-only configuration (no WiFi AP)
+- Up to 24 GPIO-configurable sensor ports
+- PN532 NFC module for wireless configuration via Android HCE or physical NTAG215 tag
+- Compact binary payload encoding for efficient LoRa transmission
+- Suitable for locations without WiFi infrastructure
+
+Common to both variants:
 - Maximum 12 pending retry packets in the node FIFO queue
 - LoRa frequency: 433 MHz
 - HTTP API hosted on XAMPP (local PHP/MySQL)
 - Telegram as the sole notification and control channel
-- NFC wireless configuration (PN532 module)
+- AES-128-CTR encryption for all wireless transmissions
+- CRC32 integrity validation
 - Event-driven automation with human-in-the-loop approval for unsafe actions
 
 Limitations:
@@ -208,7 +225,8 @@ Additionally, Telegram commands flow upstream:
 
 Component           Role
 --------           ----
-ESP32 Node          Sensor sampling, priority classification, LoRa transmitter
+ESP32 Node (30-pin) Sensor sampling, priority classification, LoRa transmitter, WiFi config
+ESP32 Node (38-pin) Sensor sampling, priority classification, LoRa transmitter, NFC config
 ESP32 HQ Gateway    LoRa receiver, HTTP client, control command forwarder
 LoRa Radio (433MHz) Long-range wireless communication link
 PHP receive_data    API endpoint, data ingestion, alert triggering
@@ -240,13 +258,29 @@ Dashboard         Vanilla JS + PHP (no framework)
 3.1 HARDWARE OVERVIEW
 ---------------------
 
-The ESP32 node operates as a self-contained sensor hub with:
+SmartPonic implements two ESP32 node variants:
 
-- WiFi AP mode for initial configuration (SSID: AQUA_NODE)
-- LoRa transmitter for data uplink
+ESP32 Node (30-pin variant):
+- WiFi AP mode for configuration (SSID: AQUA_NODE)
 - Up to 15 GPIO-configurable sensor ports
-- Preferences library for flash-based configuration storage
 - Web server for remote configuration updates
+- LoRa transmitter for data uplink
+- Preferences library for flash-based configuration storage
+
+ESP32 Node_38Pin (38-pin variant):
+- NFC-only configuration (no WiFi AP)
+- Up to 24 GPIO-configurable sensor ports
+- PN532 NFC module for wireless configuration
+- Compact binary payload encoding (max 97 bytes for 24 readings)
+- LoRa transmitter for data uplink
+- Preferences library for flash-based configuration storage
+
+Both variants maintain a JSON configuration in flash memory that defines:
+- Sensor pin assignments
+- Sensor types (DHT22, WaterTemp, pH, TDS, Turbidity, Rain)
+- Calibration coefficients
+- Node ID, latitude, longitude, distance from base
+- Unique hardware device EUI-64 identifier
 
 The node maintains a JSON configuration in flash memory that defines:
 - Sensor pin assignments
@@ -276,20 +310,7 @@ In SmartPonic, the EUI-64 is:
 - Used as the primary key in the nodes database table
 - Printed on the device label for physical identification
 - Encoded in QR codes for rapid provisioning
-- Broadcast in every LoRa packet as part of the nodeId field
-
-QR Code Provisioning:
-When deploying a new node, the Flutter app scans the device's QR code
-(which encodes: EUI-64, AES key, nodeId). The app auto-configures the
-node without manual entry:
-
-    QR Data: {"eui":"24A0C4FFFE112233","aes":"SmartPonic123456","nodeId":1}
-              ||                                  ||
-              v                                   v
-         Stored in nodes DB              Loaded by node at boot
-
-This eliminates manual node ID assignment and ensures every device has a
-cryptographically unguessable unique identity from the factory floor.
+- Carried in every LoRa packet header as the hardwareId field (16-char hex)
 
 Persistence in Preferences:
 The hardware device ID is stored at first boot and persists across firmware
@@ -301,64 +322,14 @@ reflashing (unless full flash erase is performed):
     prefs.putString("device_name", "smartponic-node-1");
     prefs.end();
 
-Note: The nodeId used in LoRa packets (1-255) is a short runtime ID
-assigned during provisioning, distinct from the hardware EUI-64. The HQ
-maintains a mapping table: nodes(eui64) -> runtime nodeId.
+The hardwareId is placed directly in the LoRa packet header as a 16-byte
+uppercase hex string, allowing HQ to identify the source node without
+requiring any nodeId lookup table or runtime ID mapping.
 
-3.3 HARDWARE DEVICE IDENTITY (EUI-64)
---------------------------------------
-
-Each ESP32 node carries a unique hardware identifier derived from its
-internal eFuse MAC address. This EUI-64 (Extended Unique Identifier) is:
-
-- Burned into ESP32 silicon at the Espressif factory
-- Physically immutable (cannot be changed or cloned without special tools)
-- Globally unique across all ESP32 devices ever manufactured
-- Used as the definitive node identity in all system communications
-
-The EUI-64 is derived from the 6-byte Bluetooth/WiFi MAC address:
-
-    ESP32 MAC Address:  24:0A:C4:XX:XX:XX  (6 bytes, 12 hex chars)
-    EUI-64 Format:     FFFEXXXXXXXXXX   (reversed + padded)
-
-In SmartPonic, the EUI-64 is:
-- Stored in ESP32 Preferences namespace "identity"
-- Used as the primary key in the nodes database table
-- Printed on the device label for physical identification
-- Encoded in QR codes for rapid provisioning
-- Broadcast in every LoRa packet as part of the nodeId field
-
-QR Code Provisioning:
-When deploying a new node, the Flutter app scans the device's QR code
-(which encodes: EUI-64, AES key, nodeId). The app auto-configures the
-node without manual entry:
-
-    QR Data: {"eui":"24A0C4FFFE112233","aes":"SmartPonic123456","nodeId":1}
-              ||                                  ||
-              v                                  v
-         Stored in nodes DB              Loaded by node at boot
-
-This eliminates manual node ID assignment and ensures every device has a
-cryptographically unguessable unique identity from the factory floor.
-
-Persistence in Preferences:
-The hardware device ID is stored at first boot and persists across firmware
-reflashing (unless full flash erase is performed):
-
-    Preferences prefs;
-    prefs.begin("identity", false);        // namespace "identity"
-    prefs.putString("eui64", euiString);   // e.g., "24A0C4FFFE112233"
-    prefs.putString("device_name", "smartponic-node-1");
-    prefs.end();
-
-Note: The nodeId used in LoRa packets (1-255) is a short runtime ID
-assigned during provisioning, distinct from the hardware EUI-64. The HQ
-maintains a mapping table: nodes(eui64) -> runtime nodeId.
-
-3.4 SENSOR SAMPLING SYSTEM
+3.3 SENSOR SAMPLING SYSTEM
 --------------------------
 
-Sensors are sampled every 5 seconds (SAMPLE_INTERVAL_MS = 5000):
+Sensors are sampled every 30 seconds (SAMPLE_INTERVAL_MS = 30000):
 
     +---------------------+
     | sampleSensors()     |
@@ -381,8 +352,8 @@ Sensors are sampled every 5 seconds (SAMPLE_INTERVAL_MS = 5000):
               |
               v
     +----------------------+
-    | Append to segments   |
-    | vector (pin=name=val)|
+    | Append reading to    |
+    | readings vector      |
     +----------------------+
               |
               v
@@ -392,52 +363,9 @@ Sensors are sampled every 5 seconds (SAMPLE_INTERVAL_MS = 5000):
     | updateReportMode()  |  (set interval based on priority)
     +---------------------+
 
-Each sampled reading is stored as a "segment" string:
-    "4=Temperature=28.5&21=Humidity=75.2&..."
-
-These segments are accumulated in latestSegments vector for transmission.
-
-3.5 PRIORITY CLASSIFICATION ENGINE
------------------------------------
-
-Sensors are sampled every 5 seconds (SAMPLE_INTERVAL_MS = 5000):
-
-    +---------------------+
-    |   sampleSensors()   |
-    +---------------------+
-              |
-              v
-    +---------------------+
-    |For each GPIO config |
-    +---------------------+
-              |
-              v
-    +---------------------+
-    | Read based on type  |---- DHT22 ----> Temperature + Humidity
-    |                     |---- WaterTemp --> DS18B20 (OneWire)
-    |                     |---- pH -------> Analog ADC
-    |                     |---- TDS ------> Analog ADC
-    |                     |---- Turbidity -> Analog ADC
-    |                     |---- Rain -----> Digital pin
-    +---------------------+
-              |
-              v
-    +---------------------+
-    | Append to segments   |
-    | vector (pin=name=val)|
-    +---------------------+
-              |
-              v
-    +---------------------+
-    | classifySensorPri() |  (per-sensor priority)
-    | escalatePriority()  |  (overall highest priority)
-    | updateReportMode()  |  (set interval based on priority)
-    +---------------------+
-
-Each sampled reading is stored as a "segment" string:
-    "4=Temperature=28.5&21=Humidity=75.2&..."
-
-These segments are accumulated in latestSegments vector for transmission.
+Each sampled reading is stored as a SensorReading struct with pin,
+sensor type, and value fields. These are encoded into a compact
+binary payload for LoRa transmission.
 
 3.4 PRIORITY CLASSIFICATION ENGINE
 -----------------------------------
@@ -553,36 +481,70 @@ efficiency. Each packet consists of four sections:
 
 +-----------+-----------+------------------+--------+
 | HEADER    | NONCE     | ENCRYPTED        | CRC32  |
-| 14 bytes  | 16 bytes  | PAYLOAD          | 4 bytes|
+| 23 bytes  | 16 bytes  | PAYLOAD          | 4 bytes|
 +-----------+-----------+------------------+--------+
 |<-------- encrypted payload region ------>|
 |<----------- full packet (variable) ----->|
 
-HEADER (14 bytes, packed struct):
+HEADER (23 bytes, packed struct):
   Offset  Size  Field            Description
   ------  ----  -----            -----------
   0       4     magic            0x31504653 ("SPF1")
   4       1     version          Protocol version (1)
-  5       1     nodeId           Runtime node identifier (1-255)
-  6       1     priority         0=LOW, 1=MEDIUM, 2=HIGH
-  7       1     reportMode       0=NORMAL, 1=ABNORMAL, 2=CRITICAL
-  8       2     payloadLength     Length of encrypted payload
-  10      4     sequence         Monotonically increasing counter
+  5       16    hardwareId       EUI-64 MAC as 16-char uppercase hex string
+  21      2     payloadLength    Encrypted payload size (little-endian)
 
-Note: The HEADER.nodeId is a short runtime ID (1-255), not the hardware
-EUI-64. HQ resolves nodeId -> EUI-64 via the nodes database table.
+The hardwareId field carries the node's full EUI-64 MAC address (e.g.,
+"AC67B21234567890"), allowing HQ to identify the source node without
+requiring a nodeId lookup table. This eliminates the need for a separate
+registration step and simplifies the protocol.
 
 NONCE (16 bytes):
   Offset  Size  Field            Source
   ------  ----  -----            ------
-  0       4     sequence         Mirrors header.sequence
-  4       4     timestamp        esp_timer (millis)
+  0       4     random           esp_random() XOR
+  4       4     timestamp        millis()
   8       4     random           esp_random()
-  12      4     nodeId           Mirrors header.nodeId
+  12      4     random           esp_random()
+
+Each nonce is generated from three hardware random values and a millis()
+timestamp, ensuring negligible probability of nonce reuse across the
+key lifetime.
 
 CRC32 (4 bytes):
   CRC32 checksum computed over HEADER + NONCE + ENCRYPTED_PAYLOAD.
   Validated BEFORE decryption to reject corrupted packets early.
+
+4.2.1 Binary Payload Encoding
+
+Telemetry data uses a compact binary encoding rather than text key-value
+pairs. After decryption, the payload format is:
+
+  [num_readings:1B] [pin:1B] [type:1B] [value:2B] ...
+
+  Field            Size  Description
+  -----            ----  -----------
+  num_readings     1     Number of sensor readings (0-24)
+  pin              1     GPIO pin number
+  type             1     SensorType enum (0=Temperature, 1=Humidity,
+                          2=WaterTemp, 3=pH, 4=TDS, 5=Turbidity, 6=Rain)
+  value            2     int16_t scaled by 10 (25.3 -> 253)
+
+  Special sentinel values:
+    0x7FFF (BIN_VALUE_NAN)   - Sensor returned NaN (invalid reading)
+    0x7FFE (BIN_VALUE_ERROR) - Sensor communication error
+
+Each reading occupies exactly 4 bytes, enabling simple fixed-offset
+parsing. A maximum of 24 readings per packet keeps the payload under
+96 bytes, well within the LoRa maximum packet size.
+
+4.2.2 Auth Key Optimization
+
+The authentication key ("auth=AQUA77") is only included in registration
+packets, not in routine telemetry. Since the packet header carries the
+hardwareId, HQ can identify the node and look up its authentication
+status without requiring an auth token in every transmission. This saves
+8-10 bytes per telemetry packet, reducing airtime and power consumption.
 
 4.3 ENCRYPTION (AES-CTR)
 -------------------------
@@ -597,8 +559,8 @@ Why AES-CTR instead of AES-CBC?
 - mbedTLS provides hardware-accelerated AES on ESP32
 
 Encryption process:
-1. Build plaintext payload string: "auth=AQUA77&4=Temperature=28.5&..."
-2. Generate 16-byte nonce from (sequence, timestamp, random, nodeId)
+1. Build binary payload: [count:1B][pin:1B][type:1B][value:2B]... for each sensor
+2. Generate 16-byte nonce from (random XOR, millis, esp_random, esp_random)
 3. Initialize AES-CTR with shared 128-bit key (same on all nodes/HQ)
 4. Encrypt payload in one call -> encryptedPayload bytes
 5. Assemble packet: [HEADER][NONCE][encryptedPayload][CRC32]
@@ -624,6 +586,63 @@ This ordering ensures:
 
 The CRC32 implementation uses the standard Ethernet polynomial (0xEDB88320)
 with bit-reversed arithmetic, providing strong error detection capability.
+
+4.5 CHANNEL ACTIVITY DETECTION (CAD)
+-------------------------------------
+
+Channel Activity Detection (CAD) is a listen-before-talk mechanism that
+reduces packet collisions on the LoRa air interface. Before transmitting,
+the node samples the channel RSSI to determine whether another transmission
+is in progress.
+
+Algorithm:
+1. Switch to receive mode and sample RSSI
+2. If RSSI < -95 dBm (channel clear), proceed with transmission
+3. If RSSI >= -95 dBm (channel busy), wait a random 20-100 ms and retry
+4. After 5 failed attempts, transmit anyway (fail-open behaviour)
+
+The fail-open approach ensures that sensor data is never permanently
+blocked by a persistently busy channel. In a typical deployment with
+fewer than 10 nodes transmitting at multi-minute intervals, collisions
+are rare and the CAD mechanism primarily prevents the rare case of two
+nodes transmitting simultaneously after a shared event (e.g., power
+restoration).
+
+CAD is applied before both registration and telemetry transmissions,
+and also before control command downlinks from HQ.
+
+4.6 ADAPTIVE DATA RATE (ADR)
+-----------------------------
+
+Adaptive Data Rate (ADR) dynamically adjusts the LoRa spreading factor
+(SF) based on the received signal strength (RSSI) of the HQ's ACK
+response. Using a lower SF when signal conditions permit reduces airtime
+and power consumption.
+
+RSSI thresholds and corresponding spreading factors:
+
+  RSSI Condition         Spreading Factor   Approximate Air Time (per 50B)
+  ---------------        ----------------   ------------------------------
+  RSSI > -100 dBm        SF7                 ~30 ms
+  -110 < RSSI <= -100    SF8                 ~55 ms
+  -120 < RSSI <= -110    SF9                 ~100 ms
+  RSSI <= -120           SF10                ~185 ms
+
+Algorithm:
+1. After each telemetry transmission, capture the RSSI of the HQ's ACK
+2. Track the best (highest) RSSI observed since the last ADR evaluation
+3. Every 60 seconds, select the lowest SF that satisfies the RSSI threshold
+4. Apply the new SF to subsequent transmissions via LoRa.setSpreadingFactor()
+
+The ADR state is re-applied after light sleep, since the radio
+configuration is reset on wake. This ensures the node always transmits
+at the optimal SF regardless of sleep/wake cycles.
+
+Benefits:
+- Nodes with strong signal use SF7, reducing airtime by ~85% compared to SF10
+- Reduced airtime lowers collision probability and power consumption
+- Nodes with weak signal automatically fall back to higher SF for reliability
+- No manual SF configuration required per node
 
 ================================================================================
                           CHAPTER 5: HQ GATEWAY (ESP32)
@@ -652,37 +671,27 @@ quality metrics, enabling the dashboard to track link health over time.
 5.2 DECRYPTION AND VALIDATION
 -----------------------------
 
-HQ maintains two decryption paths to support firmware upgrades:
+HQ decrypts incoming packets using the shared AES-128-CTR key:
 
-Path 1 - Structured Binary (current):
-    decryptStructuredPacket()
-    1. Verify magic bytes (0x31504653)
-    2. Verify protocol version
-    3. Verify packet length matches header.payloadLength + overhead
-    4. Verify CRC32 checksum
-    5. Extract nonce from packet
-    6. AES-CTR decrypt with nonce
-    7. Return plaintext payload string
+    processPacket()
+    1. Verify minimum packet length (44 bytes)
+    2. Verify magic bytes (0x31504653)
+    3. Verify protocol version
+    4. Extract hardwareId from header (offset 5, 16 bytes)
+    5. Extract payload length from header (offset 21, 2 bytes LE)
+    6. Verify total packet size matches expected size
+    7. Verify CRC32 checksum (validate-then-decrypt)
+    8. Extract nonce from packet
+    9. AES-CTR decrypt with nonce
+    10. Detect format: binary (telemetry) vs text (registration)
 
-Path 2 - Legacy HEX (backward compatibility):
-    decryptLegacyHex()
-    1. Convert ASCII HEX string to bytes
-    2. AES-ECB decrypt (old method, no nonce)
-    3. Strip padding
-    4. Return plaintext
+Format detection uses isBinaryFormat(): if the first byte of decrypted
+payload is <= 24 (max readings count), it is treated as binary telemetry.
+Otherwise it is treated as text (registration).
 
-The payload is validated using lookLikeValidPayload():
-    - Must contain "auth=AQUA77&"
-    - Must contain "&node="
-    - Must contain "&seq="
-
-Sequence tracking (lastSeq) rejects duplicate or out-of-order packets:
-    if (sequence <= lastSeq) {
-        // Duplicate/Reject
-    } else {
-        lastSeq = sequence;
-        // Forward to API
-    }
+Binary telemetry packets skip auth validation — the hardwareId in the
+packet header is sufficient for node identification. Text packets
+(registration) are validated against the expected auth key.
 
 5.3 HTTP FORWARDING WITH HMAC AUTHENTICATION
 --------------------------------------------
@@ -698,12 +707,9 @@ HQ forwards validated sensor data to receive_data.php via HTTP POST:
 
 JSON payload format:
     {
-      "node_id": 1,
+      "hardware_id": "AC67B21234567890",
       "rssi": -45,
       "snr": 10.5,
-      "priority": "HIGH",
-      "report_mode": "CRITICAL",
-      "sequence": 1234,
       "event_type": "telemetry",
       "sensors": [
         {"pin": 32, "sensor": "pH", "value": "7.2"},
@@ -716,29 +722,29 @@ The HMAC-SHA256 signature ensures:
 - integrity: any body modification invalidates the signature
 - replay protection: X-Timestamp prevents reuse of old requests
 
-5.4 OFFLINE STORAGE AND RETRY QUEUE
------------------------------------
+5.4 IN-MEMORY RETRY QUEUE
+-------------------------
 
-When HTTP POST fails (no WiFi or API unreachable), HQ queues payloads to
-local storage for later retry:
+When HTTP POST fails (no WiFi or API unreachable), HQ queues payloads
+in an in-memory vector for later retry:
 
-    queueFailedJson(jsonBody)  ->  SD card or SPIFFS
+    struct QueuedJob {
+        String url;
+        String body;
+    };
+    std::vector<QueuedJob> _queue;
 
-    Storage path: /pending_http_queue.ndjson  (newline-delimited JSON)
+Retry behavior (every 30 seconds, QUEUE_RETRY_MS):
+    processQueue()
+    1. Check WiFi connectivity; skip if disconnected
+    2. Iterate through _queue vector
+    3. Attempt httpPost() for each queued job
+    4. On success: erase job from queue
+    5. On failure: keep in queue, retry next cycle
 
-Retry behavior (every 30 seconds):
-    retryQueuedHttpIfNeeded()
-    1. Open queue file
-    2. Read one line at a time
-    3. Attempt sendJsonToAPI()
-    4. On success: discard the line
-    5. On failure: keep in queue, stop retrying this cycle
-    6. Rewrite remaining queue to file
-
-Storage priority: SD card > SPIFFS > none
-
-This store-and-forward approach ensures zero data loss even during extended
-internet outages.
+The queue is purely in-memory — if HQ loses power, queued payloads
+are lost. This is acceptable for the current deployment where HQ is
+on the same LAN as the PHP backend and WiFi outages are rare.
 
 5.5 RELAY CONTROL DOWNLINK
 ---------------------------
@@ -783,11 +789,9 @@ Request validation flow:
     4. Compare against X-Signature (constant-time comparison via hash_equals)
 
 Input validation:
-- node_id: must be positive integer
+- hardware_id: must be a valid 16-char uppercase hex string
 - sensors: must be non-empty array, max 32 items
 - Each sensor: must have pin (int), sensor (string), value (string)
-- priority: one of LOW, MEDIUM, HIGH (default: LOW)
-- report_mode: one of NORMAL, ABNORMAL, CRITICAL (default: NORMAL)
 
 6.2 DATA ROUTING TO PER-SENSOR TABLES
 --------------------------------------
@@ -843,10 +847,10 @@ Key tables:
 
 nodes                    - Node metadata (id, eui64, name, location, lat/lon)
                          The eui64 column stores the hardware EUI-64 as the
-                         definitive unique identifier; id is the runtime
-                         nodeId (1-255) used in LoRa packet headers.
-sensor_readings          - Main reading record with priority, mode, RSSI/SNR
-                           Links to nodes via runtime nodeId, not EUI-64
+                         definitive unique identifier; id is an internal
+                         auto-increment primary key.
+sensor_readings          - Main reading record with RSSI/SNR
+                           Links to nodes via eui64
 temperature_data         - Per-reading temperature values
 humidity_data            - Per-reading humidity values
 water_temp_data          - Per-reading water temperature values
@@ -861,7 +865,7 @@ alerts                   - Active/acknowledged/resolved alerts
 relay_commands           - Command queue with state machine
 communication_health     - Signal quality metrics over time
 
-Indexes are created on (node_id, created_at) for all sensor tables,
+Indexes are created on (eui64, created_at) for all sensor tables,
 enabling efficient time-range queries for the dashboard.
 
 ================================================================================
@@ -976,8 +980,9 @@ The telegram_poll.php --loop process also monitors node health:
             send "SmartPonic RECOVERED" message
 
 This provides a watchdog mechanism: if a node stops transmitting for
-too long (configurable, e.g., 15 minutes warning, 30 minutes offline),
-operators receive a Telegram alert even without explicit CRITICAL detection.
+too long (configurable, e.g., 5 minutes for STALE warning, 15 minutes for
+OFFLINE alert), operators receive a Telegram notification even without
+explicit CRITICAL detection.
 
 ================================================================================
                              CHAPTER 8: DASHBOARD
@@ -1055,7 +1060,7 @@ partition. The current implementation assumes a trusted deployment environment.
 9.2 INTEGRITY PROTECTION (CRC32)
 ---------------------------------
 
-CRC32 checksum is prepended to every packet and validated at HQ before
+CRC32 checksum is appended to every packet and validated at HQ before
 decryption:
 
     receivedChecksum = packet[packetSize - 4 ... packetSize - 1]
@@ -1256,7 +1261,9 @@ communication layer:
 The AES key is shared between:
 - LoRa transmitter (node -> HQ)
 - NFC configuration (phone -> node)
-- HTTP API (HQ -> PHP)
+
+Note: The HTTP API uses a separate HMAC-SHA256 authentication scheme
+with its own secret key, not the AES encryption key.
 
 This means the Flutter app must use the same AES key to encrypt the NFC
 payload as configured in the ESP32 node's flash storage.
@@ -1464,7 +1471,7 @@ The automation system is designed with multiple layers of safety:
                 CHAPTER 12: CONCLUSION AND FUTURE WORK
 ================================================================================
 
-10.1 SUMMARY OF ACHIEVEMENTS
+12.1 SUMMARY OF ACHIEVEMENTS
 -----------------------------
 
 This project demonstrates a complete, production-grade IoT monitoring
@@ -1486,20 +1493,20 @@ and control system with the following key achievements:
    full round-trip acknowledgment.
 
 4. STORE-AND-FORWARD RELIABILITY: The node-side FIFO retry queue and
-   HQ-side SD/SPIFFS-backed HTTP retry queue ensure zero data loss
-   during temporary link failures.
+   HQ-side in-memory HTTP retry queue ensure data resilience
+   during temporary WiFi outages.
 
 5. OPERATIONAL ALERTING: The Telegram integration provides real-time
    situational awareness through threshold-based alerts, freshness
    monitoring, and offline detection - all with deduplication cooldowns
    to prevent alert fatigue.
 
-10.2 SYSTEM SPECIFICATIONS
+12.2 SYSTEM SPECIFICATIONS
 --------------------------
 
 Parameter                          Value
 ---------                          -----
-Sensor sampling interval            5 seconds
+Sensor sampling interval            30 seconds
 NORMAL report interval              15 minutes
 ABNORMAL report interval            5 minutes
 CRITICAL report interval            1 minute (immediate bypass)
@@ -1509,8 +1516,8 @@ HQ HTTP retry interval              30 seconds
 Lora frequency                      433 MHz
 Encryption                          AES-128-CTR
 Nonce size                          16 bytes
-Packet overhead                     34 bytes (header+nonce+crc)
-Max sensors per node                15 GPIO
+Packet overhead                     43 bytes (header+nonce+crc)
+Max sensors per node                15 GPIO (30-pin) / 24 GPIO (38-pin)
 Relay control round-trip            ~8-12 seconds (estimated)
 Telegram alert cooldown (CRITICAL)  300 seconds (default)
 Telegram alert cooldown (ABNORMAL)  300 seconds (default)
@@ -1518,7 +1525,7 @@ Telegram freshness warning          300 seconds (default)
 Telegram freshness offline          900 seconds (default)
 HTTP request timestamp window       300 seconds
 
-10.3 FUTURE WORK
+12.3 FUTURE WORK
 -----------------
 
 The following enhancements are identified for future development:
@@ -1583,23 +1590,30 @@ A. FILE STRUCTURE
 ----------------
 
 firmware_esp32/
-  ESP32_Node/
+  ESP32_Node/ (30-pin variant)
     src/
-      Aquaponic_LoRa_Transmitter.cpp   <- Node firmware (main, WiFi AP config)
+      Aquaponic_LoRa_Transmitter.cpp   <- Node firmware (WiFi AP config)
     include/                           <- (SmartPacket.h in shared/)
     .pio/libdeps/                      <- PlatformIO dependencies
-  ESP32_Node_NFC/
+  ESP32_Node_38Pin/ (38-pin variant)
     src/
-      Aquaponic_LoRa_Transmitter.cpp   <- Node firmware with NFC support
+      main.cpp                         <- Node firmware (NFC-only config)
+      SensorManager.cpp                <- Sensor sampling and management
+      PacketBuilder.cpp                <- LoRa packet assembly
+      PriorityEngine.cpp               <- Priority classification engine
       NFCConfigReader.cpp              <- NFC configuration reader (PN532 + HCE)
     include/
       NFCConfigReader.h                <- NFC reader class header
-    platformio.ini                    <- NFC_CONFIG_ENABLED build flag
+    platformio.ini                     <- NFC_CONFIG_ENABLED build flag
     .pio/libdeps/                      <- PlatformIO dependencies
       (includes Adafruit PN532 + Adafruit BusIO)
   ESP32_HQ_Site/
     src/
       main.cpp                         <- HQ Gateway firmware
+      LoRaReceiver.cpp                 <- LoRa packet reception and decryption
+      HttpForwarder.cpp                <- HTTP forwarding with HMAC auth
+      RelayController.cpp              <- Relay control downlink handler
+      SerialCli.cpp                    <- Serial debug CLI
     include/
     .pio/libdeps/
   shared/

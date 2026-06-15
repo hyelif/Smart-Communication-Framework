@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -49,7 +50,6 @@ class _ConfigScreenState extends State<ConfigScreen> {
   bool _isExportingFile = false;
   bool _isFetchingLocation = false;
   bool _isWritingNfc = false;
-  bool _isPreparingDirectNfc = false;
   Esp32Variant _selectedVariant = Esp32Variant.esp32Node30Pin;
 
   static const int maxFirmwareConfigSlots = 24;
@@ -60,43 +60,44 @@ class _ConfigScreenState extends State<ConfigScreen> {
     32, 33, 34, 35, 36, 39,
   ];
 
-  // 38-pin variant: Reserved for LoRa(5,14,18,19,23) + SD Card(shared) + NFC(21,22,27)
-  // Only ADC1 (32-39) is reliable when WiFi is on
-  // ADC2 pins fail when WiFi is active
+  // 38-pin variant pins:
+  // LoRa RA-02: SCK=18, MISO=19, MOSI=23, CS=5, RST=2
+  // NFC PN532: SDA=21, SCL=22
+  // ADC1 (safe with WiFi): 32, 33, 34, 35, 36, 39
+  // Digital I/O: 12, 13, 15, 16, 17, 25, 26
   static const List<int> firmwareSafePins38Pin = [
-    // ADC1 only (safe with WiFi): 32, 33, 34, 35, 36, 37, 38, 39
-    // DI/DO compatible: 0, 2, 4, 12, 13, 15, 16, 17, 25, 26, 32, 33
-    0, 2, 4, 12, 13, 15, 16, 17,
-    25, 26, 32, 33, 34, 35, 36, 37, 38, 39,
+    12, 13, 15, 16, 17,        // DI: DHT22, Rain, WaterTemp (all 5 DI pins)
+    25, 26,                     // DO: Relay
+    32, 33, 34, 35, 36, 39,    // AI: pH, TDS, Turbidity (all 6 analog pins)
   ];
 
   // Reserved pins for hardware modules
-  // LoRa RA-02: SCK=18, MISO=19, MOSI=23, CS=5, RST=14
-  // SD Card: SCK=18, MISO=19, MOSI=23, CS=5 (shared with LoRa)
-  // PN532 NFC: SDA=21, SCL=22, IRQ=27
-  static const List<int> reservedNodePins = [5, 14, 18, 19, 21, 22, 23, 27];
+  // LoRa RA-02: SCK=18, MISO=19, MOSI=23, CS=5, RST=2
+  // PN532 NFC: SDA=21, SCL=22
+  static const List<int> reservedNodePins = [2, 5, 18, 19, 21, 22, 23];
 
-  // Pin groups by function (ADC-only pins cannot be used as DI/DO)
-  // AI: ADC1 pins only (32-39) - safe when WiFi is on
-  // DI: Digital input (input-only pins 34-39 supported)
-  // DO: Digital output (cannot use input-only pins 34-39)
+  // Pin groups by function
+  // AI: Analog Input for pH, TDS, Turbidity (6 pins)
+  // DI: Digital Input for Rain, DHT22, WaterTemp (5 pins)
+  // DO: Digital Output for Relay (2 pins)
   static const Map<String, List<int>> pinGroups = {
-    // ADC1 pins (32-39) - only these work reliably with WiFi
-    'AI': [32, 33, 34, 35, 36, 37, 38, 39],
-    // Digital input: all usable pins except reserved
-    'DI': [0, 2, 4, 12, 13, 15, 25, 26, 32, 33, 34, 35, 36, 37, 38, 39],
-    // Digital output: cannot use input-only pins 34-39
-    'DO': [0, 2, 4, 12, 13, 15, 16, 17, 25, 26, 32, 33],
+    // Analog Input: pH, TDS, Turbidity
+    'AI': [32, 33, 34, 35, 36, 39],
+    // Digital Input: Rain (1 pin), DHT22 (1 pin), WaterTemp (1-Wire, 1 pin)
+    // Available: GPIO 12, 13, 15, 16, 17 (5 DI pins total)
+    'DI': [12, 13, 15, 16, 17],
+    // Digital Output: Relay (2 pins)
+    'DO': [25, 26],
   };
 
   static const Map<String, int> defaultSensorPins = {
-    'Turbidity': 36,
-    'Rain': 39,
-    'TDS': 34,
-    'pH': 35,
-    'DHT22': 32,
-    'WaterTemp': 33,
-    'Relay': 16,
+    'Turbidity': 36,   // AI
+    'Rain': 12,        // DI
+    'TDS': 34,         // AI
+    'pH': 35,          // AI
+    'DHT22': 16,       // DI
+    'WaterTemp': 17,   // DI
+    'Relay': 25,       // DO
   };
 
   static const Map<String, String> sensorRequirements = {
@@ -476,37 +477,39 @@ class _ConfigScreenState extends State<ConfigScreen> {
 
   Future<void> _prepareDirectNfcTap() async {
     final securityKey = _keyController.text.trim();
-    final configWithMetadata = await _buildConfigWithMetadata(
-      securityKey: securityKey,
-      includeNfcKeys: true,
-    );
-    if (configWithMetadata == null) return;
+    if (securityKey.isEmpty) {
+      showStitchMessage(context, 'Please enter the security key first', isError: true);
+      return;
+    }
 
-    FocusManager.instance.primaryFocus?.unfocus();
-    setState(() => _isPreparingDirectNfc = true);
-
-    try {
-      await StorageService.saveConfig(widget.configNotifier.value, securityKey);
-
-      final result = await NfcService.prepareDirectPhoneTap(
-        configPayload: configWithMetadata,
-        securityKey: securityKey,
-        aesKey: _nfcAesKeyController.text,
-      );
-
-      if (!mounted) return;
-      showStitchMessage(
-        context,
-        'Phone NFC is ready (${result.bytesWritten} bytes). Tap phone to PN532 within 2 minutes.',
-      );
-    } catch (e) {
-      if (!mounted) return;
-      showStitchMessage(context, 'Direct NFC deploy failed: $e', isError: true);
-    } finally {
-      if (mounted) {
-        setState(() => _isPreparingDirectNfc = false);
+    // Android 13+ requires POST_NOTIFICATIONS permission for foreground services
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      final notifStatus = await Permission.notification.request();
+      if (notifStatus.isDenied) {
+        showStitchMessage(context, 'NFC needs notification permission', isError: true);
+        return;
       }
     }
+
+    // Show the same onboarding modal that "TAP PHONE TO PN532" uses
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _NfcOnboardingSheet(
+        configNotifier: widget.configNotifier,
+        securityKey: securityKey,
+        aesKey: _nfcAesKeyController.text,
+        onComplete: () {
+          Navigator.pop(context);
+          showStitchMessage(context, 'NFC configuration deployed successfully!');
+        },
+        onError: (error) {
+          Navigator.pop(context);
+          showStitchMessage(context, error, isError: true);
+        },
+      ),
+    );
   }
 
   Future<void> _loadFromNode() async {
@@ -732,12 +735,14 @@ class _ConfigScreenState extends State<ConfigScreen> {
                     : _prepareDirectNfcTap),
             backgroundColor: Colors.transparent,
             elevation: 0,
-            label: Text(
+            label: AutoSizeText(
               _isDeploying
                   ? 'DEPLOYING...'
                   : (_selectedVariant == Esp32Variant.esp32Node30Pin
                       ? 'DEPLOY TO NODE'
                       : 'PREPARE NFC TAP'),
+              maxLines: 1,
+              minFontSize: 10,
             ),
             icon: _isDeploying
                 ? const SizedBox(
@@ -793,21 +798,21 @@ class _ConfigScreenState extends State<ConfigScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                'Architect',
-                                style: Theme.of(
-                                  context,
-                                ).textTheme.displayMedium,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Build and deploy your node layout directly from this panel.',
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
+                            AutoSizeText(
+                            'Architect',
+                            style: Theme.of(
+                              context,
+                            ).textTheme.displayMedium,
+                            maxLines: 1,
+                            minFontSize: 20,
+                          ),
+                          const SizedBox(height: 8),
+                          AutoSizeText(
+                            'Build and deploy your node layout directly from this panel.',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                            maxLines: 2,
+                            minFontSize: 11,
+                          ),
                           ],
                         ),
                       ),
@@ -952,7 +957,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
                             ),
                             SizedBox(width: 8),
                             Expanded(
-                              child: Text(
+                              child: AutoSizeText(
                                 'NODE LOCATION (GPS)',
                                 style: TextStyle(
                                   color: StitchColors.primary,
@@ -960,14 +965,18 @@ class _ConfigScreenState extends State<ConfigScreen> {
                                   fontWeight: FontWeight.w700,
                                   letterSpacing: 0.4,
                                 ),
+                                maxLines: 1,
+                                minFontSize: 11,
                               ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 18),
-                        Text(
+                        AutoSizeText(
                           'Capture your phone GPS location. Node sends this to HQ when config is deployed.',
                           style: Theme.of(context).textTheme.bodyMedium,
+                          maxLines: 2,
+                          minFontSize: 11,
                         ),
                         const SizedBox(height: 16),
                         Row(
@@ -1032,12 +1041,17 @@ class _ConfigScreenState extends State<ConfigScreen> {
                                       strokeWidth: 2,
                                     ),
                                   )
-                                : const Row(
+                                : Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Icon(Icons.my_location, size: 18),
-                                      SizedBox(width: 8),
-                                      Text('CAPTURE GPS LOCATION'),
+                                      const Icon(Icons.my_location, size: 18),
+                                      const SizedBox(width: 6),
+                                      Flexible(
+                                        child: Text(
+                                          'CAPTURE GPS LOCATION',
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
                                     ],
                                   ),
                           ),
@@ -1058,7 +1072,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
                             ),
                             SizedBox(width: 8),
                             Expanded(
-                              child: Text(
+                              child: AutoSizeText(
                                 'PIN CONFIGURATION',
                                 style: TextStyle(
                                   color: StitchColors.primary,
@@ -1066,6 +1080,8 @@ class _ConfigScreenState extends State<ConfigScreen> {
                                   fontWeight: FontWeight.w700,
                                   letterSpacing: 0.4,
                                 ),
+                                maxLines: 1,
+                                minFontSize: 11,
                               ),
                             ),
                           ],
@@ -1084,19 +1100,19 @@ class _ConfigScreenState extends State<ConfigScreen> {
                                   const [
                                     _InfoTile(
                                       'ANALOG INPUT',
-                                      '32, 33, 34, 35, 36, 39',
+                                      'pH, TDS, Turbidity\n32, 33, 34, 35, 36, 39',
                                     ),
                                     _InfoTile(
                                       'DIGITAL INPUT',
-                                      '4, 13, 25, 26, 32, 33, 34, 35, 36, 39',
+                                      'Rain, DHT22, WaterTemp\n12, 13, 16, 17, 27',
                                     ),
                                     _InfoTile(
                                       'DIGITAL OUTPUT',
-                                      '4, 13, 16, 17, 25, 26, 32, 33',
+                                      'Relay\n25, 26',
                                     ),
                                     _InfoTile(
                                       'RESERVED',
-                                      '5, 14, 18, 19, 21, 22, 23, 27',
+                                      '5, 14, 18, 19, 21, 22, 23',
                                     ),
                                   ].map((tile) {
                                     return SizedBox(
@@ -1136,11 +1152,14 @@ class _ConfigScreenState extends State<ConfigScreen> {
                                     Icons.cloud_download_outlined,
                                     size: 18,
                                   ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  _isLoadingNode
-                                      ? 'LOADING...'
-                                      : 'LOAD FROM NODE',
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    _isLoadingNode
+                                        ? 'LOADING...'
+                                        : 'LOAD FROM NODE',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                               ],
                             ),
@@ -1148,37 +1167,6 @@ class _ConfigScreenState extends State<ConfigScreen> {
                         ),
                         const SizedBox(height: 10),
                       ] else ...[
-                        // NFC deploy options for 38-pin variant
-                        SizedBox(
-                          width: double.infinity,
-                          child: StitchGhostButton(
-                            onPressed: _isPreparingDirectNfc
-                                ? null
-                                : _prepareDirectNfcTap,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                if (_isPreparingDirectNfc)
-                                  const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                else
-                                  const Icon(Icons.nfc_rounded, size: 18),
-                                const SizedBox(width: 8),
-                                Text(
-                                  _isPreparingDirectNfc
-                                      ? 'PREPARING NFC...'
-                                      : 'TAP PHONE TO PN532',
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
                         SizedBox(
                           width: double.infinity,
                           child: StitchGhostButton(
@@ -1196,11 +1184,14 @@ class _ConfigScreenState extends State<ConfigScreen> {
                                   )
                                 else
                                   const Icon(Icons.style_rounded, size: 18),
-                                const SizedBox(width: 8),
-                                Text(
-                                  _isWritingNfc
-                                      ? 'WRITING TAG...'
-                                      : 'WRITE NFC TAG',
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    _isWritingNfc
+                                        ? 'WRITING TAG...'
+                                        : 'WRITE NFC TAG',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                               ],
                             ),
@@ -1232,11 +1223,14 @@ class _ConfigScreenState extends State<ConfigScreen> {
                                       Icons.file_open_rounded,
                                       size: 18,
                                     ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    _isImportingFile
-                                        ? 'IMPORTING...'
-                                        : 'IMPORT FILE',
+                                  const SizedBox(width: 6),
+                                  Flexible(
+                                    child: Text(
+                                      _isImportingFile
+                                          ? 'IMPORTING...'
+                                          : 'IMPORT FILE',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -1264,11 +1258,14 @@ class _ConfigScreenState extends State<ConfigScreen> {
                                       Icons.ios_share_rounded,
                                       size: 18,
                                     ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    _isExportingFile
-                                        ? 'EXPORTING...'
-                                        : 'EXPORT FILE',
+                                  const SizedBox(width: 6),
+                                  Flexible(
+                                    child: Text(
+                                      _isExportingFile
+                                          ? 'EXPORTING...'
+                                          : 'EXPORT FILE',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -1281,12 +1278,17 @@ class _ConfigScreenState extends State<ConfigScreen> {
                         width: double.infinity,
                         child: StitchGhostButton(
                           onPressed: _showAddNodeSheet,
-                          child: const Row(
+                          child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.add_circle_outline_rounded, size: 18),
-                              SizedBox(width: 8),
-                              Text('ADD SENSOR NODE'),
+                              const Icon(Icons.add_circle_outline_rounded, size: 18),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  'ADD SENSOR NODE',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -1309,60 +1311,88 @@ class _ConfigScreenState extends State<ConfigScreen> {
     Map<String, dynamic> item,
     int index,
   ) {
-    return StitchPanel(
-      color: StitchColors.surfaceLow,
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: StitchColors.primaryContainer.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'P${item['pin']}',
-                  style: Theme.of(context).textTheme.labelLarge,
-                ),
-              ),
-              const Spacer(),
-              Icon(
-                _componentIcon(_componentDisplayName(item)),
-                color: StitchColors.onSurfaceVariant,
-              ),
-              const SizedBox(width: 6),
-              InkWell(
-                onTap: () => _removeNode(index),
-                borderRadius: BorderRadius.circular(20),
-                child: const Padding(
-                  padding: EdgeInsets.all(4),
-                  child: Icon(
-                    Icons.close_rounded,
-                    size: 18,
-                    color: StitchColors.error,
+    final type = item['type']?.toString().toUpperCase() ?? 'AI';
+    Color accentColor;
+    if (type == 'AI') {
+      accentColor = StitchColors.primaryContainer;
+    } else if (type == 'DI') {
+      accentColor = StitchColors.secondary;
+    } else {
+      accentColor = StitchColors.tertiaryFixed;
+    }
+
+    return StitchBounce(
+      onTap: () {}, // Decorative wrapper to enable tap-down animation
+      child: StitchPanel(
+        color: StitchColors.surfaceLowest,
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: accentColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: accentColor.withValues(alpha: 0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    'P${item['pin']}',
+                    style: TextStyle(
+                      fontFamily: 'SpaceGrotesk',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: accentColor,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          const Spacer(),
-          Text(
-            _componentDisplayName(item).toUpperCase(),
-            style: Theme.of(
-              context,
-            ).textTheme.headlineMedium?.copyWith(fontSize: 16),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'GPIO ${item['pin']}  -  ${item['type']}',
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(fontSize: 13),
-          ),
-        ],
+                const Spacer(),
+                Icon(
+                  _componentIcon(_componentDisplayName(item)),
+                  color: accentColor,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                StitchBounce(
+                  onTap: () => _removeNode(index),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: StitchColors.error.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.close_rounded,
+                      size: 14,
+                      color: StitchColors.error,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const Spacer(),
+            Text(
+              _componentDisplayName(item).toUpperCase(),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                  ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'GPIO ${item['pin']}  •  $type',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1383,48 +1413,59 @@ class _VariantButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-          decoration: BoxDecoration(
+    return StitchBounce(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? StitchColors.surfaceContainer
+              : StitchColors.surfaceLow,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
             color: isSelected
-                ? StitchColors.primary.withValues(alpha: 0.15)
-                : StitchColors.surfaceHigh,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isSelected
-                  ? StitchColors.primary
-                  : StitchColors.outlineVariant,
-              width: isSelected ? 2 : 1,
-            ),
+                ? StitchColors.primaryContainer
+                : StitchColors.outlineVariant,
+            width: isSelected ? 1.5 : 1,
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 18,
-                color: isSelected
-                    ? StitchColors.primary
-                    : StitchColors.onSurfaceVariant,
-              ),
-              const SizedBox(width: 8),
-              Text(
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: StitchColors.primaryContainer.withValues(alpha: 0.15),
+                    blurRadius: 8,
+                    spreadRadius: 0,
+                  )
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: isSelected
+                  ? StitchColors.primaryContainer
+                  : StitchColors.onSurfaceVariant,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: AutoSizeText(
                 label,
                 style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                   color: isSelected
-                      ? StitchColors.primary
+                      ? StitchColors.primaryContainer
                       : StitchColors.onSurfaceVariant,
                 ),
+                maxLines: 1,
+                minFontSize: 8,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -1604,7 +1645,7 @@ class _AddNodeSheetState extends State<_AddNodeSheet> {
                 width: 42,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: StitchColors.outlineVariant.withValues(alpha: 0.55),
+                  color: StitchColors.outlineVariant,
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -1696,8 +1737,8 @@ class _AddNodeSheetState extends State<_AddNodeSheet> {
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
                   color: availablePins.isEmpty
-                      ? StitchColors.error.withValues(alpha: 0.28)
-                      : StitchColors.outlineVariant.withValues(alpha: 0.28),
+                      ? StitchColors.error
+                      : StitchColors.outlineVariant,
                 ),
               ),
               child: Text(
@@ -1784,17 +1825,23 @@ class _InfoTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(label, style: Theme.of(context).textTheme.labelMedium),
+          AutoSizeText(
+            label,
+            style: Theme.of(context).textTheme.labelMedium,
+            maxLines: 1,
+            minFontSize: 9,
+          ),
           const SizedBox(height: 6),
           Align(
             alignment: Alignment.centerLeft,
-            child: Text(
+            child: AutoSizeText(
               value,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(
                 context,
               ).textTheme.titleMedium?.copyWith(fontSize: 13),
+              minFontSize: 10,
             ),
           ),
         ],
@@ -1829,10 +1876,10 @@ class _SelectionField<T> extends StatelessWidget {
           decoration: BoxDecoration(
             color: enabled
                 ? StitchColors.surfaceLowest
-                : StitchColors.surfaceLowest.withValues(alpha: 0.65),
+                : StitchColors.surfaceLowest,
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: StitchColors.outlineVariant.withValues(alpha: 0.24),
+              color: StitchColors.outlineVariant,
             ),
           ),
           child: Padding(
@@ -1850,12 +1897,14 @@ class _SelectionField<T> extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      AutoSizeText(
                         label,
                         style: Theme.of(context).textTheme.labelMedium,
+                        maxLines: 1,
+                        minFontSize: 9,
                       ),
                       const SizedBox(height: 6),
-                      Text(
+                      AutoSizeText(
                         valueLabel,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -1865,6 +1914,7 @@ class _SelectionField<T> extends StatelessWidget {
                                   ? StitchColors.primary
                                   : StitchColors.onSurfaceVariant,
                             ),
+                        minFontSize: 10,
                       ),
                     ],
                   ),
@@ -1881,5 +1931,476 @@ class _SelectionField<T> extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _NfcOnboardingSheet extends StatefulWidget {
+  final ValueListenable<List<Map<String, dynamic>>> configNotifier;
+  final String securityKey;
+  final String aesKey;
+  final VoidCallback onComplete;
+  final Function(String) onError;
+
+  const _NfcOnboardingSheet({
+    required this.configNotifier,
+    required this.securityKey,
+    required this.aesKey,
+    required this.onComplete,
+    required this.onError,
+  });
+
+  @override
+  State<_NfcOnboardingSheet> createState() => _NfcOnboardingSheetState();
+}
+
+class _NfcOnboardingSheetState extends State<_NfcOnboardingSheet> {
+  bool _isLoading = false;
+  int _progressPercent = 0;
+  String _loadingMessage = '';
+  String? _errorMessage;
+
+  // NFC transfer stages
+  static const int stagePreparing = 10;
+  static const int stageSaving = 30;
+  static const int stageNfcReady = 50;
+  static const int stageWaitingTap = 70;
+  static const int stageVerifying = 90;
+  static const int stageComplete = 100;
+
+  Future<void> _startNfcTransfer() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      _isLoading = true;
+      _progressPercent = stagePreparing;
+      _loadingMessage = 'Preparing NFC configuration...';
+      _errorMessage = null;
+    });
+
+    try {
+      // Check if NFC HCE is supported first
+      final isSupported = await NfcService.isDirectTapSupported();
+      if (!isSupported) {
+        setState(() {
+          _errorMessage = 'NFC HCE not supported. Enable NFC in phone settings.';
+          _progressPercent = 0;
+          _isLoading = false;
+        });
+        widget.onError('NFC HCE not supported. Enable NFC in phone settings and ensure phone supports HCE. Try "Write NFC Tag" instead.');
+        return;
+      }
+
+      // Get config from notifier
+      final config = widget.configNotifier.value;
+      if (config.isEmpty) {
+        setState(() {
+          _errorMessage = 'No configuration to deploy.';
+          _progressPercent = 0;
+          _isLoading = false;
+        });
+        widget.onError('No configuration to deploy. Add sensor nodes first.');
+        return;
+      }
+
+      // Build config with metadata
+      final configPayload = <String, dynamic>{
+        'config': config,
+        'latitude': 0.0,
+        'longitude': 0.0,
+        'keys': {
+          'aes128': widget.aesKey,
+          'auth': NfcPayloadService.defaultAuthKey,
+        },
+      };
+
+      // Step 1: Save config locally (10% -> 30%)
+      setState(() {
+        _progressPercent = stageSaving;
+        _loadingMessage = 'Saving configuration locally...';
+      });
+      await StorageService.saveConfig(config, widget.securityKey);
+
+      // Step 2: Prepare phone NFC HCE (30% -> 50%)
+      setState(() {
+        _progressPercent = stageNfcReady;
+        _loadingMessage = 'Phone NFC ready. Tap to PN532 now!';
+      });
+      await NfcService.prepareDirectPhoneTap(
+        configPayload: configPayload,
+        securityKey: widget.securityKey,
+        aesKey: widget.aesKey,
+      );
+
+      // Step 3: Wait for user to tap (50% -> 70%)
+      setState(() {
+        _progressPercent = stageWaitingTap;
+        _loadingMessage = 'Waiting for NFC tap...';
+      });
+      if (!mounted) return;
+
+      // Show dialog - user taps phone to PN532
+      final confirmed = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: const Text('Tap Phone to PN532'),
+          content: const Text(
+            'Your phone NFC is ready.\n\n'
+            '1. Hold your phone near the PN532 module on the ESP32\n'
+            '2. Wait for the ESP32 to process (LED may blink)\n'
+            '3. Click "DONE" ONLY after ESP32 confirms receipt\n\n'
+            'The ESP32 will confirm via its status LED.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('CANCEL'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('DONE'),
+            ),
+          ],
+        ),
+      );
+
+      if (!mounted) return;
+
+      if (confirmed != true) {
+        await NfcService.stopDirectPhoneTap();
+        setState(() {
+          _errorMessage = 'NFC deploy cancelled by user.';
+          _progressPercent = 0;
+          _isLoading = false;
+        });
+        widget.onError('NFC deploy cancelled.');
+        return;
+      }
+
+      // Step 4: Verify with ESP32 (70% -> 90% -> 100%)
+      setState(() {
+        _progressPercent = stageVerifying;
+        _loadingMessage = 'Verifying with ESP32...';
+      });
+
+      bool success = false;
+      String errorMsg = '';
+
+      for (int attempt = 0; attempt < 5; attempt++) {
+        if (!mounted) return;
+
+        setState(() {
+          _loadingMessage = 'Verifying with ESP32... (${attempt + 1}/5)';
+        });
+
+        await Future.delayed(const Duration(seconds: 2));
+
+        if (!mounted) return;
+
+        try {
+          final healthResult = await ApiService.fetchHealth();
+          if (healthResult['ok'] == true) {
+            success = true;
+            break;
+          }
+          errorMsg = 'ESP32 not responding';
+        } catch (e) {
+          errorMsg = 'Cannot connect to ESP32: ${e.toString()}';
+        }
+      }
+
+      await NfcService.stopDirectPhoneTap();
+
+      if (!mounted) return;
+
+      if (success) {
+        setState(() {
+          _progressPercent = stageComplete;
+          _loadingMessage = 'NFC configuration deployed successfully!';
+        });
+        widget.onComplete();
+      } else {
+        final failureReason = errorMsg.isNotEmpty ? errorMsg : 'ESP32 did not acknowledge';
+        setState(() {
+          _errorMessage = 'FAILED: $failureReason\nDid you tap the phone to PN532?';
+          _progressPercent = stageVerifying;
+          _isLoading = false;
+        });
+        widget.onError('ESP32 did not acknowledge config. $failureReason. Make sure the phone was tapped to PN532 and try again.');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = 'Error: ${e.toString()}';
+        _progressPercent = 0;
+        _isLoading = false;
+      });
+      widget.onError('NFC transfer failed: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: StitchColors.surfaceLowest,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(28),
+          topRight: Radius.circular(28),
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: Container(
+                width: 42,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: StitchColors.outlineVariant.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              "NFC DEPLOYMENT",
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
+            ),
+            const SizedBox(height: 24),
+            NfcAnimatedTelemetry(
+              isError: _errorMessage != null,
+              isComplete: _progressPercent == 100,
+            ),
+            const SizedBox(height: 24),
+            if (_errorMessage != null) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: StitchColors.error.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: StitchColors.error.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Text(
+                  _errorMessage!,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: StitchColors.error,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+            Text(
+              _isLoading || _errorMessage != null
+                  ? _loadingMessage
+                  : "Hold the back of your phone near the PN532 telemetry receiver module on the ESP32.",
+              style: TextStyle(
+                fontSize: 13,
+                color: _errorMessage != null
+                    ? StitchColors.error
+                    : StitchColors.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            if (_isLoading || _errorMessage != null) ...[
+              if (_errorMessage != null)
+                SizedBox(
+                  width: double.infinity,
+                  child: StitchPrimaryButton(
+                    onPressed: _startNfcTransfer,
+                    child: const Text('RETRY DEPLOY'),
+                  ),
+                )
+              else ...[
+                // Loading indicator linear bar
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: _progressPercent / 100,
+                    minHeight: 8,
+                    color: StitchColors.primaryContainer,
+                    backgroundColor: StitchColors.surfaceLow,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  '$_progressPercent% COMPLETE',
+                  style: TextStyle(
+                    fontFamily: 'SpaceGrotesk',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: StitchColors.primaryContainer,
+                    letterSpacing: 1.0,
+                  ),
+                ),
+              ],
+            ] else
+              SizedBox(
+                width: double.infinity,
+                child: StitchPrimaryButton(
+                  onPressed: _startNfcTransfer,
+                  child: const Text('START CONFIG TRANSFER'),
+                ),
+              ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: StitchGhostButton(
+                onPressed: () {
+                  NfcService.stopDirectPhoneTap();
+                  Navigator.pop(context);
+                },
+                child: const Text('CANCEL'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class NfcAnimatedTelemetry extends StatefulWidget {
+  final bool isError;
+  final bool isComplete;
+
+  const NfcAnimatedTelemetry({
+    super.key,
+    required this.isError,
+    required this.isComplete,
+  });
+
+  @override
+  State<NfcAnimatedTelemetry> createState() => _NfcAnimatedTelemetryState();
+}
+
+class _NfcAnimatedTelemetryState extends State<NfcAnimatedTelemetry>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _animController;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _animController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animController,
+      builder: (context, child) => CustomPaint(
+        size: const Size(180, 180),
+        painter: NfcTelemetryPainter(
+          animationValue: _animController.value,
+          isError: widget.isError,
+          isComplete: widget.isComplete,
+        ),
+      ),
+    );
+  }
+}
+
+class NfcTelemetryPainter extends CustomPainter {
+  final double animationValue;
+  final bool isError;
+  final bool isComplete;
+
+  NfcTelemetryPainter({
+    required this.animationValue,
+    this.isError = false,
+    this.isComplete = false,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+
+    final color = isError
+        ? Colors.red
+        : (isComplete ? const Color(0xFF00FF87) : StitchColors.primaryContainer);
+
+    // Draw phone outline in center
+    final phoneWidth = 44.0;
+    final phoneHeight = 72.0;
+    final phoneRect = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: center, width: phoneWidth, height: phoneHeight),
+      const Radius.circular(8),
+    );
+
+    final phonePaint = Paint()
+      ..color = color.withValues(alpha: 0.8)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.0;
+
+    canvas.drawRRect(phoneRect, phonePaint);
+
+    // Draw home button on phone
+    canvas.drawCircle(
+      Offset(center.dx, center.dy + phoneHeight / 2 - 8),
+      3.0,
+      phonePaint,
+    );
+
+    // Draw NFC screen icon
+    final iconPaint = Paint()
+      ..color = color.withValues(alpha: 0.6)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+    canvas.drawArc(
+      Rect.fromCenter(center: Offset(center.dx, center.dy - 6), width: 14, height: 14),
+      -3.14 / 4,
+      3.14 / 2,
+      false,
+      iconPaint,
+    );
+    canvas.drawArc(
+      Rect.fromCenter(center: Offset(center.dx, center.dy - 6), width: 22, height: 22),
+      -3.14 / 4,
+      3.14 / 2,
+      false,
+      iconPaint,
+    );
+
+    // Draw ripples
+    final maxRadius = size.width / 2.2;
+    for (int i = 0; i < 3; i++) {
+      final rippleVal = (animationValue + i / 3.0) % 1.0;
+      final radius = rippleVal * maxRadius;
+      final opacity = (1.0 - rippleVal) * 0.45;
+
+      paint.color = color.withValues(alpha: opacity);
+      canvas.drawCircle(center, radius, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant NfcTelemetryPainter oldDelegate) {
+    return oldDelegate.animationValue != animationValue ||
+        oldDelegate.isError != isError ||
+        oldDelegate.isComplete != isComplete;
   }
 }

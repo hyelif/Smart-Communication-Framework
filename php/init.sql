@@ -1,214 +1,263 @@
 -- SmartPonic Database Schema
--- Run this in phpMyAdmin (XAMPP) to create the database
+-- Run this to initialize the database
 
--- Create database
-CREATE DATABASE IF NOT EXISTS smartponic;
+CREATE DATABASE IF NOT EXISTS smartponic
+    CHARACTER SET utf8mb4
+    COLLATE utf8mb4_unicode_ci;
+
 USE smartponic;
 
--- Nodes table (stores node information)
+-- ============================================
+-- Nodes registry
+-- ============================================
 CREATE TABLE IF NOT EXISTS nodes (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    hardware_id VARCHAR(16) NULL,
-    name VARCHAR(100) NOT NULL,
-    location VARCHAR(255),
-    latitude DECIMAL(10,6) NULL,
-    longitude DECIMAL(10,6) NULL,
-    distance_m DECIMAL(10,2) NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uniq_nodes_hardware_id (hardware_id)
-);
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    hardware_id VARCHAR(16) NOT NULL UNIQUE,
+    name        VARCHAR(64) DEFAULT NULL,
+    location    VARCHAR(128) DEFAULT NULL,
+    first_seen  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_seen   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_hardware_id (hardware_id)
+) ENGINE=InnoDB;
 
--- Sensor readings table (main reading record)
+-- ============================================
+-- Main sensor readings (one row per telemetry packet)
+-- ============================================
 CREATE TABLE IF NOT EXISTS sensor_readings (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    node_id INT NOT NULL,
-    rssi INT,
-    snr FLOAT,
-    priority_level VARCHAR(20) NULL,
-    report_mode VARCHAR(20) NULL,
-    sequence_number INT NULL,
-    hardware_id VARCHAR(16) NULL,
-    latitude DECIMAL(10,6) NULL,
-    longitude DECIMAL(10,6) NULL,
-    distance_m DECIMAL(10,2) NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE,
-    INDEX idx_node_created (node_id, created_at)
-);
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    hardware_id VARCHAR(16) NOT NULL,
+    rssi        INT DEFAULT NULL,
+    snr         FLOAT DEFAULT NULL,
+    event_type  VARCHAR(32) DEFAULT 'telemetry',
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_hardware_id (hardware_id),
+    INDEX idx_created_at (created_at),
+    INDEX idx_hw_created (hardware_id, created_at)
+) ENGINE=InnoDB;
 
--- Separate sensor tables (individual sensor values by type)
-CREATE TABLE IF NOT EXISTS temperature_data (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    reading_id INT NOT NULL,
-    node_id INT NOT NULL,
-    pin_number INT NOT NULL,
-    value VARCHAR(100) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+-- ============================================
+-- Individual sensor data points
+-- ============================================
+CREATE TABLE IF NOT EXISTS sensor_data (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    reading_id  INT NOT NULL,
+    pin         INT NOT NULL,
+    sensor      VARCHAR(32) NOT NULL,
+    value       VARCHAR(64) NOT NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (reading_id) REFERENCES sensor_readings(id) ON DELETE CASCADE,
-    FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE,
-    INDEX idx_temperature_node_created (node_id, created_at)
-);
+    INDEX idx_sensor (sensor),
+    INDEX idx_reading_id (reading_id)
+) ENGINE=InnoDB;
+
+-- ============================================
+-- Invalid sensor readings log
+-- ============================================
+CREATE TABLE IF NOT EXISTS invalid_sensor_data (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    hardware_id VARCHAR(16) NOT NULL,
+    pin         INT NOT NULL,
+    sensor      VARCHAR(32) NOT NULL,
+    value       VARCHAR(64) NOT NULL,
+    reason      VARCHAR(255) DEFAULT NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_hardware_id (hardware_id),
+    INDEX idx_created_at (created_at)
+) ENGINE=InnoDB;
+
+-- ============================================
+-- Relay command queue
+-- ============================================
+CREATE TABLE IF NOT EXISTS relay_commands (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    hardware_id VARCHAR(16) NOT NULL,
+    relay_id    TINYINT UNSIGNED NOT NULL,
+    action      VARCHAR(4) NOT NULL DEFAULT 'OFF',
+    status      ENUM('pending','approved','sent','done','failed') DEFAULT 'pending',
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_hardware_id (hardware_id),
+    INDEX idx_status (status),
+    INDEX idx_hw_status (hardware_id, status)
+) ENGINE=InnoDB;
+
+-- ============================================
+-- Telegram bot polling state
+-- ============================================
+CREATE TABLE IF NOT EXISTS telegram_bot_state (
+    state_key   VARCHAR(64) PRIMARY KEY,
+    state_value VARCHAR(255) NOT NULL,
+    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- ============================================
+-- Dashboard: sensor profiles (calibration + thresholds)
+-- ============================================
+CREATE TABLE IF NOT EXISTS sensor_profiles (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    sensor_key      VARCHAR(32) NOT NULL UNIQUE,
+    label           VARCHAR(64) NOT NULL,
+    unit            VARCHAR(16) NOT NULL DEFAULT '',
+    family          VARCHAR(64) DEFAULT '',
+    accent          VARCHAR(9) DEFAULT '#9ecaff',
+    threshold_min   DECIMAL(10,4) DEFAULT NULL,
+    threshold_max   DECIMAL(10,4) DEFAULT NULL,
+    calibration_a   DECIMAL(10,4) DEFAULT 1.0000,
+    calibration_b   DECIMAL(10,4) DEFAULT 0.0000,
+    calibration_c   DECIMAL(10,4) DEFAULT 0.0000,
+    cal_label_a     VARCHAR(32) DEFAULT 'Scale',
+    cal_label_b     VARCHAR(32) DEFAULT 'Offset',
+    cal_label_c     VARCHAR(32) DEFAULT 'Reserve',
+    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_sensor_key (sensor_key)
+) ENGINE=InnoDB;
+
+-- ============================================
+-- Dashboard: per-sensor data tables (time-series optimized)
+-- ============================================
+CREATE TABLE IF NOT EXISTS temperature_data (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    hardware_id VARCHAR(16) NOT NULL,
+    reading_id  INT NOT NULL,
+    pin         INT NOT NULL,
+    value       DECIMAL(8,2) NOT NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_hw_created (hardware_id, created_at),
+    INDEX idx_reading_id (reading_id)
+) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS humidity_data (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    reading_id INT NOT NULL,
-    node_id INT NOT NULL,
-    pin_number INT NOT NULL,
-    value VARCHAR(100) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (reading_id) REFERENCES sensor_readings(id) ON DELETE CASCADE,
-    FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE,
-    INDEX idx_humidity_node_created (node_id, created_at)
-);
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    hardware_id VARCHAR(16) NOT NULL,
+    reading_id  INT NOT NULL,
+    pin         INT NOT NULL,
+    value       DECIMAL(8,2) NOT NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_hw_created (hardware_id, created_at),
+    INDEX idx_reading_id (reading_id)
+) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS water_temp_data (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    reading_id INT NOT NULL,
-    node_id INT NOT NULL,
-    pin_number INT NOT NULL,
-    value VARCHAR(100) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (reading_id) REFERENCES sensor_readings(id) ON DELETE CASCADE,
-    FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE,
-    INDEX idx_water_temp_node_created (node_id, created_at)
-);
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    hardware_id VARCHAR(16) NOT NULL,
+    reading_id  INT NOT NULL,
+    pin         INT NOT NULL,
+    value       DECIMAL(8,2) NOT NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_hw_created (hardware_id, created_at),
+    INDEX idx_reading_id (reading_id)
+) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS ph_data (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    reading_id INT NOT NULL,
-    node_id INT NOT NULL,
-    pin_number INT NOT NULL,
-    value VARCHAR(100) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (reading_id) REFERENCES sensor_readings(id) ON DELETE CASCADE,
-    FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE,
-    INDEX idx_ph_node_created (node_id, created_at)
-);
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    hardware_id VARCHAR(16) NOT NULL,
+    reading_id  INT NOT NULL,
+    pin         INT NOT NULL,
+    value       DECIMAL(8,2) NOT NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_hw_created (hardware_id, created_at),
+    INDEX idx_reading_id (reading_id)
+) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS tds_data (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    reading_id INT NOT NULL,
-    node_id INT NOT NULL,
-    pin_number INT NOT NULL,
-    value VARCHAR(100) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (reading_id) REFERENCES sensor_readings(id) ON DELETE CASCADE,
-    FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE,
-    INDEX idx_tds_node_created (node_id, created_at)
-);
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    hardware_id VARCHAR(16) NOT NULL,
+    reading_id  INT NOT NULL,
+    pin         INT NOT NULL,
+    value       DECIMAL(10,2) NOT NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_hw_created (hardware_id, created_at),
+    INDEX idx_reading_id (reading_id)
+) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS turbidity_data (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    reading_id INT NOT NULL,
-    node_id INT NOT NULL,
-    pin_number INT NOT NULL,
-    value VARCHAR(100) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (reading_id) REFERENCES sensor_readings(id) ON DELETE CASCADE,
-    FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE,
-    INDEX idx_turbidity_node_created (node_id, created_at)
-);
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    hardware_id VARCHAR(16) NOT NULL,
+    reading_id  INT NOT NULL,
+    pin         INT NOT NULL,
+    value       DECIMAL(10,2) NOT NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_hw_created (hardware_id, created_at),
+    INDEX idx_reading_id (reading_id)
+) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS rain_data (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    reading_id INT NOT NULL,
-    node_id INT NOT NULL,
-    pin_number INT NOT NULL,
-    value VARCHAR(100) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (reading_id) REFERENCES sensor_readings(id) ON DELETE CASCADE,
-    FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE,
-    INDEX idx_rain_node_created (node_id, created_at)
-);
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    hardware_id VARCHAR(16) NOT NULL,
+    reading_id  INT NOT NULL,
+    pin         INT NOT NULL,
+    value       VARCHAR(32) NOT NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_hw_created (hardware_id, created_at),
+    INDEX idx_reading_id (reading_id)
+) ENGINE=InnoDB;
 
-CREATE TABLE IF NOT EXISTS dashboard_settings (
-    setting_key VARCHAR(100) PRIMARY KEY,
-    setting_value TEXT NOT NULL,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS sensor_profiles (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    node_id INT NOT NULL,
-    sensor_key VARCHAR(50) NOT NULL,
-    threshold_min DECIMAL(12,4) NULL,
-    threshold_max DECIMAL(12,4) NULL,
-    calibration_a DECIMAL(12,4) NOT NULL DEFAULT 1.0000,
-    calibration_b DECIMAL(12,4) NOT NULL DEFAULT 0.0000,
-    calibration_c DECIMAL(12,4) NOT NULL DEFAULT 0.0000,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uniq_node_sensor (node_id, sensor_key),
-    INDEX idx_sensor_profiles_node (node_id),
-    FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS invalid_sensor_data (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    node_id INT NOT NULL,
-    reading_id INT NULL,
-    sensor_name VARCHAR(100) NOT NULL,
-    pin_number INT NOT NULL,
-    raw_value VARCHAR(100) NOT NULL,
-    reason VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_invalid_node_created (node_id, created_at)
-);
-
--- Communication health tracking
+-- ============================================
+-- Dashboard: communication health tracking
+-- ============================================
 CREATE TABLE IF NOT EXISTS communication_health (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    node_id INT NOT NULL,
-    metric_key VARCHAR(50) NOT NULL,
-    metric_value VARCHAR(255) NOT NULL,
-    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_comm_health_node_recorded (node_id, recorded_at)
-);
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    hardware_id     VARCHAR(16) NOT NULL,
+    delivery_rate   DECIMAL(5,2) DEFAULT 100.00,
+    total_expected  INT DEFAULT 0,
+    total_received  INT DEFAULT 0,
+    sequence_gaps   INT DEFAULT 0,
+    freshness_seconds INT DEFAULT 0,
+    last_rssi       INT DEFAULT NULL,
+    last_snr        FLOAT DEFAULT NULL,
+    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_hardware_id (hardware_id)
+) ENGINE=InnoDB;
 
--- Alerts acknowledge/resolve tracking
+-- ============================================
+-- Dashboard: settings key-value store
+-- ============================================
+CREATE TABLE IF NOT EXISTS dashboard_settings (
+    setting_key  VARCHAR(64) PRIMARY KEY,
+    setting_value TEXT NOT NULL,
+    updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- ============================================
+-- Dashboard: alerts (active/acknowledged/resolved)
+-- ============================================
 CREATE TABLE IF NOT EXISTS alerts (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    node_id INT NOT NULL,
-    sensor_key VARCHAR(50) NOT NULL,
-    label VARCHAR(100) NOT NULL,
-    message TEXT NOT NULL,
-    severity VARCHAR(20) NOT NULL DEFAULT 'warning',
-    status VARCHAR(20) NOT NULL DEFAULT 'active',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    acknowledged_at TIMESTAMP NULL,
-    resolved_at TIMESTAMP NULL,
-    INDEX idx_alerts_node_created (node_id, created_at),
-    INDEX idx_alerts_status (status)
-);
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    hardware_id VARCHAR(16) NOT NULL,
+    sensor_key  VARCHAR(32) NOT NULL,
+    severity    ENUM('info','warning','critical') DEFAULT 'warning',
+    message     VARCHAR(255) NOT NULL,
+    status      ENUM('active','acknowledged','resolved') DEFAULT 'active',
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_hw_status (hardware_id, status),
+    INDEX idx_created_at (created_at)
+) ENGINE=InnoDB;
 
--- Relay control command queue (polled by HQ)
--- Note: MyISAM chosen to avoid InnoDB tablespace issues on some XAMPP setups.
-CREATE TABLE IF NOT EXISTS relay_commands (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    node_id INT NOT NULL,
-    relay_id INT NOT NULL,
-    action VARCHAR(10) NOT NULL,
-    requested_by_chat_id BIGINT NULL,
-    requested_by_label VARCHAR(120) NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    status VARCHAR(20) NOT NULL DEFAULT 'pending',
-    sent_at TIMESTAMP NULL,
-    done_at TIMESTAMP NULL,
-    result_message VARCHAR(255) NULL,
-    INDEX idx_relay_cmd_node_status_created (node_id, status, created_at)
-) ENGINE=MyISAM;
+-- ============================================
+-- Dashboard: pending approvals for automation
+-- ============================================
+CREATE TABLE IF NOT EXISTS pending_approvals (
+    id           INT AUTO_INCREMENT PRIMARY KEY,
+    command_id   INT UNSIGNED NOT NULL DEFAULT 0,
+    hardware_id  VARCHAR(16) NOT NULL,
+    relay_id     TINYINT UNSIGNED NOT NULL,
+    action       VARCHAR(4) NOT NULL,
+    trigger_value DECIMAL(10,4) DEFAULT NULL,
+    status       ENUM('pending','approved','cancelled','expired') DEFAULT 'pending',
+    chat_id      BIGINT DEFAULT NULL,
+    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at   TIMESTAMP NULL,
+    INDEX idx_status (status),
+    INDEX idx_hardware_id (hardware_id)
+) ENGINE=InnoDB;
 
--- Remove old generic tables if they still exist
-DROP TABLE IF EXISTS sensor_data_misc;
-DROP TABLE IF EXISTS sensor_data;
+-- ============================================
+-- Telegram: alert cooldown state
+-- ============================================
+CREATE TABLE IF NOT EXISTS telegram_alert_state (
+    state_key   VARCHAR(190) PRIMARY KEY,
+    last_sent_at TIMESTAMP NULL,
+    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
 
--- Insert default node
-INSERT INTO nodes (id, name, location) VALUES (1, 'Node 1', 'Greenhouse')
-ON DUPLICATE KEY UPDATE name = 'Node 1';
-
-INSERT INTO dashboard_settings (setting_key, setting_value) VALUES ('retention_policy', 'keep_forever')
-ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value);
-
--- Sample queries to get latest readings
--- SELECT * FROM ph_data WHERE node_id = 1 ORDER BY created_at DESC LIMIT 20;
--- SELECT * FROM temperature_data WHERE node_id = 1 ORDER BY created_at DESC LIMIT 20;

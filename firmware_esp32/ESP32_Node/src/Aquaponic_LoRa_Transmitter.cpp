@@ -13,17 +13,20 @@
 #include <DallasTemperature.h>
 #include <mbedtls/aes.h>
 #include "SmartPacket.h"
+#include "AckManager.h"
 
 // ================= FORWARD DECLARATIONS =================
 float readPH(int raw);
 float readTDS(int raw);
 String readTurbidity(int raw);
 String canonicalSensorName(String sensor);
+void configureLoRaRadio();
 void handleSerialCommand(String input);
 String getFieldValue(const String &data, const String &key);
 String getHardwareId();
 bool decryptStructuredPacket(const std::vector<uint8_t> &input, SmartPacket::Header &header, String &payload);
 void handleIncomingControl();
+void checkAckTimeouts();
 
 // ================= SETTINGS =================
 // NOTE: AES key and Auth key are now stored in flash Preferences
@@ -32,6 +35,11 @@ void handleIncomingControl();
 const char *ssid = "AQUA_NODE";
 const char *password = "12345678";
 
+// Hardware ID override — set this to a fixed 16-char uppercase hex ID.
+// If empty (""), the ID is derived from the ESP32's eFuse MAC address.
+// Set a fixed ID to ensure the node always identifies as the same device.
+#define HARDWARE_ID_OVERRIDE ""
+
 // Runtime key storage (loaded from flash at startup)
 String runtimeAesKey = "SmartPonic123456";  // Default fallback
 String runtimeAuthKey = "AQUA77";          // Default fallback
@@ -39,8 +47,8 @@ String runtimeAuthKey = "AQUA77";          // Default fallback
 WebServer server(80);
 Preferences prefs;
 bool loraReady = false;
-uint32_t packetSeq = 0;  // Sequence counter for data integrity
 String runtimeHardwareId = "";
+
 const char *nodeKeyHeader = "X-Node-Key";
 const char *configNamespace = "cfg";
 const char *configJsonPrefKey = "json";
@@ -50,9 +58,9 @@ const char *authKeyPrefKey = "auth_key";
 
 // ADD THIS: smart communication timing profile
 constexpr unsigned long SAMPLE_INTERVAL_MS = 5000UL;
-constexpr unsigned long REPORT_INTERVAL_NORMAL_MS = 15UL * 60UL * 1000UL;
-constexpr unsigned long REPORT_INTERVAL_ABNORMAL_MS = 5UL * 60UL * 1000UL;
-constexpr unsigned long REPORT_INTERVAL_CRITICAL_MS = 60UL * 1000UL;
+constexpr unsigned long REPORT_INTERVAL_NORMAL_MS = 60UL * 1000UL;      // 1 minute
+constexpr unsigned long REPORT_INTERVAL_ABNORMAL_MS = 30UL * 1000UL;   // 30 seconds
+constexpr unsigned long REPORT_INTERVAL_CRITICAL_MS = 2UL * 1000UL;   // 2 seconds
 constexpr unsigned long RETRY_INTERVAL_MS = 30000UL;
 constexpr size_t MAX_PENDING_PACKETS = 12;
 
@@ -76,9 +84,6 @@ struct GPIOConfig {
 
 // ADD THIS: node-side metadata provided by the app / range testing workflow
 struct NodeRuntimeSettings {
-  // nodeId is fixed at 0 for all nodes - hardwareId (from ESP32 eFuse MAC)
-  // is used as the unique identifier in the encrypted payload
-  uint8_t nodeId = 0;
   float latitude = 0.0f;
   float longitude = 0.0f;
   float distanceMeters = 0.0f;
@@ -97,7 +102,6 @@ struct PendingPacket {
   std::vector<uint8_t> bytes;
   uint8_t priority;
   uint8_t reportMode;
-  uint32_t sequence;
   unsigned long queuedAtMs;
 };
 
@@ -122,7 +126,7 @@ uint8_t currentReportMode = SmartPacket::REPORT_MODE_NORMAL;
 unsigned long currentReportIntervalMs = REPORT_INTERVAL_NORMAL_MS;
 
 const int safePins[] = {
-    4,  13, 16, 17, 21, 22, 25, 26,
+    4,  13, 15, 16, 17, 21, 22, 25, 26,
     27, 32, 33, 34, 35, 36, 39,
 };
 
@@ -150,6 +154,11 @@ String boardName() {
 }
 
 String getHardwareId() {
+  if (strlen(HARDWARE_ID_OVERRIDE) == 16) {
+    Serial.print("[HW] Using override: ");
+    Serial.println(HARDWARE_ID_OVERRIDE);
+    return String(HARDWARE_ID_OVERRIDE);
+  }
   uint64_t mac = ESP.getEfuseMac();
   uint8_t macBytes[6];
   for (int i = 0; i < 6; i++) {
@@ -422,7 +431,7 @@ void applyConfig(JsonArray arr) {
 
     bool duplicate = false;
     for (size_t existingIndex = 0; existingIndex < configList.size(); existingIndex++) {
-      if (configList[existingIndex].pin == pin && configList[existingIndex].sensor == sensor) {
+      if (configList[existingIndex].pin == pin && configList[existingIndex].sensor == sensor && configList[existingIndex].type == type) {
         duplicate = true;
         break;
       }
@@ -465,7 +474,6 @@ void applyConfig(JsonArray arr) {
 }
 
 void loadRuntimeSettingsFromDocument(JsonDocument &doc) {
-  runtimeSettings.nodeId = (uint8_t) max(1, (int) ((int) (doc["nodeId"] | runtimeSettings.nodeId)));
   runtimeSettings.latitude = doc["latitude"] | runtimeSettings.latitude;
   runtimeSettings.longitude = doc["longitude"] | runtimeSettings.longitude;
   runtimeSettings.distanceMeters = doc["distance"] | runtimeSettings.distanceMeters;
@@ -504,9 +512,6 @@ void handleRoot() {
       "<p><strong>Hardware ID:</strong> <code>" +
       runtimeHardwareId +
       "</code></p>"
-      "<p><strong>LoRa address:</strong> <code>" +
-      String(runtimeSettings.nodeId) +
-      "</code></p>"
       "<p><strong>Distance:</strong> <code>" +
       String(runtimeSettings.distanceMeters, 1) +
       " m</code></p>"
@@ -541,7 +546,6 @@ void handleHealth() {
                 ",\"clients\":" + String(WiFi.softAPgetStationNum()) +
                 ",\"configCount\":" + String(configList.size()) +
                 ",\"maxConfig\":" + String(MAX_SENSORS) +
-                ",\"nodeId\":" + String(runtimeSettings.nodeId) +
                 ",\"latitude\":" + String(runtimeSettings.latitude, 6) +
                 ",\"longitude\":" + String(runtimeSettings.longitude, 6) +
                 ",\"distance\":" + String(runtimeSettings.distanceMeters, 1) +
@@ -665,12 +669,20 @@ void sampleSensors() {
   std::vector<SensorSegment> sampledSegments;
   uint8_t highestPriority = SmartPacket::PRIORITY_LOW;
 
+  // Track which sensor slot we're using (separate from configList index)
+  int sensorSlot = 0;
+
   for (size_t i = 0; i < configList.size(); i++) {
     auto c = configList[i];
 
-    if (c.sensor == "DHT22" && dhtSensors[i]) {
-      float temp = dhtSensors[i]->readTemperature();
-      float humidity = dhtSensors[i]->readHumidity();
+    // Skip if sensor not properly initialized in this slot
+    if (sensorSlot >= MAX_SENSORS) {
+      break;
+    }
+
+    if (c.sensor == "DHT22" && dhtSensors[sensorSlot]) {
+      float temp = dhtSensors[sensorSlot]->readTemperature();
+      float humidity = dhtSensors[sensorSlot]->readHumidity();
       String tempValue = isnan(temp) ? "nan" : String(temp, 1);
       String humidityValue = isnan(humidity) ? "nan" : String(humidity, 1);
 
@@ -678,9 +690,9 @@ void sampleSensors() {
       appendSegment(sampledSegments, c.pin, "Humidity", humidityValue);
       highestPriority = escalatePriority(highestPriority, classifySensorPriority("Temperature", tempValue));
       highestPriority = escalatePriority(highestPriority, classifySensorPriority("Humidity", humidityValue));
-    } else if (c.sensor == "WaterTemp" && tempSensors[i]) {
-      tempSensors[i]->requestTemperatures();
-      String value = String(tempSensors[i]->getTempCByIndex(0), 1);
+    } else if (c.sensor == "WaterTemp" && tempSensors[sensorSlot]) {
+      tempSensors[sensorSlot]->requestTemperatures();
+      String value = String(tempSensors[sensorSlot]->getTempCByIndex(0), 1);
       appendSegment(sampledSegments, c.pin, "WaterTemp", value);
       highestPriority = escalatePriority(highestPriority, classifySensorPriority("WaterTemp", value));
     } else if (c.sensor == "pH") {
@@ -700,13 +712,15 @@ void sampleSensors() {
       appendSegment(sampledSegments, c.pin, "Rain", value);
       highestPriority = escalatePriority(highestPriority, classifySensorPriority("Rain", value));
     }
+
+    sensorSlot++;
   }
 
   latestSegments = sampledSegments;
   updateReportMode(highestPriority);
 }
 
-String buildPlainPayload(uint32_t sequence, uint8_t priority, uint8_t reportMode) {
+String buildPlainPayload(uint8_t priority, uint8_t reportMode) {
   String payload = "auth=" + runtimeAuthKey + "&";
 
   for (size_t i = 0; i < latestSegments.size(); i++) {
@@ -714,7 +728,6 @@ String buildPlainPayload(uint32_t sequence, uint8_t priority, uint8_t reportMode
   }
 
   payload += "hardware_id=" + runtimeHardwareId;
-  payload += "&seq=" + String(sequence);
   payload += "&priority=" + SmartPacket::priorityLabel(priority);
   payload += "&mode=" + SmartPacket::reportModeLabel(reportMode);
   payload += "&sample_ms=" + String(SAMPLE_INTERVAL_MS);
@@ -722,26 +735,25 @@ String buildPlainPayload(uint32_t sequence, uint8_t priority, uint8_t reportMode
   return payload;
 }
 
-String buildLocationSyncPayload(uint32_t sequence) {
+String buildLocationSyncPayload() {
   String payload = "auth=" + runtimeAuthKey;
   payload += "&meta=location";
   payload += "&hardware_id=" + runtimeHardwareId;
-  payload += "&seq=" + String(sequence);
   payload += "&lat=" + String(runtimeSettings.latitude, 6);
   payload += "&lon=" + String(runtimeSettings.longitude, 6);
   payload += "&distance=" + String(runtimeSettings.distanceMeters, 1);
   return payload;
 }
 
-void fillNonce(uint8_t nonce[SmartPacket::NONCE_SIZE], uint32_t sequence) {
+void fillNonce(uint8_t nonce[SmartPacket::NONCE_SIZE]) {
   memset(nonce, 0, SmartPacket::NONCE_SIZE);
   uint32_t now = millis();
   uint32_t randomValue = esp_random();
-  uint32_t nodeId = runtimeSettings.nodeId;
-  memcpy(nonce, &sequence, sizeof(sequence));
   memcpy(nonce + 4, &now, sizeof(now));
   memcpy(nonce + 8, &randomValue, sizeof(randomValue));
-  memcpy(nonce + 12, &nodeId, sizeof(nodeId));
+  // Nonce bytes 12-15: random data for uniqueness
+  uint32_t randomPad = esp_random();
+  memcpy(nonce + 12, &randomPad, sizeof(randomPad));
 }
 
 std::vector<uint8_t> encryptCtrPayload(const String &plainText, const uint8_t nonce[SmartPacket::NONCE_SIZE]) {
@@ -768,19 +780,17 @@ std::vector<uint8_t> encryptCtrPayload(const String &plainText, const uint8_t no
   return output;
 }
 
-std::vector<uint8_t> buildStructuredPacket(const String &plainText, uint8_t priority, uint8_t reportMode, uint32_t sequence) {
+std::vector<uint8_t> buildStructuredPacket(const String &plainText, uint8_t priority, uint8_t reportMode) {
   uint8_t nonce[SmartPacket::NONCE_SIZE];
-  fillNonce(nonce, sequence);
+  fillNonce(nonce);
   std::vector<uint8_t> encryptedPayload = encryptCtrPayload(plainText, nonce);
 
   SmartPacket::Header header;
   header.magic = SmartPacket::MAGIC;
   header.version = SmartPacket::VERSION;
-  header.nodeId = runtimeSettings.nodeId;
   header.priority = priority;
   header.reportMode = reportMode;
   header.payloadLength = (uint16_t) encryptedPayload.size();
-  header.sequence = sequence;
 
   size_t bodyLength = sizeof(SmartPacket::Header) + SmartPacket::NONCE_SIZE + encryptedPayload.size();
   std::vector<uint8_t> packet(bodyLength + sizeof(uint32_t), 0);
@@ -798,14 +808,30 @@ std::vector<uint8_t> buildStructuredPacket(const String &plainText, uint8_t prio
   return packet;
 }
 
+void configureLoRaRadio() {
+  LoRa.setSyncWord(LORA_SYNC_WORD);
+  LoRa.setSpreadingFactor(9);
+  LoRa.setSignalBandwidth(125E3);
+  LoRa.setCodingRate4(5);
+  LoRa.setPreambleLength(12);
+  LoRa.enableCrc();
+  LoRa.setTxPower(20);
+
+  LoRa.dumpRegisters(Serial);
+}
+
+// Fixed TX→RX turnaround: SX1278 requires ~15-20ms after endPacket() before RX is ready
 bool sendBinaryPacket(const std::vector<uint8_t> &packetBytes) {
   if (!loraReady) {
+    Serial.println("LoRa not ready - cannot send");
     return false;
   }
 
   LoRa.beginPacket();
   size_t written = LoRa.write(packetBytes.data(), packetBytes.size());
   int result = LoRa.endPacket();
+  // CRITICAL FIX: Wait 20ms for SX1278 TX→RX transition stabilization
+  delay(20);
   LoRa.receive();
   return written == packetBytes.size() && result == 1;
 }
@@ -929,11 +955,9 @@ void handleIncomingControl() {
     message = "ok";
   }
 
-  uint32_t seq = packetSeq++;
   String ack = "auth=" + runtimeAuthKey;
   ack += "&ack=relay";
   ack += "&hardware_id=" + runtimeHardwareId;
-  ack += "&seq=" + String(seq);
   ack += "&command_id=" + String(commandId);
   ack += "&status=" + status;
   ack += "&relay=" + String(relayId);
@@ -944,17 +968,16 @@ void handleIncomingControl() {
   std::vector<uint8_t> ackPacket = buildStructuredPacket(
       ack,
       SmartPacket::PRIORITY_HIGH,
-      SmartPacket::REPORT_MODE_ABNORMAL,
-      seq);
+      SmartPacket::REPORT_MODE_ABNORMAL);
   sendBinaryPacket(ackPacket);
 }
 
-void enqueuePendingPacket(const std::vector<uint8_t> &packetBytes, uint8_t priority, uint8_t reportMode, uint32_t sequence) {
+void enqueuePendingPacket(const std::vector<uint8_t> &packetBytes, uint8_t priority, uint8_t reportMode) {
   if (pendingPackets.size() >= MAX_PENDING_PACKETS) {
     pendingPackets.erase(pendingPackets.begin());
   }
 
-  PendingPacket packet{packetBytes, priority, reportMode, sequence, millis()};
+  PendingPacket packet{packetBytes, priority, reportMode, millis()};
   if (priority == SmartPacket::PRIORITY_HIGH) {
     pendingPackets.insert(pendingPackets.begin(), packet);
   } else {
@@ -970,12 +993,10 @@ void retryPendingPacketsIfNeeded() {
   lastRetryMs = millis();
   PendingPacket packet = pendingPackets.front();
   if (sendBinaryPacket(packet.bytes)) {
-    Serial.print("Retried queued packet successfully. Seq=");
-    Serial.println(packet.sequence);
+    Serial.println("Retried queued packet successfully.");
     pendingPackets.erase(pendingPackets.begin());
   } else {
-    Serial.print("Queued packet retry failed. Seq=");
-    Serial.println(packet.sequence);
+    Serial.println("Queued packet retry failed.");
   }
 }
 
@@ -989,16 +1010,18 @@ void sendCurrentTelemetry(bool forceImmediate) {
     return;
   }
 
-  uint32_t sequence = packetSeq++;
-  String plainText = buildPlainPayload(sequence, currentPriority, currentReportMode);
-  std::vector<uint8_t> packetBytes = buildStructuredPacket(plainText, currentPriority, currentReportMode, sequence);
+  if (runtimeHardwareId.length() == 0) {
+    Serial.println("ERROR: hardware_id is empty! Cannot send telemetry.");
+    return;
+  }
+  String plainText = buildPlainPayload(currentPriority, currentReportMode);
+  Serial.println("Plain payload preview: " + plainText.substring(0, min(150, (int)plainText.length())));
+  std::vector<uint8_t> packetBytes = buildStructuredPacket(plainText, currentPriority, currentReportMode);
 
   if (sendBinaryPacket(packetBytes)) {
     lastReportMs = millis();
     criticalDispatchPending = false;
     Serial.println("\n========== LORA PACKET ==========");
-    Serial.print("Sequence: ");
-    Serial.println(sequence);
     Serial.print("Priority: ");
     Serial.println(SmartPacket::priorityLabel(currentPriority));
     Serial.print("Report mode: ");
@@ -1011,7 +1034,7 @@ void sendCurrentTelemetry(bool forceImmediate) {
     Serial.println("=================================\n");
   } else {
     Serial.println("LoRa send failed. Queueing packet.");
-    enqueuePendingPacket(packetBytes, currentPriority, currentReportMode, sequence);
+    enqueuePendingPacket(packetBytes, currentPriority, currentReportMode);
   }
 }
 
@@ -1020,19 +1043,17 @@ void sendLocationSyncIfNeeded() {
     return;
   }
 
-  uint32_t sequence = packetSeq++;
-  String payload = buildLocationSyncPayload(sequence);
+  String payload = buildLocationSyncPayload();
   std::vector<uint8_t> packetBytes = buildStructuredPacket(
       payload,
       SmartPacket::PRIORITY_LOW,
-      SmartPacket::REPORT_MODE_NORMAL,
-      sequence);
+      SmartPacket::REPORT_MODE_NORMAL);
 
   if (sendBinaryPacket(packetBytes)) {
     metadataSyncPending = false;
     Serial.println("Location sync packet sent after config update.");
   } else {
-    enqueuePendingPacket(packetBytes, SmartPacket::PRIORITY_LOW, SmartPacket::REPORT_MODE_NORMAL, sequence);
+    enqueuePendingPacket(packetBytes, SmartPacket::PRIORITY_LOW, SmartPacket::REPORT_MODE_NORMAL);
     Serial.println("Location sync packet queued for retry.");
   }
 }
@@ -1171,7 +1192,7 @@ void setup() {
   LoRa.setPins(LORA_SS, LORA_RST, LORA_DIO0);
   loraReady = LoRa.begin(433E6);
   if (loraReady) {
-    LoRa.setSyncWord(LORA_SYNC_WORD);
+    configureLoRaRadio();
     LoRa.receive();
     Serial.println("System Ready");
   } else {
@@ -1191,14 +1212,16 @@ void loop() {
     sampleSensors();
   }
 
-  if (currentPriority == SmartPacket::PRIORITY_HIGH && criticalDispatchPending) {
-    sendCurrentTelemetry(true);
-  } else {
-    sendCurrentTelemetry(false);
-  }
+  // CRITICAL mode: send immediately every 2 seconds (no waiting for interval)
+  // NORMAL/ABNORMAL mode: respect report interval
+  bool shouldForce = (currentPriority == SmartPacket::PRIORITY_HIGH);
+  sendCurrentTelemetry(shouldForce);
 
   sendLocationSyncIfNeeded();
   retryPendingPacketsIfNeeded();
+
+  // Check ACK timeouts
+  checkAckTimeouts();
 
   // Handle serial commands for configuration
   if (Serial.available()) {
@@ -1222,7 +1245,7 @@ void handleSerialCommand(String input) {
     Serial.println("LIST           - Show current sensor config");
     Serial.println("CLEAR          - Clear all sensor config");
     Serial.println("ADD,pin,type,sensor,label - Add sensor");
-    Serial.println("META,nodeAddress,lat,lon,distance - Update node metadata");
+    Serial.println("META,lat,lon,distance - Update node location metadata");
     Serial.println("ID             - Show ESP32 hardware identity");
     Serial.println("");
     Serial.println("KEY MANAGEMENT:");
@@ -1231,8 +1254,8 @@ void handleSerialCommand(String input) {
     Serial.println("CLEARKEYS      - Reset keys to defaults");
     Serial.println("");
     Serial.println("Examples:");
-    Serial.println("ADD,4,AI,DHT22,TempSensor");
-    Serial.println("ADD,21,AI,WaterTemp,WaterTemp");
+    Serial.println("ADD,15,AI,DHT22,TempSensor");
+    Serial.println("ADD,27,AI,WaterTemp,WaterTemp");
     Serial.println("ADD,34,AI,pH,pHSensor");
     Serial.println("ADD,35,AI,TDS,TDSensor");
     Serial.println("ADD,36,AI,Turbidity,TurbSensor");
@@ -1254,7 +1277,6 @@ void handleSerialCommand(String input) {
                      " Label:" + c.label);
     }
     Serial.println("Hardware ID: " + runtimeHardwareId);
-    Serial.println("LoRa address: " + String(runtimeSettings.nodeId));
     Serial.println("Latitude: " + String(runtimeSettings.latitude, 6));
     Serial.println("Longitude: " + String(runtimeSettings.longitude, 6));
     Serial.println("Distance(m): " + String(runtimeSettings.distanceMeters, 1));
@@ -1272,7 +1294,6 @@ void handleSerialCommand(String input) {
   if (command == "ID") {
     Serial.println("=== HARDWARE IDENTITY ===");
     Serial.println("Hardware ID (EUI-64): " + runtimeHardwareId);
-    Serial.println("LoRa transport address: " + String(runtimeSettings.nodeId));
     Serial.println("Chip model: " + String(ESP.getChipModel()));
     Serial.println("Chip revision: " + String(ESP.getChipRevision()));
     return;
@@ -1291,15 +1312,14 @@ void handleSerialCommand(String input) {
       }
     }
 
-    if (partIdx < 4) {
-      Serial.println("ERROR: Invalid format. Use: META,nodeAddress,lat,lon,distance");
+    if (partIdx < 3) {
+      Serial.println("ERROR: Invalid format. Use: META,lat,lon,distance");
       return;
     }
 
-    runtimeSettings.nodeId = (uint8_t) max(1, (int) parts[0].toInt());
-    runtimeSettings.latitude = parts[1].toFloat();
-    runtimeSettings.longitude = parts[2].toFloat();
-    runtimeSettings.distanceMeters = parts[3].toFloat();
+    runtimeSettings.latitude = parts[0].toFloat();
+    runtimeSettings.longitude = parts[1].toFloat();
+    runtimeSettings.distanceMeters = parts[2].toFloat();
     Serial.println("Node metadata updated.");
     return;
   }
@@ -1387,7 +1407,7 @@ void handleSerialCommand(String input) {
 
     if (!isSafePin(pin)) {
       Serial.println("ERROR: Pin " + String(pin) + " is not safe to use!");
-      Serial.println("Safe pins: 4,13,16,17,21,22,25,26,27,32,33,34,35,36,39");
+      Serial.println("Safe pins: 4,13,15,16,17,21,22,25,26,27,32,33,34,35,36,39");
       return;
     }
 
@@ -1422,4 +1442,13 @@ void handleSerialCommand(String input) {
   }
 
   Serial.println("Unknown command. Type HELP for available commands.");
+}
+
+// ACK timeout check - basic implementation for the original Node firmware
+// Since this version doesn't have ACK tracking, we provide a placeholder
+// that clears ACK state after a timeout to prevent infinite waits
+void checkAckTimeouts() {
+  // Placeholder for ACK timeout checking
+  // In a more complete implementation, this would check for pending ACKs
+  // and reset waitingForAck state if timeout expires
 }

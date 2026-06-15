@@ -1,125 +1,99 @@
 #include "NFCConfigReader.h"
 #include <mbedtls/aes.h>
+#include <ArduinoJson.h>
 #include <Preferences.h>
-#include <algorithm>
-
-// Preferences namespace for NFC state
-const char* nfcNamespace = "nfc_cfg";
-const char* nfcLastConfigPrefKey = "last_cfg";
-const char* nfcLastReadPrefKey = "last_read";
-
-// AES key for NFC payload decryption (same as LoRa payload)
-// Loaded from Preferences "secrets" namespace at runtime
-static String getNfcAesKey() {
-    Preferences prefs;
-    prefs.begin("secrets", true);
-    String key = prefs.getString("aes_key", "SmartPonic123456");
-    prefs.end();
-    return key.length() == 16 ? key : "SmartPonic123456";
-}
 
 NFCConfigReader::NFCConfigReader()
-    : _nfc(NFC_IRQ, NFC_RESET, &Wire)
-    , _initialized(false)
-{
+    : _nfc(0xFF, 0xFF), _initialized(false) {
 }
 
 bool NFCConfigReader::begin() {
-    if (_initialized) {
-        return true;
-    }
+    Serial.println("[NFC] Initializing PN532 over I2C...");
 
-    Serial.println("[NFC] Initializing PN532...");
+    // Wait for PN532 power to stabilize
+    delay(NFC_POWER_STABILIZE_MS);
+
+    // Internal pull-up on SCL to help I2C state-switch (SDA has external 3.3kΩ)
+    pinMode(NFC_I2C_SCL, INPUT_PULLUP);
+    delay(10);
 
     Wire.begin(NFC_I2C_SDA, NFC_I2C_SCL);
+    delay(200);
 
-    // Initialize PN532 over I2C
-    _nfc.begin();
+    for (int attempt = 0; attempt < 2; attempt++) {
+        if (attempt > 0) {
+            Serial.print("[NFC] Retry attempt ");
+            Serial.println(attempt + 1);
+            delay(500);
+        }
 
-    // Check PN532 version
-    uint32_t versiondata = _nfc.getFirmwareVersion();
-    if (versiondata == 0) {
-        _lastError = "PN532 not found - check wiring";
-        Serial.println("[NFC] ERROR: " + _lastError);
-        return false;
+        _nfc.begin();
+
+        uint32_t versiondata = _nfc.getFirmwareVersion();
+        if (versiondata) {
+            Serial.print("[NFC] Found PN532 (FW v");
+            Serial.print((versiondata >> 16) & 0xFF, HEX);
+            Serial.print(".");
+            Serial.print((versiondata >> 8) & 0xFF, HEX);
+            Serial.println(")");
+
+            _nfc.setPassiveActivationRetries(0xFF);
+            _nfc.SAMConfig();
+
+            _initialized = true;
+            Serial.println("[NFC] PN532 ready");
+            return true;
+        }
     }
 
-    Serial.print("[NFC] PN532 found: v0.");
-    Serial.print((versiondata >> 24) & 0xFF, HEX);
-    Serial.print(".");
-    Serial.print((versiondata >> 16) & 0xFF, HEX);
-    Serial.println();
-
-    // Set max retries
-    _nfc.setPassiveActivationRetries(0xFF);
-
-    // Configure SAM (Secure Access Module)
-    if (!_nfc.SAMConfig()) {
-        _lastError = "PN532 SAMConfig failed";
-        Serial.println("[NFC] ERROR: " + _lastError);
-        return false;
-    }
-
-    // Initialize LED pin
-    pinMode(NFC_LED_PIN, OUTPUT);
-    digitalWrite(NFC_LED_PIN, LOW);
-
-    _initialized = true;
-    Serial.println("[NFC] PN532 initialized successfully");
-    return true;
+    _lastError = "PN532 not detected - check wiring (SDA=21, SCL=22)";
+    Serial.print("[NFC] ERROR: ");
+    Serial.println(_lastError);
+    _initialized = false;
+    return false;
 }
 
-bool NFCConfigReader::isCardPresent() {
-    if (!_initialized) {
-        return false;
-    }
+void NFCConfigReader::reinitAfterSleep() {
+    // Re-enable internal pull-up on SCL (lost during light sleep)
+    pinMode(NFC_I2C_SCL, INPUT_PULLUP);
+    delay(10);
+    // I2C bus is already re-init'd in main.cpp; just re-apply SAMConfig
+    _nfc.SAMConfig();
+    Serial.println("[NFC] Re-init after sleep");
+}
 
-    uint8_t success;
-    uint8_t uid[32];
-    uint8_t uidLength;
+bool NFCConfigReader::quickCardCheck() {
+    if (!_initialized) return false;
 
-    success = _nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength);
+    // Use minimal retry for quick polling — avoids 3s delays on each empty check
+    uint8_t uid[7] = {0};
+    uint8_t uidLen = 0;
 
-    if (success) {
-        Serial.print("[NFC] Card detected: UID length ");
-        Serial.println(uidLength);
+    if (_nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLen, 10)) {
+        Serial.print("[NFC] Quick check: target UID ");
+        for (uint8_t i = 0; i < uidLen; i++) {
+            Serial.print(uid[i], HEX);
+        }
+        Serial.println();
         return true;
     }
 
     return false;
 }
 
+bool NFCConfigReader::isCardPresent() {
+    return quickCardCheck();
+}
+
 bool NFCConfigReader::waitForCard(uint32_t timeoutMs) {
-    if (!_initialized) {
-        _lastError = "PN532 not initialized";
-        return false;
-    }
-
-    Serial.println("[NFC] Waiting for NFC card...");
-    setLed(true);  // LED on while waiting
-
-    unsigned long startMs = millis();
-    bool cardDetected = false;
-
-    while (millis() - startMs < timeoutMs) {
-        if (isCardPresent()) {
-            cardDetected = true;
-            break;
+    unsigned long start = millis();
+    while (millis() - start < timeoutMs) {
+        if (quickCardCheck()) {
+            return true;
         }
-        delay(100);
+        delay(50);  // Shorter delay between checks
     }
-
-    setLed(false);
-
-    if (!cardDetected) {
-        _lastError = "No card detected within timeout";
-        Serial.println("[NFC] TIMEOUT: " + _lastError);
-        return false;
-    }
-
-    // Card detected, now read config
-    String configJson, authKey;
-    return readConfig(configJson, authKey);
+    return false;
 }
 
 bool NFCConfigReader::readConfig(String& configJson, String& authKey) {
@@ -128,337 +102,441 @@ bool NFCConfigReader::readConfig(String& configJson, String& authKey) {
         return false;
     }
 
-    Serial.println("[NFC] Reading NFC tag...");
-    flashLed(2, 100);  // Double flash
+    Serial.println("[NFC] Reading config...");
 
-    if (readDirectHceConfig(configJson)) {
-        authKey = "AQUA77";
-        flashLed(5, 50);
-        return true;
-    }
-
-    uint8_t data[NFC_MAX_PAYLOAD_SIZE];
-    uint16_t dataLen = 0;
-
-    uint8_t uid[32];
-    uint8_t uidLength;
-
-    if (!_nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength)) {
-        _lastError = "Failed to read card UID";
-        return false;
-    }
-
-    Serial.print("[NFC] Card UID: ");
-    for (uint8_t i = 0; i < uidLength; i++) {
-        Serial.print(uid[i] < 0x10 ? "0" : "");
-        Serial.print(uid[i], HEX);
-        Serial.print(" ");
-    }
-    Serial.println();
-
-    // NTAG215 has 135 pages (0-135), 4 bytes per page
-    // Pages 0-3 are manufacturer data
-    // User data: pages 4-135 = 132 pages = 528 bytes total
-    uint8_t page = 4;  // Start at page 4
-    uint8_t bytesPerRead = 4;
-    uint16_t offset = 0;
-
-    while (offset < NFC_MAX_PAYLOAD_SIZE - bytesPerRead) {
-        uint8_t pageData[4];
-
-        if (!_nfc.ntag2xx_ReadPage(page, pageData)) {
-            if (offset > 0) {
-                dataLen = offset;
-                break;
-            }
-            _lastError = "Failed to read page " + String(page);
-            Serial.println("[NFC] ERROR: " + _lastError);
+    // Try HCE (direct phone tap) first
+    String encryptedStr;
+    if (readHceFromPhone(encryptedStr)) {
+        Serial.println("[NFC] HCE read successful");
+    } else {
+        Serial.println("[NFC] HCE failed, trying physical tag...");
+        // Fall back to physical NTAG215
+        if (!readPhysicalTag(encryptedStr)) {
+            _lastError = "Both HCE and physical tag read failed";
+            Serial.print("[NFC] ERROR: ");
+            Serial.println(_lastError);
             return false;
         }
-
-        memcpy(data + offset, pageData, bytesPerRead);
-        offset += bytesPerRead;
-        page++;
-
-        if (page > 135) {
-            dataLen = offset;
-            break;
-        }
+        Serial.println("[NFC] Physical tag read successful");
     }
 
-    if (dataLen == 0 && offset > 0) {
-        dataLen = offset;
+    // Convert hex string to byte buffer
+    std::vector<uint8_t> encrypted;
+    for (size_t i = 0; i < encryptedStr.length(); i += 2) {
+        char hi = encryptedStr[i];
+        char lo = encryptedStr[i + 1];
+        uint8_t byte = 0;
+        if (hi >= '0' && hi <= '9') byte |= (hi - '0') << 4;
+        else if (hi >= 'A' && hi <= 'F') byte |= (hi - 'A' + 10) << 4;
+        else if (hi >= 'a' && hi <= 'f') byte |= (hi - 'a' + 10) << 4;
+        if (lo >= '0' && lo <= '9') byte |= (lo - '0');
+        else if (lo >= 'A' && lo <= 'F') byte |= (lo - 'A' + 10);
+        else if (lo >= 'a' && lo <= 'f') byte |= (lo - 'a' + 10);
+        encrypted.push_back(byte);
     }
 
-    if (dataLen < 16) {
-        _lastError = "Payload too small";
-        Serial.println("[NFC] ERROR: " + _lastError);
+    if (encrypted.size() < 17) {  // At least 16-byte IV + 1 byte ciphertext
+        _lastError = "Encrypted payload too short";
+        Serial.print("[NFC] ERROR: ");
+        Serial.println(_lastError);
         return false;
     }
 
-    Serial.print("[NFC] Read ");
-    Serial.print(dataLen);
-    Serial.println(" bytes from NFC tag");
+    // Get AES key from Preferences
+    Preferences prefs;
+    prefs.begin("secrets", true);
+    String aesKey = prefs.getString("aes_key", "SmartPonic123456");
+    prefs.end();
 
-    // Parse NDEF record to extract encrypted payload
-    std::vector<uint8_t> encryptedPayload;
-    if (!parseNdefRecord(data, dataLen, encryptedPayload)) {
-        _lastError = "Failed to parse NDEF record";
-        Serial.println("[NFC] ERROR: " + _lastError);
-        return false;
-    }
-
-    if (encryptedPayload.empty()) {
-        // Try raw payload (no NDEF wrapper)
-        encryptedPayload.assign(data, data + dataLen);
-    }
-
-    // Decrypt payload
-    String aesKey = getNfcAesKey();
-    configJson = decryptPayload(encryptedPayload, aesKey);
-
-    if (configJson.isEmpty()) {
+    // Decrypt
+    String plaintext = decryptPayload(encrypted, aesKey);
+    if (plaintext.length() == 0) {
         _lastError = "Decryption failed";
-        Serial.println("[NFC] ERROR: " + _lastError);
+        Serial.print("[NFC] ERROR: ");
+        Serial.println(_lastError);
         return false;
     }
 
-    Serial.println("[NFC] Config decrypted successfully");
-    Serial.println("[NFC] Config JSON: " + configJson);
+    Serial.print("[NFC] Decrypted config: ");
+    Serial.println(plaintext);
 
-    // Auth key is embedded in the JSON payload under "keys.auth"
-    // or use default "AQUA77"
-    authKey = "AQUA77";  // Default, will be overridden by JSON parsing in main code
+    // Parse JSON
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, plaintext);
+    if (error) {
+        _lastError = "JSON parse failed: ";
+        _lastError += error.c_str();
+        Serial.print("[NFC] ERROR: ");
+        Serial.println(_lastError);
+        return false;
+    }
 
-    flashLed(5, 50);  // Success: 5 quick flashes
+    // Extract config JSON
+    if (!doc["config"].isNull()) {
+        serializeJson(doc["config"], configJson);
+    } else {
+        configJson = plaintext;
+    }
+
+    // Extract auth key if present
+    JsonObject keysObj = doc["keys"];
+    if (!keysObj.isNull() && keysObj["auth"].is<const char*>()) {
+        authKey = keysObj["auth"].as<String>();
+    }
+
+    Serial.println("[NFC] Config parsed successfully");
     return true;
 }
 
 bool NFCConfigReader::writeConfig(const String& configJson) {
-    if (!_initialized) {
-        _lastError = "PN532 not initialized";
-        return false;
-    }
+    // Write config to Preferences
+    Preferences prefs;
+    prefs.begin("config", false);
+    prefs.putString("nfc_config", configJson);
+    prefs.end();
 
-    Serial.println("[NFC] Writing config to NFC tag...");
-
-    // Wait for card
-    if (!waitForCard(10000)) {
-        return false;
-    }
-
-    // For writing, we need to encrypt the payload first
-    // This is a placeholder - full implementation would:
-    // 1. Encrypt configJson with AES key
-    // 2. Wrap in NDEF record
-    // 3. Write to NTAG215 pages 4-39 using ntag2xx_WritePage
-
-    _lastError = "Write not fully implemented yet";
-    Serial.println("[NFC] WARNING: " + _lastError);
-    return false;
+    Serial.println("[NFC] Config written to Preferences");
+    return true;
 }
 
-bool NFCConfigReader::readDirectHceConfig(String& configJson) {
-    Serial.println("[NFC] Trying direct Android HCE/APDU config...");
+// ================= HCE (Direct Phone Tap) =================
 
-    if (!_nfc.inListPassiveTarget()) {
-        _lastError = "No ISO14443 target for direct HCE";
+bool NFCConfigReader::readHceFromPhone(String& configJson) {
+    Serial.println("[NFC] Waiting for HCE device...");
+
+    uint8_t uid[7] = {0};
+    uint8_t uidLen = 0;
+
+    // Wait for ISO14443A target
+    if (!_nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLen, 2000)) {
+        _lastError = "No ISO14443A target detected";
         return false;
     }
 
-    const uint8_t selectSmartPonicAid[] = {
+    Serial.print("[NFC] HCE target detected, UID: ");
+    for (uint8_t i = 0; i < uidLen; i++) {
+        Serial.print(uid[i], HEX);
+    }
+    Serial.println();
+
+    delay(100);
+
+    // Step 1: SELECT AID
+    // Command: 00 A4 04 00 0B [AID: 11 bytes] 00
+    uint8_t selectAid[] = {
         0x00, 0xA4, 0x04, 0x00, 0x0B,
         0xF0, 0x53, 0x4D, 0x41, 0x52, 0x54, 0x50, 0x4F, 0x4E, 0x49, 0x43,
         0x00
     };
-    uint8_t response[64];
-    uint8_t responseLen = sizeof(response);
+    uint8_t selectResp[32] = {0};
+    uint8_t selectRespLen = sizeof(selectResp);
 
-    if (!exchangeApdu(selectSmartPonicAid, sizeof(selectSmartPonicAid), response, responseLen) ||
-        !isSuccessStatus(response, responseLen)) {
-        _lastError = "SmartPonic HCE AID not selected";
+    if (!_nfc.inDataExchange(selectAid, sizeof(selectAid), selectResp, &selectRespLen)) {
+        _lastError = "SELECT AID exchange failed";
         return false;
     }
 
-    const uint8_t getLengthApdu[] = {0x00, 0xCA, 0x00, 0x00, 0x04};
-    responseLen = sizeof(response);
-    if (!exchangeApdu(getLengthApdu, sizeof(getLengthApdu), response, responseLen) ||
-        !isSuccessStatus(response, responseLen) || responseLen < 6) {
-        _lastError = "Failed to read HCE payload length";
+    // Check response: should end with 0x90 0x00
+    if (selectRespLen < 2 || selectResp[selectRespLen - 2] != 0x90 || selectResp[selectRespLen - 1] != 0x00) {
+        _lastError = "SELECT AID rejected by phone";
+        Serial.print("[NFC] SELECT AID response: ");
+        for (uint16_t i = 0; i < selectRespLen; i++) {
+            Serial.print(selectResp[i], HEX);
+            Serial.print(" ");
+        }
+        Serial.println();
+        return false;
+    }
+    Serial.println("[NFC] SELECT AID OK");
+
+    delay(50);
+
+    // Step 2: GET LENGTH
+    // Command: 00 CA 00 00 04
+    uint8_t getLenCmd[] = {0x00, 0xCA, 0x00, 0x00, 0x04};
+    uint8_t getLenResp[32] = {0};
+    uint8_t getLenRespLen = sizeof(getLenResp);
+
+    if (!_nfc.inDataExchange(getLenCmd, sizeof(getLenCmd), getLenResp, &getLenRespLen)) {
+        _lastError = "GET LENGTH exchange failed";
         return false;
     }
 
-    uint32_t payloadLen = ((uint32_t)response[0] << 24) |
-                          ((uint32_t)response[1] << 16) |
-                          ((uint32_t)response[2] << 8) |
-                          (uint32_t)response[3];
-    if (payloadLen < 16 || payloadLen > NFC_MAX_HCE_PAYLOAD_SIZE) {
-        _lastError = "Invalid HCE payload length " + String(payloadLen);
-        Serial.println("[NFC] ERROR: " + _lastError);
+    if (getLenRespLen < 6 || getLenResp[getLenRespLen - 2] != 0x90 || getLenResp[getLenRespLen - 1] != 0x00) {
+        _lastError = "GET LENGTH failed";
         return false;
     }
 
-    std::vector<uint8_t> encryptedPayload;
-    encryptedPayload.reserve(payloadLen);
+    // First 4 bytes are big-endian payload length
+    uint32_t payloadLen = ((uint32_t)getLenResp[0] << 24) |
+                          ((uint32_t)getLenResp[1] << 16) |
+                          ((uint32_t)getLenResp[2] << 8) |
+                          (uint32_t)getLenResp[3];
 
-    uint32_t offset = 0;
+    if (payloadLen == 0 || payloadLen > NFC_MAX_PAYLOAD_SIZE) {
+        _lastError = "Invalid payload length: ";
+        _lastError += String(payloadLen);
+        return false;
+    }
+
+    Serial.print("[NFC] Payload length: ");
+    Serial.println(payloadLen);
+
+    delay(50);
+
+    // Step 3: READ BINARY (chunked)
+    std::vector<uint8_t> fullPayload;
+    fullPayload.reserve(payloadLen);
+
+    uint16_t offset = 0;
     while (offset < payloadLen) {
-        uint8_t chunkLen = (uint8_t)std::min<uint32_t>(48, payloadLen - offset);
-        uint8_t readApdu[] = {
-            0x00,
-            0xB0,
-            (uint8_t)((offset >> 8) & 0xFF),
-            (uint8_t)(offset & 0xFF),
-            chunkLen
-        };
+        uint8_t chunkSize = (payloadLen - offset < MAX_CHUNK_SIZE) ? (payloadLen - offset) : MAX_CHUNK_SIZE;
 
-        responseLen = sizeof(response);
-        if (!exchangeApdu(readApdu, sizeof(readApdu), response, responseLen) ||
-            !isSuccessStatus(response, responseLen) || responseLen < 2) {
-            _lastError = "Failed to read HCE payload chunk";
-            Serial.println("[NFC] ERROR: " + _lastError);
+        uint8_t readCmd[] = {
+            0x00, 0xB0,
+            (uint8_t)((offset >> 8) & 0xFF),  // offset hi
+            (uint8_t)(offset & 0xFF),          // offset lo
+            chunkSize
+        };
+        uint8_t readResp[64] = {0};
+        uint8_t readRespLen = sizeof(readResp);
+
+        if (!_nfc.inDataExchange(readCmd, sizeof(readCmd), readResp, &readRespLen)) {
+            _lastError = "READ BINARY exchange failed at offset ";
+            _lastError += String(offset);
             return false;
         }
 
-        uint8_t dataLen = responseLen - 2;
-        encryptedPayload.insert(encryptedPayload.end(), response, response + dataLen);
+        if (readRespLen < 2 || readResp[readRespLen - 2] != 0x90 || readResp[readRespLen - 1] != 0x00) {
+            _lastError = "READ BINARY failed at offset ";
+            _lastError += String(offset);
+            return false;
+        }
+
+        // Copy data (exclude status bytes)
+        uint16_t dataLen = readRespLen - 2;
+        for (uint16_t i = 0; i < dataLen; i++) {
+            fullPayload.push_back(readResp[i]);
+        }
+
         offset += dataLen;
+        delay(20);
     }
 
-    if (encryptedPayload.size() != payloadLen) {
-        _lastError = "Incomplete HCE payload";
+    if (fullPayload.size() != payloadLen) {
+        _lastError = "Payload size mismatch: got ";
+        _lastError += String(fullPayload.size());
+        _lastError += " expected ";
+        _lastError += String(payloadLen);
         return false;
     }
 
-    String aesKey = getNfcAesKey();
-    configJson = decryptPayload(encryptedPayload, aesKey);
-    if (configJson.isEmpty()) {
-        _lastError = "HCE payload decryption failed";
-        Serial.println("[NFC] ERROR: " + _lastError);
-        return false;
+    // Convert binary payload to hex string for return
+    configJson = "";
+    for (size_t i = 0; i < fullPayload.size(); i++) {
+        char buf[3];
+        snprintf(buf, sizeof(buf), "%02X", fullPayload[i]);
+        configJson += buf;
     }
 
-    Serial.println("[NFC] Direct HCE config decrypted successfully");
-    Serial.println("[NFC] Config JSON: " + configJson);
+    Serial.print("[NFC] HCE payload received: ");
+    Serial.print(fullPayload.size());
+    Serial.println(" bytes");
     return true;
 }
 
-bool NFCConfigReader::exchangeApdu(const uint8_t* command, uint8_t commandLen,
-                                   uint8_t* response, uint8_t& responseLen) {
-    uint8_t responseCapacity = responseLen;
-    responseLen = responseCapacity;
-    return _nfc.inDataExchange((uint8_t*)command, commandLen, response, &responseLen);
+uint8_t NFCConfigReader::handleHceCommand(const uint8_t* apdu, uint8_t apduLen,
+                                            uint8_t* response, uint8_t& responseLen) {
+    // This is used when ESP32 is in card emulation mode (not reader mode).
+    // For our use case, ESP32 is always the reader, so this is a stub.
+    // Returns SW = 0x6D 0x00 (INS not supported)
+    response[0] = 0x6D;
+    response[1] = 0x00;
+    responseLen = 2;
+    return 2;
 }
 
-bool NFCConfigReader::isSuccessStatus(const uint8_t* response, uint8_t responseLen) {
-    return responseLen >= 2 &&
-           response[responseLen - 2] == 0x90 &&
-           response[responseLen - 1] == 0x00;
-}
+// ================= Physical NTAG215 Tag Read =================
 
-String NFCConfigReader::decryptPayload(const std::vector<uint8_t>& encrypted, const String& aesKey) {
-    // AES-128-CTR decryption
-    // Payload format: [IV (16 bytes)] + [Ciphertext]
+bool NFCConfigReader::readPhysicalTag(String& configJson) {
+    Serial.println("[NFC] Reading physical NTAG215 tag...");
 
-    if (encrypted.size() < 16) {
-        Serial.println("[NFC] Payload too short for AES decryption");
-        return "";
-    }
+    uint8_t uid[7] = {0};
+    uint8_t uidLen = 0;
 
-    // Extract IV from first 16 bytes
-    uint8_t iv[16];
-    memcpy(iv, encrypted.data(), 16);
-
-    // Ciphertext starts after IV
-    size_t ciphertextLen = encrypted.size() - 16;
-    uint8_t* ciphertext = (uint8_t*)encrypted.data() + 16;
-
-    // Allocate output buffer
-    uint8_t* plaintext = new uint8_t[ciphertextLen + 1];
-    memset(plaintext, 0, ciphertextLen + 1);
-
-    // Initialize AES context
-    mbedtls_aes_context aes;
-    mbedtls_aes_init(&aes);
-
-    // Set key (AES-128)
-    String keyStr = aesKey;
-    unsigned char key[16];
-    memcpy(key, keyStr.c_str(), 16);
-
-    if (mbedtls_aes_setkey_enc(&aes, key, 128) != 0) {
-        mbedtls_aes_free(&aes);
-        delete[] plaintext;
-        Serial.println("[NFC] AES key setup failed");
-        return "";
-    }
-
-    // CTR mode decryption (same as encryption for CTR)
-    uint8_t counter[16];
-    memcpy(counter, iv, 16);
-
-    size_t nc_off = 0;
-    uint8_t stream_block[16];
-
-    if (mbedtls_aes_crypt_ctr(&aes, ciphertextLen, &nc_off, counter, stream_block, ciphertext, plaintext) != 0) {
-        mbedtls_aes_free(&aes);
-        delete[] plaintext;
-        Serial.println("[NFC] AES CTR decryption failed");
-        return "";
-    }
-
-    mbedtls_aes_free(&aes);
-
-    String result = String((char*)plaintext);
-    delete[] plaintext;
-
-    return result;
-}
-
-bool NFCConfigReader::parseNdefRecord(const uint8_t* data, uint16_t len, std::vector<uint8_t>& payload) {
-    // Simple NDEF parser for SmartPonic format
-    // NDEF Record structure:
-    // [Header (1 byte)] [Type Length (1 byte)] [Payload Length (4 bytes)] [Type] [Payload]
-
-    if (len < 6) {
+    // Wait for tag
+    if (!_nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLen, 2000)) {
+        _lastError = "No tag detected";
         return false;
     }
 
-    uint8_t header = data[0];
-    uint8_t typeLen = data[1];
+    Serial.print("[NFC] Tag UID: ");
+    for (uint8_t i = 0; i < uidLen; i++) {
+        Serial.print(uid[i], HEX);
+    }
+    Serial.println();
 
-    // Payload length is 4 bytes (big endian for NDEF)
-    uint32_t payloadLen = ((uint32_t)data[2] << 24) | ((uint32_t)data[3] << 16) |
-                          ((uint32_t)data[4] << 8) | data[5];
+    // Read NDEF message from tag
+    // NTAG215 has 135 pages of 4 bytes each
+    // NDEF data starts at page 4
+    uint8_t pageData[4] = {0};
+    std::vector<uint8_t> ndefData;
+    ndefData.reserve(540);
 
-    if (payloadLen == 0 || payloadLen > len - 6 - typeLen) {
+    // Read pages 4 through 135 (max NTAG215 pages)
+    for (uint8_t page = 4; page <= 135; page++) {
+        if (!_nfc.ntag2xx_ReadPage(page, pageData)) {
+            Serial.print("[NFC] Read page ");
+            Serial.print(page);
+            Serial.println(" failed");
+            break;
+        }
+
+        for (int i = 0; i < 4; i++) {
+            ndefData.push_back(pageData[i]);
+        }
+
+        // Check for NDEF terminator (0xFE in first byte of a page)
+        // or end of NDEF data
+        if (pageData[0] == 0xFE) break;
+
+        delay(5);
+    }
+
+    if (ndefData.size() < 10) {
+        _lastError = "Tag data too short";
         return false;
+    }
+
+    // Parse NDEF record
+    // NDEF format: [TNF(1B)] [Type Len(1B)] [Payload Len(4B, BE)] [Type] [Payload]
+    size_t pos = 0;
+
+    // Skip NDEF header bytes
+    // First byte: TNF + MB/ME/CF/SR/IL flags
+    uint8_t tnf_byte = ndefData[pos++];
+
+    // Check if MB (Message Begin) and ME (Message End) are set
+    bool isMB = (tnf_byte & 0x80) != 0;
+    bool isME = (tnf_byte & 0x40) != 0;
+
+    (void)isMB;
+    (void)isME;
+
+    // Type length
+    if (pos >= ndefData.size()) {
+        _lastError = "NDEF header truncated (type len)";
+        return false;
+    }
+    uint8_t typeLen = ndefData[pos++];
+
+    // Payload length (3 bytes for long NDEF, or 1 byte for short)
+    uint32_t payloadLen = 0;
+
+    // Check SR (Short Record) flag
+    if (tnf_byte & 0x10) {
+        // Short record: payload length is 1 byte
+        if (pos >= ndefData.size()) {
+            _lastError = "NDEF header truncated (short payload len)";
+            return false;
+        }
+        payloadLen = ndefData[pos++];
+    } else {
+        // Long record: payload length is 4 bytes
+        if (pos + 4 > ndefData.size()) {
+            _lastError = "NDEF header truncated (long payload len)";
+            return false;
+        }
+        payloadLen = ((uint32_t)ndefData[pos] << 24) |
+                     ((uint32_t)ndefData[pos + 1] << 16) |
+                     ((uint32_t)ndefData[pos + 2] << 8) |
+                     (uint32_t)ndefData[pos + 3];
+        pos += 4;
     }
 
     // Skip type field
-    uint16_t payloadOffset = 2 + 4 + typeLen;
+    pos += typeLen;
+
+    // Check IL (ID Length) flag
+    if (tnf_byte & 0x08) {
+        if (pos >= ndefData.size()) {
+            _lastError = "NDEF header truncated (id len)";
+            return false;
+        }
+        uint8_t idLen = ndefData[pos++];
+        pos += idLen;
+    }
 
     // Extract payload
-    payload.assign(data + payloadOffset, data + payloadOffset + payloadLen);
+    if (pos + payloadLen > ndefData.size()) {
+        _lastError = "NDEF payload truncated";
+        return false;
+    }
 
-    Serial.print("[NFC] NDEF payload extracted: ");
-    Serial.print(payload.size());
+    // Convert payload to hex string
+    configJson = "";
+    for (uint32_t i = 0; i < payloadLen; i++) {
+        char buf[3];
+        snprintf(buf, sizeof(buf), "%02X", ndefData[pos + i]);
+        configJson += buf;
+    }
+
+    Serial.print("[NFC] Tag payload: ");
+    Serial.print(payloadLen);
     Serial.println(" bytes");
-
     return true;
 }
 
-void NFCConfigReader::setLed(bool on) {
-    digitalWrite(NFC_LED_PIN, on ? HIGH : LOW);
-}
+// ================= AES-CTR Decryption =================
 
-void NFCConfigReader::flashLed(int count, int durationMs) {
-    for (int i = 0; i < count; i++) {
-        setLed(true);
-        delay(durationMs);
-        setLed(false);
-        if (i < count - 1) {
-            delay(durationMs);
-        }
+String NFCConfigReader::decryptPayload(const std::vector<uint8_t>& encrypted, const String& aesKey) {
+    if (encrypted.size() < 17) {
+        _lastError = "Encrypted data too short";
+        return "";
     }
+
+    // First 16 bytes = IV/nonce
+    const uint8_t* iv = encrypted.data();
+    size_t ciphertextLen = encrypted.size() - 16;
+    const uint8_t* ciphertext = encrypted.data() + 16;
+
+    // Prepare key
+    uint8_t keyBuf[16] = {0};
+    size_t keyLen = aesKey.length();
+    if (keyLen > 16) keyLen = 16;
+    memcpy(keyBuf, aesKey.c_str(), keyLen);
+
+    // Prepare output buffer
+    std::vector<uint8_t> plaintext(ciphertextLen + 1, 0);
+
+    // AES-CTR decrypt using mbedtls
+    mbedtls_aes_context aes;
+    mbedtls_aes_init(&aes);
+    mbedtls_aes_setkey_enc(&aes, keyBuf, 128);
+
+    uint8_t counter[16];
+    memcpy(counter, iv, 16);
+    size_t ncOff = 0;
+    uint8_t streamBlock[16] = {0};
+
+    int ret = mbedtls_aes_crypt_ctr(&aes, ciphertextLen, &ncOff,
+                                     counter, streamBlock,
+                                     ciphertext, plaintext.data());
+    mbedtls_aes_free(&aes);
+
+    if (ret != 0) {
+        _lastError = "AES-CTR decryption failed";
+        return "";
+    }
+
+    // Null-terminate and convert to String
+    plaintext[ciphertextLen] = 0;
+    String result = String((const char*)plaintext.data());
+
+    if (result.length() == 0) {
+        _lastError = "Decrypted payload is empty";
+        return "";
+    }
+
+    return result;
 }

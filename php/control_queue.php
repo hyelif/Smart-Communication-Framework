@@ -1,143 +1,175 @@
 <?php
-// control_queue.php
-// HQ->PHP command queue endpoint (signed). HQ polls pending relay commands and posts acknowledgements.
+/**
+ * SmartPonic control_queue.php
+ *
+ * Relay command queue management.
+ * HQ polls this endpoint to get pending relay commands for registered nodes.
+ *
+ * Actions:
+ *   get_pending  - Returns pending/approved commands for a node
+ *   mark_sent    - Marks a command as sent (after LoRa TX)
+ *   ack          - Acknowledges command execution (after node ACK)
+ *
+ * Headers (same as receive_data):
+ *   X-API-Key, X-Timestamp, X-Signature
+ */
 
-require_once 'security_config.php';
+require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/security_config.php';
 
-header('Content-Type: application/json');
-header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, X-API-Key, X-Timestamp, X-Signature');
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit;
-}
-
+// ──────────────────────────────────────────────
+// 1. Validate method
+// ──────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(['error' => 'Method not allowed']);
     exit;
 }
 
-require_once 'db.php';
-require_once 'control_lib.php';
+// ──────────────────────────────────────────────
+// 2. Authenticate request
+// ──────────────────────────────────────────────
+$apiKey    = $_SERVER['HTTP_X_API_KEY']   ?? '';
+$timestamp = $_SERVER['HTTP_X_TIMESTAMP'] ?? '';
+$signature = $_SERVER['HTTP_X_SIGNATURE'] ?? '';
 
-function respondWithJsonError(int $statusCode, string $message): void
-{
-    http_response_code($statusCode);
-    echo json_encode(['error' => $message]);
+if ($apiKey !== SMARTPONIC_API_KEY) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Invalid API key']);
     exit;
 }
 
-function getRequiredHeader(string $headerName): string
-{
-    $serverKey = 'HTTP_' . strtoupper(str_replace('-', '_', $headerName));
-    $value = $_SERVER[$serverKey] ?? '';
-    return is_string($value) ? trim($value) : '';
+if (!is_numeric($timestamp)) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Invalid timestamp']);
+    exit;
 }
 
-function verifySignedRequest(string $rawJson): void
-{
-    $apiKey = getRequiredHeader('X-API-Key');
-    $timestamp = getRequiredHeader('X-Timestamp');
-    $signature = getRequiredHeader('X-Signature');
-
-    if ($apiKey === '' || $timestamp === '' || $signature === '') {
-        respondWithJsonError(401, 'Missing security headers');
-    }
-
-    if (!hash_equals(SMARTPONIC_API_KEY, $apiKey)) {
-        respondWithJsonError(403, 'Invalid API key');
-    }
-
-    if (!ctype_digit($timestamp)) {
-        respondWithJsonError(400, 'Invalid request timestamp');
-    }
-
-    if (abs(time() - (int) $timestamp) > SMARTPONIC_REQUEST_MAX_AGE_SECONDS) {
-        respondWithJsonError(408, 'Request timestamp expired');
-    }
-
-    $expectedSignature = hash_hmac('sha256', $timestamp . "\n" . $rawJson, SMARTPONIC_HMAC_SECRET);
-    if (!hash_equals($expectedSignature, strtolower($signature))) {
-        respondWithJsonError(403, 'Invalid request signature');
-    }
+$now = time();
+if (abs($now - (int)$timestamp) > SMARTPONIC_REQUEST_MAX_AGE) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Timestamp out of window']);
+    exit;
 }
 
-$raw = file_get_contents('php://input');
-verifySignedRequest($raw);
-$payload = json_decode($raw, true);
-if (!is_array($payload)) {
-    respondWithJsonError(400, 'Invalid JSON payload');
+$rawBody = file_get_contents('php://input');
+if ($rawBody === false || $rawBody === '') {
+    http_response_code(400);
+    echo json_encode(['error' => 'Empty request body']);
+    exit;
 }
 
-$action = isset($payload['action']) ? strtolower(trim((string) $payload['action'])) : '';
-if ($action === '') {
-    respondWithJsonError(400, 'action is required');
+$expectedSig = hash('sha256', $timestamp . $rawBody . SMARTPONIC_HMAC_SECRET);
+if (!hash_equals($expectedSig, $signature)) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Invalid signature']);
+    exit;
 }
+
+// ──────────────────────────────────────────────
+// 3. Parse request
+// ──────────────────────────────────────────────
+$data = json_decode($rawBody, true);
+if ($data === null || !isset($data['action'])) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Invalid JSON or missing action']);
+    exit;
+}
+
+$action = $data['action'];
 
 try {
-    if ($action === 'get_pending') {
-        $nodeId = isset($payload['node_id']) ? (int) $payload['node_id'] : 0;
-        if ($nodeId <= 0) {
-            throw new InvalidArgumentException('node_id is required');
-        }
+    $db = getDb();
 
-        $limit = isset($payload['limit']) ? (int) $payload['limit'] : 3;
-        $markSent = isset($payload['mark_sent']) ? (bool) $payload['mark_sent'] : true;
+    switch ($action) {
 
-        $pending = fetchPendingRelayCommands($pdo, $nodeId, $limit);
-        if ($markSent) {
-            foreach ($pending as $cmd) {
-                markRelayCommandSent($pdo, (int) $cmd['id']);
+        // ──────────────────────────────────────────
+        case 'get_pending':
+            $hwId   = $data['hardware_id'] ?? '';
+            $limit  = isset($data['limit']) ? (int)$data['limit'] : 5;
+            $filter = $data['status_filter'] ?? 'approved';
+
+            if (!preg_match('/^[0-9A-F]{16}$/', $hwId)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid hardware_id']);
+                break;
             }
-        }
 
-        echo json_encode([
-            'status' => 'success',
-            'node_id' => $nodeId,
-            'pending' => $pending,
-        ]);
-        exit;
+            if ($limit < 1) $limit = 1;
+            if ($limit > 20) $limit = 20;
+
+            $stmt = $db->prepare(
+                'SELECT id, relay_id, action
+                 FROM relay_commands
+                 WHERE hardware_id = ? AND status = ?
+                 ORDER BY created_at ASC
+                 LIMIT ?'
+            );
+            $stmt->execute([$hwId, $filter, $limit]);
+            $rows = $stmt->fetchAll();
+
+            echo json_encode(['pending' => $rows]);
+            break;
+
+        // ──────────────────────────────────────────
+        case 'mark_sent':
+            $cmdId = $data['command_id'] ?? 0;
+
+            if ($cmdId <= 0) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid command_id']);
+                break;
+            }
+
+            $stmt = $db->prepare(
+                'UPDATE relay_commands SET status = ? WHERE id = ? AND status IN (?, ?)'
+            );
+            $stmt->execute(['sent', $cmdId, 'pending', 'approved']);
+
+            if ($stmt->rowCount() > 0) {
+                echo json_encode(['status' => 'ok']);
+            } else {
+                echo json_encode(['status' => 'not_found']);
+            }
+            break;
+
+        // ──────────────────────────────────────────
+        case 'ack':
+            $cmdId  = $data['command_id'] ?? 0;
+            $status = $data['status'] ?? 'done';
+            $msg    = $data['message'] ?? '';
+
+            if ($cmdId <= 0) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid command_id']);
+                break;
+            }
+
+            if (!in_array($status, ['done', 'failed'], true)) {
+                $status = 'done';
+            }
+
+            $stmt = $db->prepare(
+                'UPDATE relay_commands SET status = ?, result_message = ? WHERE id = ?'
+            );
+            $stmt->execute([$status, $msg, $cmdId]);
+
+            echo json_encode(['status' => 'ok']);
+            break;
+
+        // ──────────────────────────────────────────
+        default:
+            http_response_code(400);
+            echo json_encode(['error' => 'Unknown action']);
+            break;
     }
 
-    if ($action === 'ack') {
-        $commandId = isset($payload['command_id']) ? (int) $payload['command_id'] : 0;
-        $status = isset($payload['status']) ? strtolower(trim((string) $payload['status'])) : '';
-        $message = isset($payload['message']) ? trim((string) $payload['message']) : null;
-
-        if ($commandId <= 0) {
-            throw new InvalidArgumentException('command_id is required');
-        }
-        if (!in_array($status, ['done', 'failed'], true)) {
-            throw new InvalidArgumentException('status must be done|failed');
-        }
-
-        $ok = markRelayCommandDone($pdo, $commandId, $status, $message);
-        echo json_encode([
-            'status' => 'success',
-            'updated' => $ok,
-            'command_id' => $commandId,
-        ]);
-        exit;
-    }
-
-    if ($action === 'mark_sent') {
-        $commandId = isset($payload['command_id']) ? (int) $payload['command_id'] : 0;
-        if ($commandId <= 0) {
-            throw new InvalidArgumentException('command_id is required');
-        }
-
-        $ok = markRelayCommandSent($pdo, $commandId);
-        echo json_encode([
-            'status' => 'success',
-            'updated' => $ok,
-            'command_id' => $commandId,
-        ]);
-        exit;
-    }
-
-    respondWithJsonError(400, 'Unsupported action');
-} catch (Exception $e) {
-    respondWithJsonError(500, 'Failed to process control action: ' . $e->getMessage());
+} catch (PDOException $e) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Database error']);
+    error_log('SmartPonic control_queue DB error: ' . $e->getMessage());
+} catch (Throwable $e) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Internal server error']);
+    error_log('SmartPonic control_queue error: ' . $e->getMessage());
 }

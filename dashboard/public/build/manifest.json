@@ -1,0 +1,55 @@
+{
+  "_chart-BR_H7_9u.js": {
+    "file": "assets/chart-BR_H7_9u.js",
+    "name": "chart"
+  },
+  "resources/js/Pages/Dashboard/Overview.vue": {
+    "file": "assets/Overview-C_mBacAj.js",
+    "name": "Overview",
+    "src": "resources/js/Pages/Dashboard/Overview.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js",
+      "resources/js/Pages/Dashboard/SignalChart.vue",
+      "resources/js/Pages/Dashboard/TrendChart.vue",
+      "_chart-BR_H7_9u.js"
+    ],
+    "css": [
+      "assets/Overview-DRGZTQQW.css"
+    ]
+  },
+  "resources/js/Pages/Dashboard/SignalChart.vue": {
+    "file": "assets/SignalChart-SZmDCbCL.js",
+    "name": "SignalChart",
+    "src": "resources/js/Pages/Dashboard/SignalChart.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_chart-BR_H7_9u.js",
+      "resources/js/app.js"
+    ]
+  },
+  "resources/js/Pages/Dashboard/TrendChart.vue": {
+    "file": "assets/TrendChart-Hz3vOIsE.js",
+    "name": "TrendChart",
+    "src": "resources/js/Pages/Dashboard/TrendChart.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_chart-BR_H7_9u.js",
+      "resources/js/app.js"
+    ]
+  },
+  "resources/js/app.js": {
+    "file": "assets/app-BZkIZqSV.js",
+    "name": "app",
+    "src": "resources/js/app.js",
+    "isEntry": true,
+    "dynamicImports": [
+      "resources/js/Pages/Dashboard/Overview.vue",
+      "resources/js/Pages/Dashboard/SignalChart.vue",
+      "resources/js/Pages/Dashboard/TrendChart.vue"
+    ],
+    "css": [
+      "assets/app-HrMb_Qtg.css"
+    ]
+  }
+}

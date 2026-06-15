@@ -1,22 +1,20 @@
 <?php
-// Copy to `php/telegram_config.php` (ignored by git) and fill in real values.
+/**
+ * SmartPonic Telegram Bot Configuration
+ *
+ * Copy this file to telegram_config.php and fill in your values.
+ * telegram_config.php is gitignored — secrets stay local.
+ */
 
-return [
-    // Bot token from @BotFather (keep secret; never commit).
-    'bot_token' => '8635772990:AAE_sU0VGXRovOoJCNahlwbeJJf5YGHkqeI',
+// Bot token from @BotFather
+define('TELEGRAM_BOT_TOKEN', '1234567890:ABCdefGHIjklMNOpqrsTUVwxyzABCDEFGHIJklmno');
 
-    // Allowlist of chat IDs permitted to use control commands.
-    // Example: [123456789, -1001234567890]
-    'allowed_chat_ids' => [],
+// Allowed chat IDs — users who can issue commands.
+// Find your chat ID by sending /start to the bot and checking the logs,
+// or use /whoami once the bot is running.
+define('TELEGRAM_ALLOWED_CHAT_IDS', serialize([
+    // 123456789,  // replace with your chat ID
+]));
 
-    // Default chat ID to receive alerts (optional).
-    'default_alert_chat_id' => null,
-
-    // Anti-spam defaults (seconds).
-    'cooldown_critical_s' => 0,
-    'cooldown_abnormal_s' => 300,
-
-    // Freshness monitoring (seconds). Used by telegram_poll.php in --loop mode.
-    'freshness_warning_s' => 300,
-    'freshness_offline_s' => 900,
-];
+// API base URL (no trailing slash)
+define('TELEGRAM_API_URL', 'https://api.telegram.org/bot' . TELEGRAM_BOT_TOKEN);

@@ -13,8 +13,10 @@ class StorageService {
   static bool _calibrationLoaded = false;
   static String? _cachedConfigJson;
   static String? _cachedProfilesJson;
+  static List<Map<String, dynamic>>? _cachedProfilesParsed;
   static String? _cachedKey;
   static String? _cachedCalibrationJson;
+  static Map<String, dynamic>? _cachedCalibrationParsed;
 
   static Future<SharedPreferences> _prefs() {
     return _prefsFuture ??= SharedPreferences.getInstance();
@@ -71,25 +73,32 @@ class StorageService {
 
   static Future<List<Map<String, dynamic>>> getProfiles() async {
     await _ensureProfilesCache();
+    if (_cachedProfilesParsed != null) return _cachedProfilesParsed!;
     final data = _cachedProfilesJson;
     if (data == null) return [];
-    return List<Map<String, dynamic>>.from(jsonDecode(data));
+    _cachedProfilesParsed = List<Map<String, dynamic>>.from(jsonDecode(data));
+    return _cachedProfilesParsed!;
   }
 
   // Calibration profiles are stored as:
   // { "temperature": {threshold_min, threshold_max, calibration_a, calibration_b, calibration_c}, ... }
   static Future<Map<String, dynamic>> loadCalibrationProfiles() async {
     await _ensureCalibrationCache();
+    if (_cachedCalibrationParsed != null) return _cachedCalibrationParsed!;
     final data = _cachedCalibrationJson;
     if (data == null || data.isEmpty) return {};
     final decoded = jsonDecode(data);
-    if (decoded is Map<String, dynamic>) return decoded;
+    if (decoded is Map<String, dynamic>) {
+      _cachedCalibrationParsed = decoded;
+      return decoded;
+    }
     return {};
   }
 
   static Future<void> saveCalibrationProfiles(Map<String, dynamic> profiles) async {
     final prefs = await _prefs();
     _cachedCalibrationJson = jsonEncode(profiles);
+    _cachedCalibrationParsed = profiles;
     _calibrationLoaded = true;
     await prefs.setString(_calibrationKey, _cachedCalibrationJson!);
   }
@@ -100,12 +109,14 @@ class StorageService {
   ) async {
     final prefs = await _prefs();
     final profiles = await getProfiles();
-    profiles.insert(0, {
+    final newProfile = {
       'name': name,
       'time': DateTime.now().toIso8601String(),
       'config': config,
-    });
-    _cachedProfilesJson = jsonEncode(profiles);
+    };
+    final updated = [newProfile, ...profiles];
+    _cachedProfilesJson = jsonEncode(updated);
+    _cachedProfilesParsed = updated;
     _profilesLoaded = true;
     await prefs.setString(_profilesKey, _cachedProfilesJson!);
   }
@@ -121,8 +132,9 @@ class StorageService {
     final prefs = await _prefs();
     final profiles = await getProfiles();
     if (index >= 0 && index < profiles.length) {
-      profiles.removeAt(index);
-      _cachedProfilesJson = jsonEncode(profiles);
+      final updated = List<Map<String, dynamic>>.from(profiles)..removeAt(index);
+      _cachedProfilesJson = jsonEncode(updated);
+      _cachedProfilesParsed = updated;
       _profilesLoaded = true;
       await prefs.setString(_profilesKey, _cachedProfilesJson!);
     }
