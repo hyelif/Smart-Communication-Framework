@@ -1,0 +1,48 @@
+services:
+  - type: web
+    name: smartponic-dashboard
+    env: php
+    buildCommand: |
+      composer install --no-dev --optimize-autoloader --no-interaction
+      php artisan config:cache
+      php artisan route:cache
+      php artisan view:cache
+    startCommand: |
+      php artisan serve --host=0.0.0.0 --port=$PORT
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: false
+      - key: APP_KEY
+        sync: false
+      - key: APP_URL
+        value: https://smartponic-dashboard.onrender.com
+      - key: DB_CONNECTION
+        value: libsql
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false
+      - key: SMARTPONIC_API_KEY
+        value: smartponic-hq-key
+      - key: SMARTPONIC_HMAC_SECRET
+        value: smartponic-hq-signature-secret
+      - key: SMARTPONIC_AUTH_KEY
+        value: AQUA77
+      - key: SMARTPONIC_REQUEST_MAX_AGE
+        value: "300"
+      - key: LOG_CHANNEL
+        value: stack
+      - key: LOG_LEVEL
+        value: warning
+      - key: CACHE_DRIVER
+        value: file
+      - key: SESSION_DRIVER
+        value: file
+      - key: QUEUE_CONNECTION
+        value: sync
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_ALLOWED_CHAT_IDS
+        sync: false

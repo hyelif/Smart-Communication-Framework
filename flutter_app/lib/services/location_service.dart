@@ -3,6 +3,25 @@ import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class LocationService {
+  LocationService._(); // Private constructor to prevent instantiation.
+
+  // ---------------------------------------------------------------------------
+  // Named constants
+  // ---------------------------------------------------------------------------
+
+  /// GPS location timeout in seconds.
+  static const int _locationTimeoutSeconds = 10;
+
+  /// Threshold in meters below which distance is shown in meters (1 km).
+  static const double _metersThreshold = 1000;
+
+  /// Number of meters in one kilometre.
+  static const double _metersPerKm = 1000;
+
+  // ---------------------------------------------------------------------------
+  // Internal state
+  // ---------------------------------------------------------------------------
+
   static LocationPermission? _cachedPermission;
 
   /// Request location permission from user
@@ -37,7 +56,7 @@ class LocationService {
       final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 10),
+          timeLimit: Duration(seconds: _locationTimeoutSeconds),
         ),
       );
       return position;
@@ -59,10 +78,10 @@ class LocationService {
 
   /// Format distance for display
   static String formatDistance(double meters) {
-    if (meters < 1000) {
+    if (meters < _metersThreshold) {
       return '${meters.toStringAsFixed(1)} m';
     }
-    return '${(meters / 1000).toStringAsFixed(2)} km';
+    return '${(meters / _metersPerKm).toStringAsFixed(2)} km';
   }
 
   /// Open phone's location settings

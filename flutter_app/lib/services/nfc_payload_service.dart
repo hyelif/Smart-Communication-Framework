@@ -7,7 +7,21 @@ import 'package:pointycastle/api.dart';
 import 'package:pointycastle/stream/ctr.dart';
 
 class NfcPayloadService {
-  static const String defaultAesKey = 'SmartPonic123456';
+  NfcPayloadService._(); // Private constructor to prevent instantiation.
+
+  // ---------------------------------------------------------------------------
+  // Named constants
+  // ---------------------------------------------------------------------------
+
+  /// AES IV length in bytes (128-bit).
+  static const int aesIvLength = 16;
+
+  /// AES key length in bytes (128-bit).
+  static const int aesKeyLength = 16;
+
+  /// Development default AES key -- only used when no key is configured.
+  /// In production, always set a unique key per node.
+  static const String _defaultAesKey = 'SmartPonic123456';
   static const String defaultAuthKey = 'AQUA77';
   static const String mimeType = 'application/x-smartponic';
   static const int minLongNdefPayloadLength = 256;
@@ -20,7 +34,7 @@ class NfcPayloadService {
     final normalizedKey = _normalizeAesKey(aesKey);
     final jsonPayload = _jsonForFirmware(configPayload);
     final plaintext = Uint8List.fromList(utf8.encode(jsonPayload));
-    final iv = _secureRandomBytes(16);
+    final iv = _secureRandomBytes(aesIvLength);
     final ciphertext = _aesCtr(plaintext, normalizedKey, iv);
 
     return Uint8List.fromList([...iv, ...ciphertext]);
@@ -40,7 +54,7 @@ class NfcPayloadService {
   }
 
   static String validateAesKey(String value) {
-    if (value.trim().isEmpty) return defaultAesKey;
+    if (value.trim().isEmpty) return _defaultAesKey;
     return _normalizeAesKey(value);
   }
 
@@ -52,9 +66,9 @@ class NfcPayloadService {
     final padded = Map<String, dynamic>.from(payload);
     var padLength = 0;
 
-    while (utf8.encode(jsonEncode(padded)).length + 16 <
+    while (utf8.encode(jsonEncode(padded)).length + aesIvLength <
         minLongNdefPayloadLength) {
-      padLength += 16;
+      padLength += aesIvLength;
       padded['_pad'] = '0' * padLength;
     }
 
@@ -63,8 +77,10 @@ class NfcPayloadService {
 
   static String _normalizeAesKey(String value) {
     final key = value.trim();
-    if (key.length != 16) {
-      throw const FormatException('NFC AES key must be exactly 16 characters.');
+    if (key.length != aesKeyLength) {
+      throw FormatException(
+        'NFC AES key must be exactly $aesKeyLength characters.',
+      );
     }
     return key;
   }

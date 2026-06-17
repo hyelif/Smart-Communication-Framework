@@ -1,41 +1,64 @@
 import 'package:flutter/material.dart';
 
+/// Central color palette for the SmartPonic v2 dark theme.
 class StitchColors {
-  static const background = Color(0xFF0A0D14);
-  static const surface = Color(0xFF0A0D14);
-  static const surfaceLowest = Color(0xFF0E131F);
-  static const surfaceLow = Color(0xFF151B29);
-  static const surfaceContainer = Color(0xFF1D263B);
-  static const surfaceHigh = Color(0xFF2B3754);
+  StitchColors._(); // Private constructor to prevent instantiation.
 
-  static const primary = Color(0xFFFFFFFF);
-  static const primaryContainer = Color(0xFF00F5FF); // Neon Electric Cyan
-  static const secondary = Color(0xFFB08CFF); // Soft Aurora Purple
-  static const secondaryContainer = Color(0xFF1B60EC); // Quantum Blue
-  static const tertiaryFixed = Color(0xFFFAD02C); // Sol Gold
+  // Backgrounds & surfaces
+  static const Color background = Color(0xFF0A0D14);
+  static const Color surface = Color(0xFF0A0D14);
+  static const Color surfaceLowest = Color(0xFF0E131F);
+  static const Color surfaceLow = Color(0xFF151B29);
+  static const Color surfaceContainer = Color(0xFF1D263B);
+  static const Color surfaceHigh = Color(0xFF2B3754);
 
-  static const onSurface = Color(0xFFE2E6F0);
-  static const onSurfaceVariant = Color(0xFFA5B2CD);
-  static const outlineVariant = Color(0xFF334163);
-  static const error = Color(0xFFFF8E8E);
-  static const onSecondaryContainer = Color(0xFFFFFFFF);
+  // Primary / accent
+  static const Color primary = Color(0xFFFFFFFF);
+  static const Color primaryContainer = Color(0xFF00F5FF); // Neon Electric Cyan
+  static const Color secondary = Color(0xFFB08CFF); // Soft Aurora Purple
+  static const Color secondaryContainer = Color(0xFF1B60EC); // Quantum Blue
+  static const Color tertiaryFixed = Color(0xFFFAD02C); // Sol Gold
+
+  // On-colors
+  static const Color onSurface = Color(0xFFE2E6F0);
+  static const Color onSurfaceVariant = Color(0xFFA5B2CD);
+  static const Color outlineVariant = Color(0xFF334163);
+  static const Color error = Color(0xFFFF8E8E);
+  static const Color onSecondaryContainer = primary;
 
   // Glassmorphism
-  static const glassSurface = Color(0x1A1D263B);
-  static const glassBorder = Color(0x1A334163);
+  static const Color glassSurface = Color(0x1A1D263B);
+  static const Color glassBorder = Color(0x1A334163);
 
   // Shimmer
-  static const shimmerBase = Color(0xFF151B29);
-  static const shimmerHighlight = Color(0xFF1D263B);
+  static const Color shimmerBase = Color(0xFF151B29);
+  static const Color shimmerHighlight = Color(0xFF1D263B);
 
   // Trend indicators
-  static const trendUp = Color(0xFF00FF87);
-  static const trendDown = Color(0xFFFF8E8E);
-  static const trendStable = Color(0xFFA5B2CD);
+  static const Color trendUp = Color(0xFF00FF87);
+  static const Color trendDown = Color(0xFFFF8E8E);
+  static const Color trendStable = Color(0xFFA5B2CD);
 }
 
+/// Theme data and visual assets for the SmartPonic v2 dark theme.
 class AppTheme {
-  static ThemeData get darkTheme {
+  AppTheme._(); // Private constructor to prevent instantiation.
+
+  // ---------------------------------------------------------------------------
+  // Border radius constants
+  // ---------------------------------------------------------------------------
+
+  /// Default border radius used for input fields.
+  static const double _inputBorderRadius = 16;
+
+  // ---------------------------------------------------------------------------
+  // Theme data
+  // ---------------------------------------------------------------------------
+
+  /// The complete dark theme for the app.
+  static final ThemeData darkTheme = _buildDarkTheme();
+
+  static ThemeData _buildDarkTheme() {
     const colorScheme = ColorScheme.dark(
       primary: StitchColors.primary,
       secondary: StitchColors.secondary,
@@ -112,15 +135,15 @@ class AppTheme {
         filled: true,
         fillColor: StitchColors.surfaceLowest,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(_inputBorderRadius),
           borderSide: const BorderSide(color: StitchColors.outlineVariant, width: 1),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(_inputBorderRadius),
           borderSide: const BorderSide(color: StitchColors.outlineVariant, width: 1),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(_inputBorderRadius),
           borderSide: const BorderSide(color: StitchColors.primaryContainer, width: 1.5),
         ),
       ),
@@ -136,67 +159,81 @@ class AppTheme {
     );
   }
 
-  static LinearGradient get ctaGradient => const LinearGradient(
-        colors: [StitchColors.primaryContainer, StitchColors.secondaryContainer],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      );
+  // ---------------------------------------------------------------------------
+  // Gradients
+  // ---------------------------------------------------------------------------
 
-  static List<BoxShadow> get cyanGlowShadow => [
-        BoxShadow(
-          color: StitchColors.primaryContainer.withValues(alpha: 0.25),
-          blurRadius: 12,
-          spreadRadius: 1,
-        ),
-        BoxShadow(
-          color: StitchColors.secondaryContainer.withValues(alpha: 0.15),
-          blurRadius: 24,
-          spreadRadius: 0,
-        ),
-      ];
+  /// Call-to-action gradient from primaryContainer to secondaryContainer.
+  static const LinearGradient ctaGradient = LinearGradient(
+    colors: [StitchColors.primaryContainer, StitchColors.secondaryContainer],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 
-  static List<BoxShadow> get glassShadow => [
-        BoxShadow(
-          color: Colors.black.withValues(alpha: 0.3),
-          blurRadius: 20,
-          spreadRadius: 0,
-          offset: const Offset(0, 4),
-        ),
-        BoxShadow(
-          color: StitchColors.primaryContainer.withValues(alpha: 0.06),
-          blurRadius: 40,
-          spreadRadius: 0,
-        ),
-      ];
+  /// pH bar gradient spanning the colour spectrum.
+  static const LinearGradient phGradient = LinearGradient(
+    colors: [
+      Colors.red,
+      Colors.orange,
+      Colors.yellow,
+      Colors.green,
+      Colors.blue,
+      Colors.purple,
+    ],
+  );
 
-  static List<BoxShadow> get subtleShadow => [
-        BoxShadow(
-          color: Colors.black.withValues(alpha: 0.2),
-          blurRadius: 8,
-          offset: const Offset(0, 2),
-        ),
-      ];
+  /// Temperature bar gradient from secondaryContainer to primaryContainer.
+  static final LinearGradient tempGradient = LinearGradient(
+    colors: [
+      StitchColors.secondaryContainer,
+      StitchColors.primaryContainer,
+    ],
+  );
 
-  // Sensor-specific bar gradients
-  static Gradient get phGradient => const LinearGradient(
-        colors: [
-          Colors.red,
-          Colors.orange,
-          Colors.yellow,
-          Colors.green,
-          Colors.blue,
-          Colors.purple,
-        ],
-      );
+  /// TDS bar gradient from blue to green.
+  static const LinearGradient tdsGradient = LinearGradient(
+    colors: [Color(0xFF00B4D8), Color(0xFF00FF87)],
+  );
 
-  static Gradient get tempGradient => LinearGradient(
-        colors: [
-          StitchColors.secondaryContainer,
-          StitchColors.primaryContainer,
-        ],
-      );
+  // ---------------------------------------------------------------------------
+  // Shadows
+  // ---------------------------------------------------------------------------
 
-  static Gradient get tdsGradient => const LinearGradient(
-        colors: [Color(0xFF00B4D8), Color(0xFF00FF87)],
-      );
+  /// Cyan glow shadow used for interactive elements.
+  static final List<BoxShadow> cyanGlowShadow = [
+    BoxShadow(
+      color: StitchColors.primaryContainer.withValues(alpha: 0.25),
+      blurRadius: 12,
+      spreadRadius: 1,
+    ),
+    BoxShadow(
+      color: StitchColors.secondaryContainer.withValues(alpha: 0.15),
+      blurRadius: 24,
+      spreadRadius: 0,
+    ),
+  ];
+
+  /// Glassmorphism shadow used for frosted-glass panels.
+  static final List<BoxShadow> glassShadow = [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.3),
+      blurRadius: 20,
+      spreadRadius: 0,
+      offset: const Offset(0, 4),
+    ),
+    BoxShadow(
+      color: StitchColors.primaryContainer.withValues(alpha: 0.06),
+      blurRadius: 40,
+      spreadRadius: 0,
+    ),
+  ];
+
+  /// Subtle shadow used for default panels.
+  static final List<BoxShadow> subtleShadow = [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.2),
+      blurRadius: 8,
+      offset: const Offset(0, 2),
+    ),
+  ];
 }

@@ -2,8 +2,12 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../utils/environment.dart';
+
 class ApiService {
-  static const String baseUrl = 'http://192.168.4.1';
+  /// Base URL for the ESP32 node API, resolved from [EnvironmentConfig].
+  static String get baseUrl => EnvironmentConfig.current.apiBaseUrl;
+
   static const String _nodeKeyHeader = 'X-Node-Key';
 
   static final http.Client _client = http.Client();

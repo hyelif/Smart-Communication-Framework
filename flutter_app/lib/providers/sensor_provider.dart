@@ -10,16 +10,27 @@ class SensorProvider extends ChangeNotifier {
   List<Map<String, dynamic>> _rawConfig = [];
   bool _isLoading = false;
   String? _error;
+  bool _disposed = false;
 
   List<SensorModel> get sensors => _sensors;
   List<Map<String, dynamic>> get rawConfig => _rawConfig;
   bool get isLoading => _isLoading;
   String? get error => _error;
 
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
+  void _notifyListeners() {
+    if (!_disposed) notifyListeners();
+  }
+
   Future<void> fetchConfig(String securityKey) async {
     _isLoading = true;
     _error = null;
-    notifyListeners();
+    _notifyListeners();
 
     try {
       final result = await _repository.fetchConfig(securityKey);
@@ -33,31 +44,31 @@ class SensorProvider extends ChangeNotifier {
       _error = e.toString();
     } finally {
       _isLoading = false;
-      notifyListeners();
+      _notifyListeners();
     }
   }
 
   Future<bool> sendConfig(List<Map<String, dynamic>> config, String securityKey) async {
     _isLoading = true;
     _error = null;
-    notifyListeners();
+    _notifyListeners();
 
     try {
       final result = await _repository.sendConfig(config, securityKey);
       _isLoading = false;
-      notifyListeners();
+      _notifyListeners();
       return result['ok'] == true;
     } catch (e) {
       _error = e.toString();
       _isLoading = false;
-      notifyListeners();
+      _notifyListeners();
       return false;
     }
   }
 
   Future<void> loadSavedConfig() async {
     _isLoading = true;
-    notifyListeners();
+    _notifyListeners();
 
     try {
       _rawConfig = await _repository.loadConfig();
@@ -66,7 +77,7 @@ class SensorProvider extends ChangeNotifier {
       _error = e.toString();
     } finally {
       _isLoading = false;
-      notifyListeners();
+      _notifyListeners();
     }
   }
 
@@ -75,10 +86,10 @@ class SensorProvider extends ChangeNotifier {
       await _repository.saveConfig(config, key);
       _rawConfig = config;
       _sensors = config.map((json) => SensorModel.fromMap(json)).toList();
-      notifyListeners();
+      _notifyListeners();
     } catch (e) {
       _error = e.toString();
-      notifyListeners();
+      _notifyListeners();
     }
   }
 

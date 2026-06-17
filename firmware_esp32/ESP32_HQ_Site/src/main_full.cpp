@@ -19,8 +19,8 @@ const char* WIFI_SSID  = "Kimie";
 const char* WIFI_PASS  = "00008888";
 
 // API endpoints
-const char* API_URL       = "http://172.20.10.3/smartponic/receive_data.php";
-const char* CONTROL_URL   = "http://172.20.10.3/smartponic/control_queue.php";
+const char* API_URL       = "https://smartponic-dashboard.onrender.com/api/receive-data";
+const char* CONTROL_URL   = "https://smartponic-dashboard.onrender.com/api/control-queue";
 
 // Default keys
 #define DEFAULT_AES_KEY    "SmartPonic123456"

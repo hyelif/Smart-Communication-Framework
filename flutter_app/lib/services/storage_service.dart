@@ -2,10 +2,28 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class StorageService {
-  static const String _configKey = 'esp_config_data';
-  static const String _profilesKey = 'esp_profiles_list';
-  static const String _aesKey = 'esp_aes_key';
-  static const String _calibrationKey = 'esp_calibration_profiles';
+  StorageService._(); // Private constructor to prevent instantiation.
+
+  // ---------------------------------------------------------------------------
+  // Named string key constants
+  // ---------------------------------------------------------------------------
+
+  /// SharedPreferences key for the ESP32 config data JSON.
+  static const String configKey = 'esp_config_data';
+
+  /// SharedPreferences key for the ESP32 profiles list JSON.
+  static const String profilesKey = 'esp_profiles_list';
+
+  /// SharedPreferences key for the ESP32 AES key.
+  static const String aesKey = 'esp_aes_key';
+
+  /// SharedPreferences key for the ESP32 calibration profiles JSON.
+  static const String calibrationKey = 'esp_calibration_profiles';
+
+  // ---------------------------------------------------------------------------
+  // Internal state
+  // ---------------------------------------------------------------------------
+
   static Future<SharedPreferences>? _prefsFuture;
   static bool _configLoaded = false;
   static bool _profilesLoaded = false;
@@ -25,28 +43,28 @@ class StorageService {
   static Future<void> _ensureConfigCache() async {
     if (_configLoaded) return;
     final prefs = await _prefs();
-    _cachedConfigJson = prefs.getString(_configKey);
+    _cachedConfigJson = prefs.getString(configKey);
     _configLoaded = true;
   }
 
   static Future<void> _ensureProfilesCache() async {
     if (_profilesLoaded) return;
     final prefs = await _prefs();
-    _cachedProfilesJson = prefs.getString(_profilesKey);
+    _cachedProfilesJson = prefs.getString(profilesKey);
     _profilesLoaded = true;
   }
 
   static Future<void> _ensureKeyCache() async {
     if (_keyLoaded) return;
     final prefs = await _prefs();
-    _cachedKey = prefs.getString(_aesKey);
+    _cachedKey = prefs.getString(aesKey);
     _keyLoaded = true;
   }
 
   static Future<void> _ensureCalibrationCache() async {
     if (_calibrationLoaded) return;
     final prefs = await _prefs();
-    _cachedCalibrationJson = prefs.getString(_calibrationKey);
+    _cachedCalibrationJson = prefs.getString(calibrationKey);
     _calibrationLoaded = true;
   }
 
@@ -56,8 +74,8 @@ class StorageService {
     _cachedKey = key;
     _configLoaded = true;
     _keyLoaded = true;
-    await prefs.setString(_configKey, _cachedConfigJson!);
-    await prefs.setString(_aesKey, key);
+    await prefs.setString(configKey, _cachedConfigJson!);
+    await prefs.setString(aesKey, key);
   }
 
   static Future<Map<String, dynamic>> loadConfig() async {
@@ -100,7 +118,7 @@ class StorageService {
     _cachedCalibrationJson = jsonEncode(profiles);
     _cachedCalibrationParsed = profiles;
     _calibrationLoaded = true;
-    await prefs.setString(_calibrationKey, _cachedCalibrationJson!);
+    await prefs.setString(calibrationKey, _cachedCalibrationJson!);
   }
 
   static Future<void> saveAsNewProfile(
@@ -118,7 +136,7 @@ class StorageService {
     _cachedProfilesJson = jsonEncode(updated);
     _cachedProfilesParsed = updated;
     _profilesLoaded = true;
-    await prefs.setString(_profilesKey, _cachedProfilesJson!);
+    await prefs.setString(profilesKey, _cachedProfilesJson!);
   }
 
   static Future<void> saveProfile(
@@ -136,7 +154,7 @@ class StorageService {
       _cachedProfilesJson = jsonEncode(updated);
       _cachedProfilesParsed = updated;
       _profilesLoaded = true;
-      await prefs.setString(_profilesKey, _cachedProfilesJson!);
+      await prefs.setString(profilesKey, _cachedProfilesJson!);
     }
   }
 }

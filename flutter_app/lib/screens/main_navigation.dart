@@ -14,58 +14,40 @@ class MainNavigation extends StatefulWidget {
 }
 
 class _MainNavigationState extends State<MainNavigation> {
-  int index = 1;
-
   final ValueNotifier<List<Map<String, dynamic>>> globalConfig =
       ValueNotifier([]);
   final ValueNotifier<int> activeTab = ValueNotifier(1);
 
-  @override
-  void initState() {
-    super.initState();
-    _pages[1] = _buildPage(1);
-  }
-
-  final Map<int, Widget> _pages = {};
-
-  Widget _buildPage(int pageIndex) {
-    switch (pageIndex) {
-      case 0:
-        return DeviceScreen(
-          activeTabListenable: activeTab,
-          tabIndex: 0,
-          onLoadToConfig: (cfg) {
-            globalConfig.value = cfg;
-            _setIndex(1);
-          },
-        );
-      case 1:
-        return ConfigScreen(
-          configNotifier: globalConfig,
-          activeTabListenable: activeTab,
-          tabIndex: 1,
-        );
-      case 2:
-        return ProfilesScreen(
-          activeTabListenable: activeTab,
-          tabIndex: 2,
-          onSelectProfile: (cfg) {
-            globalConfig.value = cfg;
-            _setIndex(1);
-          },
-        );
-      case 3:
-        return CalibrationScreen(
-          activeTabListenable: activeTab,
-          tabIndex: 3,
-        );
-      default:
-        return const StitchEmptyState(
-          title: 'Analytics Pipeline Offline',
-          subtitle: 'This panel is reserved for future signal telemetry.',
-          icon: Icons.insights_outlined,
-        );
-    }
+  List<Widget> get _pages {
+    return [
+      DeviceScreen(
+        activeTabListenable: activeTab,
+        tabIndex: 0,
+        onLoadToConfig: (cfg) {
+          globalConfig.value =
+              List<Map<String, dynamic>>.from(cfg.map((e) => Map<String, dynamic>.from(e)));
+          _setIndex(1);
+        },
+      ),
+      ConfigScreen(
+        configNotifier: globalConfig,
+        activeTabListenable: activeTab,
+        tabIndex: 1,
+      ),
+      ProfilesScreen(
+        activeTabListenable: activeTab,
+        tabIndex: 2,
+        onSelectProfile: (cfg) {
+          globalConfig.value =
+              List<Map<String, dynamic>>.from(cfg.map((e) => Map<String, dynamic>.from(e)));
+          _setIndex(1);
+        },
+      ),
+      CalibrationScreen(
+        activeTabListenable: activeTab,
+        tabIndex: 3,
+      ),
+    ];
   }
 
   @override
@@ -76,10 +58,8 @@ class _MainNavigationState extends State<MainNavigation> {
   }
 
   void _setIndex(int value) {
-    if (value == index) return;
-    _pages.putIfAbsent(value, () => _buildPage(value));
+    if (value == activeTab.value) return;
     activeTab.value = value;
-    setState(() => index = value);
   }
 
   @override
@@ -87,15 +67,12 @@ class _MainNavigationState extends State<MainNavigation> {
     return Scaffold(
       body: RepaintBoundary(
         child: IndexedStack(
-          index: index,
-          children: List.generate(
-            4,
-            (pageIndex) => _pages[pageIndex] ?? const SizedBox.shrink(),
-          ),
+          index: activeTab.value,
+          children: _pages,
         ),
       ),
       bottomNavigationBar: StitchBottomNavigation(
-        currentIndex: index,
+        currentIndex: activeTab.value,
         onTap: _setIndex,
       ),
     );

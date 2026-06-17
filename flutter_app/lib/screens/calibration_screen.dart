@@ -6,6 +6,48 @@ import '../services/storage_service.dart';
 import '../widgets/app_theme.dart';
 import '../widgets/custom_ui.dart';
 
+// ---------------------------------------------------------------------------
+// Named constants for calibration field keys
+// ---------------------------------------------------------------------------
+
+/// Map key for the sensor key field within a calibration profile.
+const String _fieldSensorKey = 'sensor_key';
+
+/// Map key for the minimum threshold field.
+const String _fieldThresholdMin = 'threshold_min';
+
+/// Map key for the maximum threshold field.
+const String _fieldThresholdMax = 'threshold_max';
+
+/// Map key for calibration coefficient A.
+const String _fieldCalibrationA = 'calibration_a';
+
+/// Map key for calibration coefficient B.
+const String _fieldCalibrationB = 'calibration_b';
+
+/// Map key for calibration coefficient C.
+const String _fieldCalibrationC = 'calibration_c';
+
+// ---------------------------------------------------------------------------
+// Other named constants
+// ---------------------------------------------------------------------------
+
+/// Cache extent for the calibration list.
+const double _calibrationCacheExtent = 600;
+
+/// Error icon size.
+const double _errorIconSize = 56;
+
+/// Sensor card icon container size.
+const double _sensorCardIconSize = 36;
+
+/// Number of decimal places for double formatting.
+const int _formatDecimalPlaces = 4;
+
+// ---------------------------------------------------------------------------
+// CalibrationScreen
+// ---------------------------------------------------------------------------
+
 class CalibrationScreen extends StatefulWidget {
   final ValueListenable<int> activeTabListenable;
   final int tabIndex;
@@ -115,12 +157,12 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
     final updated = Map<String, dynamic>.from(_profiles);
     if (!updated.containsKey(key)) {
       updated[key] = {
-        'sensor_key': key,
-        'threshold_min': null,
-        'threshold_max': null,
-        'calibration_a': 1.0,
-        'calibration_b': 0.0,
-        'calibration_c': 0.0,
+        _fieldSensorKey: key,
+        _fieldThresholdMin: null,
+        _fieldThresholdMax: null,
+        _fieldCalibrationA: 1.0,
+        _fieldCalibrationB: 0.0,
+        _fieldCalibrationC: 0.0,
       };
     }
     updated[key] = Map<String, dynamic>.from(updated[key]);
@@ -202,7 +244,7 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
           children: [
             const Icon(
               Icons.cloud_off_rounded,
-              size: 56,
+              size: _errorIconSize,
               color: StitchColors.error,
             ),
             const SizedBox(height: 16),
@@ -232,7 +274,7 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
         physics: const BouncingScrollPhysics(
           parent: AlwaysScrollableScrollPhysics(),
         ),
-        cacheExtent: 600,
+        cacheExtent: _calibrationCacheExtent,
         padding: const EdgeInsets.fromLTRB(20, 24, 20, 200),
         children: [
           Row(
@@ -298,11 +340,11 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
   }
 
   Widget _buildSensorCard(String key, String label, String unit, Map<String, dynamic>? profile) {
-    final tMin = profile?['threshold_min'];
-    final tMax = profile?['threshold_max'];
-    final calA = profile?['calibration_a'] ?? 1.0;
-    final calB = profile?['calibration_b'] ?? 0.0;
-    final calC = profile?['calibration_c'] ?? 0.0;
+    final tMin = profile?[_fieldThresholdMin];
+    final tMax = profile?[_fieldThresholdMax];
+    final calA = profile?[_fieldCalibrationA] ?? 1.0;
+    final calB = profile?[_fieldCalibrationB] ?? 0.0;
+    final calC = profile?[_fieldCalibrationC] ?? 0.0;
 
     final isCalActive = calA != 1.0 || calB != 0.0 || calC != 0.0;
     final isLimitsSet = tMin != null || tMax != null;
@@ -316,8 +358,8 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
             Row(
               children: [
                 Container(
-                  width: 36,
-                  height: 36,
+                  width: _sensorCardIconSize,
+                  height: _sensorCardIconSize,
                   decoration: BoxDecoration(
                     color: StitchColors.surfaceContainer,
                     borderRadius: BorderRadius.circular(10),
@@ -420,7 +462,7 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
                 Expanded(
                   child: _buildNumberField(
                     key: key,
-                    field: 'threshold_min',
+                    field: _fieldThresholdMin,
                     label: 'Min',
                     value: tMin,
                     hint: unit.isNotEmpty ? unit : 'min',
@@ -430,7 +472,7 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
                 Expanded(
                   child: _buildNumberField(
                     key: key,
-                    field: 'threshold_max',
+                    field: _fieldThresholdMax,
                     label: 'Max',
                     value: tMax,
                     hint: unit.isNotEmpty ? unit : 'max',
@@ -451,11 +493,11 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
             const SizedBox(height: 10),
             Row(
               children: [
-                Expanded(child: _buildNumberField(key: key, field: 'calibration_a', label: 'A', value: calA)),
+                Expanded(child: _buildNumberField(key: key, field: _fieldCalibrationA, label: 'A', value: calA)),
                 const SizedBox(width: 10),
-                Expanded(child: _buildNumberField(key: key, field: 'calibration_b', label: 'B', value: calB)),
+                Expanded(child: _buildNumberField(key: key, field: _fieldCalibrationB, label: 'B', value: calB)),
                 const SizedBox(width: 10),
-                Expanded(child: _buildNumberField(key: key, field: 'calibration_c', label: 'C', value: calC)),
+                Expanded(child: _buildNumberField(key: key, field: _fieldCalibrationC, label: 'C', value: calC)),
               ],
             ),
           ],
@@ -529,6 +571,8 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
 
   String _formatDouble(double v) {
     if (v == v.roundToDouble()) return v.toInt().toString();
-    return v.toStringAsFixed(4).replaceAll(RegExp(r'0+$'), '').replaceAll(RegExp(r'\.$'), '');
+    return v.toStringAsFixed(_formatDecimalPlaces)
+        .replaceAll(RegExp(r'0+$'), '')
+        .replaceAll(RegExp(r'\.$'), '');
   }
 }

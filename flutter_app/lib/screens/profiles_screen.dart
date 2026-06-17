@@ -6,6 +6,53 @@ import '../services/storage_service.dart';
 import '../widgets/app_theme.dart';
 import '../widgets/custom_ui.dart';
 
+// ---------------------------------------------------------------------------
+// Named constants
+// ---------------------------------------------------------------------------
+
+/// Number of columns in the stats grid.
+const int _statsGridColumns = 3;
+
+/// Cache extent for the profiles list.
+const double _listCacheExtent = 500;
+
+/// Width subtracted from screen width for the title area.
+const double _titleWidthOffset = 120;
+
+/// Accent bar width.
+const double _accentBarWidth = 56;
+
+/// Accent bar height.
+const double _accentBarHeight = 4;
+
+/// Aspect ratio threshold for wide layout.
+const double _wideAspectThreshold = 760;
+
+/// Aspect ratio for wide layout.
+const double _wideAspectRatio = 1.9;
+
+/// Aspect ratio for narrow layout.
+const double _narrowAspectRatio = 1.15;
+
+/// Grid spacing.
+const double _gridSpacing = 10;
+
+/// Stat tile horizontal padding.
+const double _statTileH = 12;
+
+/// Stat tile vertical padding.
+const double _statTileV = 14;
+
+/// Delete button icon size.
+const double _deleteIconSize = 18;
+
+/// Delete button padding.
+const double _deleteButtonPadding = 8;
+
+// ---------------------------------------------------------------------------
+// ProfilesScreen
+// ---------------------------------------------------------------------------
+
 class ProfilesScreen extends StatefulWidget {
   final Function(List<Map<String, dynamic>>) onSelectProfile;
   final ValueListenable<int> activeTabListenable;
@@ -102,7 +149,7 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
               backgroundColor: StitchColors.surfaceHigh,
               onRefresh: _refresh,
               child: ListView(
-                cacheExtent: 500,
+                cacheExtent: _listCacheExtent,
                 padding: const EdgeInsets.fromLTRB(20, 24, 20, 120),
                 children: [
                   Wrap(
@@ -110,7 +157,7 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                     alignment: WrapAlignment.spaceBetween,
                     children: [
                       SizedBox(
-                        width: MediaQuery.of(context).size.width - 120,
+                        width: MediaQuery.of(context).size.width - _titleWidthOffset,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -140,8 +187,8 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                   ),
                   const SizedBox(height: 18),
                   Container(
-                    width: 56,
-                    height: 4,
+                    width: _accentBarWidth,
+                    height: _accentBarHeight,
                     decoration: BoxDecoration(
                       color: StitchColors.primaryContainer,
                       borderRadius: BorderRadius.circular(20),
@@ -150,13 +197,14 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                   const SizedBox(height: 22),
                   LayoutBuilder(
                     builder: (context, constraints) {
-                      final crossAxisCount = 3;
                       return GridView.count(
-                        crossAxisCount: crossAxisCount,
+                        crossAxisCount: _statsGridColumns,
                         shrinkWrap: true,
-                        mainAxisSpacing: 10,
-                        crossAxisSpacing: 10,
-                        childAspectRatio: constraints.maxWidth > 760 ? 1.9 : 1.15,
+                        mainAxisSpacing: _gridSpacing,
+                        crossAxisSpacing: _gridSpacing,
+                        childAspectRatio: constraints.maxWidth > _wideAspectThreshold
+                            ? _wideAspectRatio
+                            : _narrowAspectRatio,
                         physics: const NeverScrollableScrollPhysics(),
                         children: [
                           _buildStatTile(
@@ -274,7 +322,7 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                                   await StorageService.deleteProfile(index);
                                 },
                                 child: Container(
-                                  padding: const EdgeInsets.all(8),
+                                  padding: const EdgeInsets.all(_deleteButtonPadding),
                                   decoration: BoxDecoration(
                                     color: StitchColors.error.withValues(alpha: 0.1),
                                     shape: BoxShape.circle,
@@ -282,7 +330,7 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                                   child: const Icon(
                                     Icons.delete_outline_rounded,
                                     color: StitchColors.error,
-                                    size: 18,
+                                    size: _deleteIconSize,
                                   ),
                                 ),
                               ),
@@ -307,7 +355,7 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
     bool showPulse = false,
   }) {
     return StitchPanel(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: _statTileH, vertical: _statTileV),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,

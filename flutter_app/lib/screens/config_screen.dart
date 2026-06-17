@@ -13,6 +13,7 @@ import '../services/nfc_payload_service.dart';
 import '../services/nfc_service.dart';
 import '../services/storage_service.dart';
 import '../services/location_service.dart';
+import '../utils/config_validator.dart';
 import '../widgets/app_theme.dart';
 import '../widgets/custom_ui.dart';
 
@@ -32,8 +33,6 @@ class ConfigScreen extends StatefulWidget {
   State<ConfigScreen> createState() => _ConfigScreenState();
 }
 
-enum Esp32Variant { esp32Node30Pin, esp32Node38Pin }
-
 class _ConfigScreenState extends State<ConfigScreen> {
   final TextEditingController _keyController = TextEditingController();
   final TextEditingController _nfcAesKeyController = TextEditingController(
@@ -51,64 +50,6 @@ class _ConfigScreenState extends State<ConfigScreen> {
   bool _isFetchingLocation = false;
   bool _isWritingNfc = false;
   Esp32Variant _selectedVariant = Esp32Variant.esp32Node30Pin;
-
-  static const int maxFirmwareConfigSlots = 24;
-
-  // 30-pin variant safe pins (LoRa + WiFi I2C)
-  static const List<int> firmwareSafePins30Pin = [
-    4, 13, 16, 17, 21, 22, 25, 26,
-    32, 33, 34, 35, 36, 39,
-  ];
-
-  // 38-pin variant pins:
-  // LoRa RA-02: SCK=18, MISO=19, MOSI=23, CS=5, RST=2
-  // NFC PN532: SDA=21, SCL=22
-  // ADC1 (safe with WiFi): 32, 33, 34, 35, 36, 39
-  // Digital I/O: 12, 13, 15, 16, 17, 25, 26
-  static const List<int> firmwareSafePins38Pin = [
-    12, 13, 15, 16, 17,        // DI: DHT22, Rain, WaterTemp (all 5 DI pins)
-    25, 26,                     // DO: Relay
-    32, 33, 34, 35, 36, 39,    // AI: pH, TDS, Turbidity (all 6 analog pins)
-  ];
-
-  // Reserved pins for hardware modules
-  // LoRa RA-02: SCK=18, MISO=19, MOSI=23, CS=5, RST=2
-  // PN532 NFC: SDA=21, SCL=22
-  static const List<int> reservedNodePins = [2, 5, 18, 19, 21, 22, 23];
-
-  // Pin groups by function
-  // AI: Analog Input for pH, TDS, Turbidity (6 pins)
-  // DI: Digital Input for Rain, DHT22, WaterTemp (5 pins)
-  // DO: Digital Output for Relay (2 pins)
-  static const Map<String, List<int>> pinGroups = {
-    // Analog Input: pH, TDS, Turbidity
-    'AI': [32, 33, 34, 35, 36, 39],
-    // Digital Input: Rain (1 pin), DHT22 (1 pin), WaterTemp (1-Wire, 1 pin)
-    // Available: GPIO 12, 13, 15, 16, 17 (5 DI pins total)
-    'DI': [12, 13, 15, 16, 17],
-    // Digital Output: Relay (2 pins)
-    'DO': [25, 26],
-  };
-
-  static const Map<String, int> defaultSensorPins = {
-    'Turbidity': 36,   // AI
-    'Rain': 12,        // DI
-    'TDS': 34,         // AI
-    'pH': 35,          // AI
-    'DHT22': 16,       // DI
-    'WaterTemp': 17,   // DI
-    'Relay': 25,       // DO
-  };
-
-  static const Map<String, String> sensorRequirements = {
-    'pH': 'AI',
-    'TDS': 'AI',
-    'Turbidity': 'AI',
-    'Rain': 'DI',
-    'DHT22': 'DI',
-    'WaterTemp': 'DI',
-    'Relay': 'DO',
-  };
 
   @override
   void initState() {
@@ -142,7 +83,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
         _keyController.text = key;
       }
 
-      if (!_sameConfig(parsed, widget.configNotifier.value)) {
+      if (!ConfigValidator.sameConfig(parsed, widget.configNotifier.value)) {
         widget.configNotifier.value = parsed;
       }
 
@@ -156,23 +97,11 @@ class _ConfigScreenState extends State<ConfigScreen> {
     }
   }
 
-  bool _sameConfig(
-    List<Map<String, dynamic>> left,
-    List<Map<String, dynamic>> right,
-  ) {
-    if (identical(left, right)) return true;
-    if (left.length != right.length) return false;
-    for (var i = 0; i < left.length; i++) {
-      if (!mapEquals(left[i], right[i])) return false;
-    }
-    return true;
-  }
-
   Future<void> _saveSnapshot() async {
-    final normalizedConfig = _normalizedFirmwareConfig(
+    final normalizedConfig = ConfigValidator.normalizedFirmwareConfig(
       widget.configNotifier.value,
     );
-    if (!_sameConfig(normalizedConfig, widget.configNotifier.value)) {
+    if (!ConfigValidator.sameConfig(normalizedConfig, widget.configNotifier.value)) {
       widget.configNotifier.value = normalizedConfig;
     }
     await StorageService.saveConfig(
@@ -222,96 +151,24 @@ class _ConfigScreenState extends State<ConfigScreen> {
     }
   }
 
-  String _canonicalSensorName(String sensor) {
-    final normalized = sensor.trim().toUpperCase();
-    if (normalized == 'PH') return 'pH';
-    if (normalized == 'TDS') return 'TDS';
-    if (normalized == 'TURBIDITY') return 'Turbidity';
-    if (normalized == 'RAIN') return 'Rain';
-    if (normalized == 'DHT22') return 'DHT22';
-    if (normalized == 'WATERTEMP') return 'WaterTemp';
-    if (normalized == 'RELAY') return 'Relay';
-    return sensor.trim();
-  }
+  // ---------------------------------------------------------------------------
+  // Validation helpers (delegated to ConfigValidator)
+  // ---------------------------------------------------------------------------
 
   List<Map<String, dynamic>> _normalizedFirmwareConfig(
     List<Map<String, dynamic>> config,
-  ) {
-    return config.map((item) {
-      final sensor = _canonicalSensorName(item['sensor']?.toString() ?? '');
-      final expectedType = sensorRequirements[sensor];
-      final normalized = <String, dynamic>{
-        'pin': item['pin'],
-        'sensor': sensor,
-        'type': expectedType ?? item['type']?.toString().toUpperCase(),
-      };
-      final label = item['label']?.toString().trim();
-      if (label != null && label.isNotEmpty) {
-        normalized['label'] = label;
-      }
-      return normalized;
-    }).toList();
-  }
+  ) =>
+      ConfigValidator.normalizedFirmwareConfig(config);
 
-  List<String> _firmwareConfigErrors(List<Map<String, dynamic>> config, {Esp32Variant? variant}) {
-    final errors = <String>[];
-    final usedPins = <int>{};
-    final safePins = variant == null
-        ? firmwareSafePins30Pin // Default to 30-pin
-        : (variant == Esp32Variant.esp32Node30Pin ? firmwareSafePins30Pin : firmwareSafePins38Pin);
-    final maxSlots = variant == null
-        ? 15
-        : (variant == Esp32Variant.esp32Node30Pin ? 15 : 24);
-
-    if (config.isEmpty) {
-      errors.add('Add at least one GPIO node before deploying.');
-    }
-
-    if (config.length > maxSlots) {
-      errors.add(
-        'ESP32 firmware supports only $maxSlots GPIO config slots.',
-      );
-    }
-
-    for (final item in config) {
-      final pin = item['pin'];
-      final sensor = item['sensor']?.toString() ?? '';
-      final type = item['type']?.toString().toUpperCase() ?? '';
-
-      if (pin is! int) {
-        errors.add('$sensor has an invalid GPIO pin.');
-        continue;
-      }
-
-      if (!safePins.contains(pin)) {
-        errors.add('GPIO $pin is not accepted by the ESP32 node firmware.');
-      }
-
-      if (reservedNodePins.contains(pin)) {
-        errors.add('GPIO $pin is reserved by LoRa/NFC hardware on this node.');
-      }
-
-      if (!usedPins.add(pin)) {
-        errors.add('GPIO $pin is assigned more than once.');
-      }
-
-      if (!sensorRequirements.containsKey(sensor)) {
-        errors.add('$sensor is not a supported firmware sensor type.');
-        continue;
-      }
-
-      final expectedType = sensorRequirements[sensor]!;
-      if (type != expectedType) {
-        errors.add('$sensor must use $expectedType, not $type.');
-      }
-
-      final validPins = pinGroups[expectedType] ?? const <int>[];
-      if (!validPins.contains(pin)) {
-        errors.add('GPIO $pin cannot be used as $expectedType for $sensor.');
-      }
-    }
-
-    return errors;
+  List<String> _firmwareConfigErrors(
+    List<Map<String, dynamic>> config, {
+    Esp32Variant? variant,
+  }) {
+    final errors = ConfigValidator.firmwareConfigErrors(
+      config,
+      variant: variant ?? Esp32Variant.esp32Node30Pin,
+    );
+    return errors.map((e) => e.message).toList();
   }
 
   Future<Map<String, dynamic>?> _buildConfigWithMetadata({
@@ -353,7 +210,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
       return null;
     }
 
-    if (!_sameConfig(normalizedConfig, widget.configNotifier.value)) {
+    if (!ConfigValidator.sameConfig(normalizedConfig, widget.configNotifier.value)) {
       widget.configNotifier.value = normalizedConfig;
     }
 
@@ -625,17 +482,8 @@ class _ConfigScreenState extends State<ConfigScreen> {
     widget.configNotifier.value = updated;
   }
 
-  IconData _componentIcon(String component) {
-    final normalized = component.toLowerCase();
-    if (normalized.contains('pump')) return Icons.water_rounded;
-    if (normalized.contains('valve')) return Icons.tune_rounded;
-    if (normalized.contains('relay')) return Icons.toggle_on_rounded;
-    if (normalized.contains('temp')) return Icons.thermostat_rounded;
-    if (normalized.contains('ph')) return Icons.science_outlined;
-    if (normalized.contains('tds')) return Icons.opacity_rounded;
-    if (normalized.contains('turbidity')) return Icons.water_drop_outlined;
-    return Icons.sensors_outlined;
-  }
+  IconData _componentIcon(String component) =>
+      ConfigValidator.componentIcon(component);
 
   String _componentDisplayName(Map<String, dynamic> item) {
     final sensor = item['sensor']?.toString().trim() ?? 'Node';
@@ -648,10 +496,10 @@ class _ConfigScreenState extends State<ConfigScreen> {
 
   Future<void> _showAddNodeSheet() async {
     FocusManager.instance.primaryFocus?.unfocus();
-    if (widget.configNotifier.value.length >= maxFirmwareConfigSlots) {
+    if (widget.configNotifier.value.length >= ConfigValidator.maxFirmwareConfigSlots) {
       showStitchMessage(
         context,
-        'ESP32 firmware supports only $maxFirmwareConfigSlots GPIO config slots.',
+        'ESP32 firmware supports only ${ConfigValidator.maxFirmwareConfigSlots} GPIO config slots.',
         isError: true,
       );
       return;
@@ -1493,7 +1341,7 @@ class _AddNodeSheetState extends State<_AddNodeSheet> {
   }
 
   String get _requiredType {
-    return _ConfigScreenState.sensorRequirements[_selectedSensor]!;
+    return ConfigValidator.sensorRequirements[_selectedSensor]!;
   }
 
   bool get _isRelay => _selectedSensor == 'Relay';
@@ -1501,22 +1349,13 @@ class _AddNodeSheetState extends State<_AddNodeSheet> {
   List<int> get _availablePins {
     final usedPins = widget.existingConfig.map((e) => e['pin'] as int).toSet();
 
-    return _ConfigScreenState.pinGroups[_requiredType]!
+    return ConfigValidator.pinGroups[_requiredType]!
         .where((pin) => !usedPins.contains(pin))
         .toList();
   }
 
-  IconData _componentIcon(String component) {
-    final normalized = component.toLowerCase();
-    if (normalized.contains('pump')) return Icons.water_rounded;
-    if (normalized.contains('valve')) return Icons.tune_rounded;
-    if (normalized.contains('relay')) return Icons.toggle_on_rounded;
-    if (normalized.contains('temp')) return Icons.thermostat_rounded;
-    if (normalized.contains('ph')) return Icons.science_outlined;
-    if (normalized.contains('tds')) return Icons.opacity_rounded;
-    if (normalized.contains('turbidity')) return Icons.water_drop_outlined;
-    return Icons.sensors_outlined;
-  }
+  IconData _componentIcon(String component) =>
+      ConfigValidator.componentIcon(component);
 
   Future<T?> _showPickerSheet<T>({
     required BuildContext context,
@@ -1667,13 +1506,13 @@ class _AddNodeSheetState extends State<_AddNodeSheet> {
                 final value = await _showPickerSheet<String>(
                   context: context,
                   title: 'Select Component Type',
-                  values: _ConfigScreenState.sensorRequirements.keys.toList(),
+                  values: ConfigValidator.sensorRequirements.keys.toList(),
                   selectedValue: _selectedSensor,
                   labelBuilder: (sensor) => sensor,
                   iconBuilder: _componentIcon,
                 );
                 if (value == null || !mounted) return;
-                final defaultPin = _ConfigScreenState.defaultSensorPins[value];
+                final defaultPin = ConfigValidator.defaultSensorPins[value];
                 setState(() {
                   _selectedSensor = value;
                   _selectedPin = defaultPin;

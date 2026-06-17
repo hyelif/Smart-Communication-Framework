@@ -10,6 +10,7 @@ class SettingsProvider extends ChangeNotifier {
   Map<String, dynamic> _calibrationProfiles = {};
   bool _isLoading = false;
   String? _error;
+  bool _disposed = false;
 
   Map<String, dynamic> get config => _config;
   List<Map<String, dynamic>> get profiles => _profiles;
@@ -17,10 +18,20 @@ class SettingsProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
+  void _notifyListeners() {
+    if (!_disposed) notifyListeners();
+  }
+
   Future<void> loadConfig() async {
     _isLoading = true;
     _error = null;
-    notifyListeners();
+    _notifyListeners();
 
     try {
       _config = await _repository.loadConfig();
@@ -28,7 +39,7 @@ class SettingsProvider extends ChangeNotifier {
       _error = e.toString();
     } finally {
       _isLoading = false;
-      notifyListeners();
+      _notifyListeners();
     }
   }
 
@@ -36,16 +47,16 @@ class SettingsProvider extends ChangeNotifier {
     try {
       await _repository.saveConfig(config, key);
       _config = {'config': config, 'key': key};
-      notifyListeners();
+      _notifyListeners();
     } catch (e) {
       _error = e.toString();
-      notifyListeners();
+      _notifyListeners();
     }
   }
 
   Future<void> loadProfiles() async {
     _isLoading = true;
-    notifyListeners();
+    _notifyListeners();
 
     try {
       _profiles = await _repository.getProfiles();
@@ -53,7 +64,7 @@ class SettingsProvider extends ChangeNotifier {
       _error = e.toString();
     } finally {
       _isLoading = false;
-      notifyListeners();
+      _notifyListeners();
     }
   }
 
@@ -63,7 +74,7 @@ class SettingsProvider extends ChangeNotifier {
       await loadProfiles();
     } catch (e) {
       _error = e.toString();
-      notifyListeners();
+      _notifyListeners();
     }
   }
 
@@ -71,16 +82,16 @@ class SettingsProvider extends ChangeNotifier {
     try {
       await _repository.deleteProfile(index);
       _profiles.removeAt(index);
-      notifyListeners();
+      _notifyListeners();
     } catch (e) {
       _error = e.toString();
-      notifyListeners();
+      _notifyListeners();
     }
   }
 
   Future<void> loadCalibrationProfiles() async {
     _isLoading = true;
-    notifyListeners();
+    _notifyListeners();
 
     try {
       _calibrationProfiles = await _repository.loadCalibrationProfiles();
@@ -88,7 +99,7 @@ class SettingsProvider extends ChangeNotifier {
       _error = e.toString();
     } finally {
       _isLoading = false;
-      notifyListeners();
+      _notifyListeners();
     }
   }
 
@@ -96,10 +107,10 @@ class SettingsProvider extends ChangeNotifier {
     try {
       await _repository.saveCalibrationProfiles(profiles);
       _calibrationProfiles = profiles;
-      notifyListeners();
+      _notifyListeners();
     } catch (e) {
       _error = e.toString();
-      notifyListeners();
+      _notifyListeners();
     }
   }
 

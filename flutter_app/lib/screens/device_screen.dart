@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 
 import '../services/api_service.dart';
 import '../services/storage_service.dart';
+import '../utils/config_validator.dart';
 import '../widgets/app_theme.dart';
 import '../widgets/custom_ui.dart';
 import '../widgets/sensor_matrix.dart';
@@ -107,7 +108,7 @@ class _DeviceScreenState extends State<DeviceScreen>
       }
 
       if (!mounted) return;
-      final changed = !_sameConfig(parsed, deviceConfig);
+      final changed = !ConfigValidator.sameConfig(parsed, deviceConfig);
       final healthChanged = !mapEquals(nextHealth, _nodeHealth) ||
           nextHealthMessage != _healthMessage;
       if (changed || healthChanged || loading) {
@@ -193,18 +194,6 @@ class _DeviceScreenState extends State<DeviceScreen>
       return '${minutes}m ${seconds}s';
     }
     return '${seconds}s';
-  }
-
-  bool _sameConfig(
-    List<Map<String, dynamic>> left,
-    List<Map<String, dynamic>> right,
-  ) {
-    if (identical(left, right)) return true;
-    if (left.length != right.length) return false;
-    for (var i = 0; i < left.length; i++) {
-      if (!mapEquals(left[i], right[i])) return false;
-    }
-    return true;
   }
 
   Future<void> _saveCurrent() async {

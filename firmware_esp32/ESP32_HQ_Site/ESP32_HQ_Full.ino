@@ -60,7 +60,7 @@ bool isBinaryFormat(const uint8_t* d, size_t l) { return l > 0 && d[0] <= BIN_MA
 // ================= GLOBALS =================
 const char* WIFI_SSID = "Kimie";
 const char* WIFI_PASS = "00008888";
-const char* API_URL   = "http://172.20.10.3/smartponic/receive_data.php";
+const char* API_URL   = "https://smartponic-dashboard.onrender.com/api/receive-data";
 
 String gAesKey = "SmartPonic123456";
 String gApiKey = "smartponic-hq-key";

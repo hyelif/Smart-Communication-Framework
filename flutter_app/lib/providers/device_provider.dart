@@ -10,21 +10,32 @@ class DeviceProvider extends ChangeNotifier {
   bool _isLoading = false;
   bool _nfcAvailable = false;
   String? _error;
+  bool _disposed = false;
 
   List<Map<String, dynamic>> get liveSensors => _liveSensors;
   bool get isLoading => _isLoading;
   bool get nfcAvailable => _nfcAvailable;
   String? get error => _error;
 
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
+  void _notifyListeners() {
+    if (!_disposed) notifyListeners();
+  }
+
   Future<void> checkNfcAvailability() async {
     _nfcAvailable = await _repository.isNfcAvailable();
-    notifyListeners();
+    _notifyListeners();
   }
 
   Future<void> fetchLiveSensors() async {
     _isLoading = true;
     _error = null;
-    notifyListeners();
+    _notifyListeners();
 
     try {
       _liveSensors = await _repository.fetchLiveSensors();
@@ -32,7 +43,7 @@ class DeviceProvider extends ChangeNotifier {
       _error = e.toString();
     } finally {
       _isLoading = false;
-      notifyListeners();
+      _notifyListeners();
     }
   }
 
@@ -43,7 +54,7 @@ class DeviceProvider extends ChangeNotifier {
   }) async {
     _isLoading = true;
     _error = null;
-    notifyListeners();
+    _notifyListeners();
 
     try {
       final result = await _repository.writeSmartPonicTag(
@@ -52,12 +63,12 @@ class DeviceProvider extends ChangeNotifier {
         aesKey: aesKey,
       );
       _isLoading = false;
-      notifyListeners();
+      _notifyListeners();
       return result;
     } catch (e) {
       _error = e.toString();
       _isLoading = false;
-      notifyListeners();
+      _notifyListeners();
       return null;
     }
   }
@@ -69,7 +80,7 @@ class DeviceProvider extends ChangeNotifier {
   }) async {
     _isLoading = true;
     _error = null;
-    notifyListeners();
+    _notifyListeners();
 
     try {
       final result = await _repository.prepareDirectPhoneTap(
@@ -78,12 +89,12 @@ class DeviceProvider extends ChangeNotifier {
         aesKey: aesKey,
       );
       _isLoading = false;
-      notifyListeners();
+      _notifyListeners();
       return result;
     } catch (e) {
       _error = e.toString();
       _isLoading = false;
-      notifyListeners();
+      _notifyListeners();
       return null;
     }
   }

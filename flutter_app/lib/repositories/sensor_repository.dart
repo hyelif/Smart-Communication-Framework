@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '../services/api_service.dart';
 import '../services/storage_service.dart';
 import '../models/sensor_model.dart';
@@ -20,9 +22,11 @@ class SensorRepository {
 
   Future<List<Map<String, dynamic>>> loadConfig() async {
     final data = await StorageService.loadConfig();
-    final configJson = data['config'];
-    if (configJson == null) return [];
-    return List<Map<String, dynamic>>.from(configJson);
+    final configJson = data['config'] as String?;
+    if (configJson == null || configJson.isEmpty) return [];
+    final decoded = jsonDecode(configJson);
+    if (decoded is! List) return [];
+    return List<Map<String, dynamic>>.from(decoded);
   }
 
   Future<void> saveConfig(List<Map<String, dynamic>> config, String key) async {

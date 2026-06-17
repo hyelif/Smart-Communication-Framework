@@ -1,13 +1,8 @@
-import 'dart:math';
-
 import 'package:auto_size_text/auto_size_text.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
 import '../widgets/app_theme.dart';
 import '../widgets/custom_ui.dart';
-
-enum _Trend { up, down, stable }
 
 class SensorMatrix extends StatelessWidget {
   final List<Map<String, dynamic>> deviceConfig;
@@ -21,11 +16,11 @@ class SensorMatrix extends StatelessWidget {
     this.loading = false,
   });
 
-  static const _accentColors = [
+  static final _accentColors = [
     StitchColors.primaryContainer,
     StitchColors.secondary,
     StitchColors.tertiaryFixed,
-    Color(0xFF00FF87),
+    const Color(0xFF00FF87),
   ];
 
   String _displayName(Map<String, dynamic> item) {
@@ -180,76 +175,19 @@ class AnimatedTelemetryCard extends StatefulWidget {
 class _AnimatedTelemetryCardState extends State<AnimatedTelemetryCard>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
-  late final Animation<double> _sweepAnimation;
-  late double _targetPct;
-  late String _valText;
-  late _Trend _trend;
-  late String _trendLabel;
-  late List<FlSpot> _sparklineSpots;
+  late final Animation<double> _pulseAnimation;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: Duration(milliseconds: 600 + widget.index * 100),
+      duration: const Duration(milliseconds: 1500),
     );
-    _sweepAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
+    _pulseAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOutSine),
     );
-
-    _loadMockTelemetry();
-    _controller.forward();
-  }
-
-  void _loadMockTelemetry() {
-    final sensor = (widget.item['sensor']?.toString() ?? '').toLowerCase();
-    final label = (widget.item['label']?.toString() ?? '').toLowerCase();
-
-    if (sensor.contains('ph')) {
-      _targetPct = 6.8 / 14.0;
-      _valText = '6.8 pH';
-    } else if (sensor.contains('temp') || label.contains('temp')) {
-      _targetPct = 26.5 / 50.0;
-      _valText = '26.5 °C';
-    } else if (sensor.contains('tds')) {
-      _targetPct = 340.0 / 1000.0;
-      _valText = '340 ppm';
-    } else if (sensor.contains('turbidity')) {
-      _targetPct = 18.0 / 100.0;
-      _valText = '18 NTU';
-    } else if (sensor.contains('rain')) {
-      _targetPct = 0.08;
-      _valText = 'DRY';
-    } else if (sensor.contains('relay') || label.contains('relay') ||
-        sensor.contains('pump') || label.contains('pump')) {
-      _targetPct = 1.0;
-      _valText = 'ACTIVE';
-    } else {
-      _targetPct = 0.72;
-      _valText = 'ON';
-    }
-
-    // Trend: deterministic pseudo-random based on index
-    final variance = ((widget.index * 0.37) % 1.0) * 1.5 - 0.5;
-    if (variance > 0.2) {
-      _trend = _Trend.up;
-      _trendLabel = '+${variance.toStringAsFixed(1)}';
-    } else if (variance < -0.2) {
-      _trend = _Trend.down;
-      _trendLabel = variance.toStringAsFixed(1);
-    } else {
-      _trend = _Trend.stable;
-      _trendLabel = '0.0';
-    }
-
-    // Sparkline: 10 data points clustered around target
-    final rng = Random(widget.index * 7 + 13);
-    final base = _targetPct * 100;
-    _sparklineSpots = List.generate(10, (i) {
-      final noise = (rng.nextDouble() - 0.5) * 15;
-      return FlSpot(i.toDouble(), (base + noise).clamp(0.0, 100.0));
-    });
+    _controller.repeat(reverse: true);
   }
 
   @override
@@ -258,7 +196,7 @@ class _AnimatedTelemetryCardState extends State<AnimatedTelemetryCard>
     super.dispose();
   }
 
-  IconData _iconForSensor(String sensor) {
+  static IconData _iconForSensor(String sensor) {
     final normalized = sensor.toLowerCase();
     if (normalized.contains('pump')) return Icons.water_rounded;
     if (normalized.contains('valve')) return Icons.tune_rounded;
@@ -275,8 +213,6 @@ class _AnimatedTelemetryCardState extends State<AnimatedTelemetryCard>
 
   @override
   Widget build(BuildContext context) {
-    final sensorType = (widget.item['sensor']?.toString() ?? '').toLowerCase();
-
     return StitchPanel(
       color: StitchColors.surfaceLowest,
       padding: const EdgeInsets.all(16),
@@ -334,61 +270,28 @@ class _AnimatedTelemetryCardState extends State<AnimatedTelemetryCard>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    AutoSizeText(
-                      _valText,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: StitchColors.primary,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                          ),
-                      maxLines: 1,
-                      minFontSize: 12,
-                    ),
-                    const SizedBox(height: 2),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _trend == _Trend.up
-                              ? Icons.trending_up_rounded
-                              : _trend == _Trend.down
-                                  ? Icons.trending_down_rounded
-                                  : Icons.trending_flat_rounded,
-                          size: 12,
-                          color: _trend == _Trend.up
-                              ? StitchColors.trendUp
-                              : _trend == _Trend.down
-                                  ? StitchColors.trendDown
-                                  : StitchColors.trendStable,
-                        ),
-                        const SizedBox(width: 2),
-                        AutoSizeText(
-                          _trendLabel,
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            color: _trend == _Trend.up
-                                ? StitchColors.trendUp
-                                : _trend == _Trend.down
-                                    ? StitchColors.trendDown
-                                    : StitchColors.trendStable,
-                          ),
-                          maxLines: 1,
-                          minFontSize: 8,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
                     AnimatedBuilder(
-                      animation: _sweepAnimation,
+                      animation: _pulseAnimation,
                       builder: (context, child) {
-                        final currentPct = _sweepAnimation.value * _targetPct;
-                        return _buildVisualTelemetryBar(sensorType, currentPct);
+                        return Opacity(
+                          opacity: _pulseAnimation.value,
+                          child: AutoSizeText(
+                            'AWAITING\nSIGNAL',
+                            textAlign: TextAlign.right,
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  color: StitchColors.onSurfaceVariant,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.8,
+                                ),
+                            maxLines: 2,
+                            minFontSize: 8,
+                          ),
+                        );
                       },
                     ),
-                    const SizedBox(height: 6),
-                    _buildSparkline(),
+                    const SizedBox(height: 8),
+                    _buildNoDataBar(),
                   ],
                 ),
               ),
@@ -399,134 +302,12 @@ class _AnimatedTelemetryCardState extends State<AnimatedTelemetryCard>
     );
   }
 
-  Widget _buildSparkline() {
-    return SizedBox(
-      width: 104,
-      height: 28,
-      child: LineChart(
-        LineChartData(
-          minY: 0,
-          maxY: 100,
-          gridData: const FlGridData(show: false),
-          borderData: FlBorderData(show: false),
-          titlesData: const FlTitlesData(show: false),
-          lineTouchData: const LineTouchData(enabled: false),
-          lineBarsData: [
-            LineChartBarData(
-              spots: _sparklineSpots,
-              isCurved: true,
-              curveSmoothness: 0.3,
-              color: widget.accent,
-              barWidth: 2,
-              isStrokeCapRound: true,
-              dotData: const FlDotData(show: false),
-              belowBarData: BarAreaData(
-                show: true,
-                color: widget.accent.withValues(alpha: 0.15),
-              ),
-            ),
-          ],
-        ),
-        duration: const Duration(milliseconds: 300),
-      ),
-    );
-  }
-
-  Gradient _barGradient(String sensorType) {
-    if (sensorType.contains('temp')) return AppTheme.tempGradient;
-    if (sensorType.contains('tds')) return AppTheme.tdsGradient;
-    return LinearGradient(
-      colors: [widget.accent, widget.accent],
-    );
-  }
-
-  Widget _buildVisualTelemetryBar(String sensorType, double pct) {
-    if (sensorType.contains('ph')) {
-      return Container(
-        height: 6,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(3),
-          gradient: AppTheme.phGradient,
-        ),
-        child: Align(
-          alignment: Alignment(pct * 2 - 1, 0),
-          child: Container(
-            width: 8,
-            height: 8,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black45,
-                  blurRadius: 2,
-                )
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (sensorType.contains('relay') || sensorType.contains('pump')) {
-      return Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: const Color(0xFF00FF87),
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF00FF87).withValues(alpha: 0.5),
-                  blurRadius: 4,
-                  spreadRadius: 1,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 6),
-          AutoSizeText(
-            'ON',
-            style: const TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w900,
-              color: Color(0xFF00FF87),
-              letterSpacing: 0.5,
-            ),
-            maxLines: 1,
-            minFontSize: 8,
-          ),
-        ],
-      );
-    }
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(4),
-      child: SizedBox(
-        height: 6,
-        child: Stack(
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                color: StitchColors.surfaceLow,
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-            FractionallySizedBox(
-              alignment: Alignment.centerLeft,
-              widthFactor: pct.clamp(0.0, 1.0),
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(4),
-                  gradient: _barGradient(sensorType),
-                ),
-              ),
-            ),
-          ],
-        ),
+  Widget _buildNoDataBar() {
+    return Container(
+      height: 6,
+      decoration: BoxDecoration(
+        color: StitchColors.surfaceLow,
+        borderRadius: BorderRadius.circular(3),
       ),
     );
   }

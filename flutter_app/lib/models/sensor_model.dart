@@ -21,7 +21,7 @@ class SensorModel {
   }
 
   Map<String, dynamic> toMap() {
-    final map = {
+    final map = <String, dynamic>{
       'pin': pin,
       'sensor': sensor,
       'type': type,
@@ -30,5 +30,37 @@ class SensorModel {
       map['label'] = label!;
     }
     return map;
+  }
+
+  SensorModel copyWith({
+    int? pin,
+    String? sensor,
+    String? type,
+    String? label,
+  }) {
+    return SensorModel(
+      pin: pin ?? this.pin,
+      sensor: sensor ?? this.sensor,
+      type: type ?? this.type,
+      label: label ?? this.label,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is SensorModel &&
+        other.pin == pin &&
+        other.sensor == sensor &&
+        other.type == type &&
+        other.label == label;
+  }
+
+  @override
+  int get hashCode => Object.hash(pin, sensor, type, label);
+
+  @override
+  String toString() {
+    return 'SensorModel(pin: $pin, sensor: $sensor, type: $type, label: $label)';
   }
 }

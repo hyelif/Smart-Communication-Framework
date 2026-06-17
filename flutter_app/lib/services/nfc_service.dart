@@ -180,7 +180,7 @@ class NfcService {
       records: [
         NdefRecord(
           typeNameFormat: TypeNameFormat.media,
-          type: Uint8List.fromList(utf8Bytes(NfcPayloadService.mimeType)),
+          type: Uint8List.fromList(utf8.encode(NfcPayloadService.mimeType)),
           identifier: Uint8List(0),
           payload: encryptedPayload,
         ),
@@ -230,9 +230,6 @@ class NfcService {
     );
   }
 
-  static List<int> utf8Bytes(String value) {
-    return Uint8List.fromList(value.codeUnits);
-  }
 }
 
 class NfcException implements Exception {

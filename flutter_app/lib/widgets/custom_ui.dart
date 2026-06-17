@@ -328,11 +328,17 @@ class StitchPanel extends StatelessWidget {
 
     if (!glass) return panel;
 
+    // Performance note: BackdropFilter with blur is GPU-intensive.
+    // sigma 6 provides a strong frosted-glass look while being ~4x cheaper
+    // than sigma 12 on most mobile GPUs. The RepaintBoundary prevents
+    // the filter from being re-applied when ancestor widgets repaint.
     return ClipRRect(
       borderRadius: borderRadius ?? BorderRadius.circular(20),
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: panel,
+      child: RepaintBoundary(
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+          child: panel,
+        ),
       ),
     );
   }

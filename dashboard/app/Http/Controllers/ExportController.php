@@ -2,8 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\TursoService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
@@ -42,17 +43,24 @@ class ExportController extends Controller
     private const ALLOWED_RANGES = ['1 HOUR', '6 HOUR', '24 HOUR', '7 DAY', '30 DAY'];
     private const MAX_POINTS_PER_SHEET = 1000;
 
+    private TursoService $turso;
+
+    public function __construct(TursoService $turso)
+    {
+        $this->turso = $turso;
+    }
+
     public function export(Request $request)
     {
         $range = $this->validateRange($request->query('range', '24 HOUR'));
         $hardwareId = $request->query('hardware_id');
 
-        $sensorTypes = DB::table('sensor_data')
-            ->select('sensor')
-            ->distinct()
-            ->pluck('sensor');
+        $sensorTypes = $this->turso->query(
+            "SELECT DISTINCT sensor FROM sensor_data ORDER BY sensor"
+        );
+        $sensorNames = array_column($sensorTypes, 'sensor');
 
-        if ($sensorTypes->isEmpty()) {
+        if (empty($sensorNames)) {
             return response()->json(['error' => 'No data found'], 404);
         }
 
@@ -71,9 +79,9 @@ class ExportController extends Controller
         $first = true;
         $startTime = microtime(true);
 
-        foreach ($sensorTypes as $sensor) {
+        foreach ($sensorNames as $sensor) {
             $data = $this->fetchSensorData($sensor, $range, $hardwareId);
-            if ($data->isEmpty()) continue;
+            if (empty($data)) continue;
 
             $sheetLabel = substr(self::SENSOR_NAMES[$sensor] ?? $sensor, 0, 31);
             $sheet = $spreadsheet->createSheet();
@@ -121,38 +129,41 @@ class ExportController extends Controller
         $sheet->setCellValue('B4', $range);
 
         if ($hardwareId) {
-            $node = DB::table('nodes')->where('hardware_id', $hardwareId)->first();
+            $node = $this->turso->queryOne(
+                "SELECT * FROM nodes WHERE hardware_id = ?",
+                [$hardwareId]
+            );
             $sheet->setCellValue('A5', 'Hardware ID:');
             $sheet->setCellValue('B5', $hardwareId);
             if ($node) {
                 $sheet->setCellValue('A6', 'Node Name:');
-                $sheet->setCellValue('B6', $node->name ?? '-');
+                $sheet->setCellValue('B6', $node['name'] ?? '-');
                 $sheet->setCellValue('A7', 'Location:');
-                $sheet->setCellValue('B7', $node->location ?? '-');
+                $sheet->setCellValue('B7', $node['location'] ?? '-');
             }
         }
 
-        $sensorCount = DB::table('sensor_data')
-            ->select('sensor')
-            ->distinct()
-            ->pluck('sensor')
-            ->toArray();
+        $sensorTypes = $this->turso->query(
+            "SELECT DISTINCT sensor FROM sensor_data ORDER BY sensor"
+        );
+        $sensorNames = array_column($sensorTypes, 'sensor');
 
         $sheet->setCellValue('A9', 'Sensors Available:');
-        $sheet->setCellValue('B9', implode(', ', $sensorCount));
+        $sheet->setCellValue('B9', implode(', ', $sensorNames));
 
-        $stats = DB::table('sensor_readings')
-            ->where('created_at', '>=', DB::raw("NOW() - INTERVAL {$range}"))
-            ->selectRaw('COUNT(*) as readings, MIN(created_at) as earliest, MAX(created_at) as latest')
-            ->first();
+        $stats = $this->turso->queryOne(
+            "SELECT COUNT(*) as readings, MIN(created_at) as earliest, MAX(created_at) as latest"
+            . " FROM sensor_readings"
+            . " WHERE created_at >= datetime('now', '-{$this->sqliteRange($range)}')"
+        );
 
-        if ($stats && $stats->readings) {
+        if ($stats && ($stats['readings'] ?? 0) > 0) {
             $sheet->setCellValue('A10', 'Total Readings:');
-            $sheet->setCellValue('B10', (int) $stats->readings);
+            $sheet->setCellValue('B10', (int) $stats['readings']);
             $sheet->setCellValue('A11', 'Earliest:');
-            $sheet->setCellValue('B11', $stats->earliest);
+            $sheet->setCellValue('B11', $stats['earliest']);
             $sheet->setCellValue('A12', 'Latest:');
-            $sheet->setCellValue('B12', $stats->latest);
+            $sheet->setCellValue('B12', $stats['latest']);
         }
 
         $sheet->getStyle('A3:A12')->getFont()->setBold(true);
@@ -160,31 +171,35 @@ class ExportController extends Controller
         $sheet->getColumnDimension('B')->setWidth(40);
     }
 
-    private function fetchSensorData(string $sensor, string $range, ?string $hardwareId)
+    private function fetchSensorData(string $sensor, string $range, ?string $hardwareId): array
     {
-        $query = DB::table('sensor_data as sd')
-            ->join('sensor_readings as sr', 'sd.reading_id', '=', 'sr.id')
-            ->where('sd.sensor', $sensor)
-            ->where('sr.created_at', '>=', DB::raw("NOW() - INTERVAL {$range}"))
-            ->orderBy('sr.created_at')
-            ->select('sd.value', 'sr.created_at', 'sr.rssi', 'sr.hardware_id');
+        $sql = "SELECT sd.value, sr.created_at, sr.rssi, sr.hardware_id"
+            . " FROM sensor_data AS sd"
+            . " JOIN sensor_readings AS sr ON sd.reading_id = sr.id"
+            . " WHERE sd.sensor = ?"
+            . " AND sr.created_at >= datetime('now', '-{$this->sqliteRange($range)}')";
+
+        $params = [$sensor];
 
         if ($hardwareId) {
-            $query->where('sr.hardware_id', $hardwareId);
+            $sql .= " AND sr.hardware_id = ?";
+            $params[] = $hardwareId;
         }
 
-        $rows = $query->get();
+        $sql .= " ORDER BY sr.created_at";
+
+        $rows = $this->turso->query($sql, $params);
 
         // Downsample if needed
-        if ($rows->count() > self::MAX_POINTS_PER_SHEET) {
-            $step = ceil($rows->count() / self::MAX_POINTS_PER_SHEET);
-            return $rows->nth($step);
+        if (count($rows) > self::MAX_POINTS_PER_SHEET) {
+            $step = ceil(count($rows) / self::MAX_POINTS_PER_SHEET);
+            return $this->arrayNth($rows, $step);
         }
 
         return $rows;
     }
 
-    private function writeDataSheet($sheet, string $sensor, $data): void
+    private function writeDataSheet($sheet, string $sensor, array $data): void
     {
         $unit = self::SENSOR_UNITS[$sensor] ?? '';
         $label = self::SENSOR_NAMES[$sensor] ?? $sensor;
@@ -209,17 +224,17 @@ class ExportController extends Controller
         $row = 4;
         $numericCount = 0;
         foreach ($data as $d) {
-            $sheet->setCellValue("A{$row}", $d->created_at);
+            $sheet->setCellValue("A{$row}", $d['created_at']);
             $sheet->setCellValue("C{$row}", $unit);
 
-            if (is_numeric($d->value)) {
-                $sheet->setCellValue("B{$row}", (float) $d->value);
+            if (is_numeric($d['value'])) {
+                $sheet->setCellValue("B{$row}", (float) $d['value']);
                 $numericCount++;
             } else {
-                $sheet->setCellValue("B{$row}", $d->value);
+                $sheet->setCellValue("B{$row}", $d['value']);
             }
 
-            $sheet->setCellValue("D{$row}", $d->rssi ?? '');
+            $sheet->setCellValue("D{$row}", $d['rssi'] ?? '');
             $row++;
         }
 
@@ -244,18 +259,19 @@ class ExportController extends Controller
             ->setBorderStyle(Border::BORDER_THIN);
     }
 
-    private function addLineChart(Spreadsheet $spreadsheet, $sheet, string $sensor, $data): void
+    private function addLineChart(Spreadsheet $spreadsheet, $sheet, string $sensor, array $data): void
     {
-        if ($data->count() < 2) return;
+        if (count($data) < 2) return;
 
         // Check if numeric
-        $numericData = $data->filter(fn($d) => is_numeric($d->value));
-        if ($numericData->count() < 2) return;
+        $numericData = array_filter($data, fn($d) => is_numeric($d['value']));
+        $numericData = array_values($numericData); // re-index
+        if (count($numericData) < 2) return;
 
         $label = self::SENSOR_NAMES[$sensor] ?? $sensor;
 
         // Write chart data in a hidden area (below the main table)
-        $dataStartRow = $data->count() + 6; // Start after table
+        $dataStartRow = count($data) + 6; // Start after table
         $chartLabelRow = $dataStartRow;
 
         $sheet->setCellValue("A{$chartLabelRow}", 'Chart Timestamp');
@@ -264,8 +280,8 @@ class ExportController extends Controller
         $chartDataRow = $chartLabelRow + 1;
         $chartRow = $chartDataRow;
         foreach ($numericData as $d) {
-            $sheet->setCellValue("A{$chartRow}", $d->created_at);
-            $sheet->setCellValue("B{$chartRow}", (float) $d->value);
+            $sheet->setCellValue("A{$chartRow}", $d['created_at']);
+            $sheet->setCellValue("B{$chartRow}", (float) $d['value']);
             $chartRow++;
         }
         $chartEndRow = $chartRow - 1;
@@ -343,7 +359,7 @@ class ExportController extends Controller
         $sheet->mergeCells('A2:F2');
 
         $row = 4;
-        $intervalSql = "NOW() - INTERVAL {$range}";
+        $sqliteRange = $this->sqliteRange($range);
 
         // ═══════════════════════════════════════════════════
         // Section 1: Instability & System Health
@@ -355,35 +371,38 @@ class ExportController extends Controller
         $row++;
 
         try {
-            $readingsTotal = DB::table('sensor_readings')
-                ->where('created_at', '>=', DB::raw($intervalSql))
-                ->count();
+            $readingsTotal = (int) $this->turso->queryOne(
+                "SELECT COUNT(*) as cnt FROM sensor_readings"
+                . " WHERE created_at >= datetime('now', '-{$sqliteRange}')"
+            )['cnt'] ?? 0;
 
-            $criticalReadings = DB::table('sensor_readings')
-                ->where('created_at', '>=', DB::raw($intervalSql))
-                ->where('report_mode', 'CRITICAL')
-                ->count();
+            $criticalReadings = (int) $this->turso->queryOne(
+                "SELECT COUNT(*) as cnt FROM sensor_readings"
+                . " WHERE created_at >= datetime('now', '-{$sqliteRange}')"
+                . " AND report_mode = 'CRITICAL'"
+            )['cnt'] ?? 0;
 
-            $abnormalReadings = DB::table('sensor_readings')
-                ->where('created_at', '>=', DB::raw($intervalSql))
-                ->where('report_mode', 'ABNORMAL')
-                ->count();
+            $abnormalReadings = (int) $this->turso->queryOne(
+                "SELECT COUNT(*) as cnt FROM sensor_readings"
+                . " WHERE created_at >= datetime('now', '-{$sqliteRange}')"
+                . " AND report_mode = 'ABNORMAL'"
+            )['cnt'] ?? 0;
 
-            $highPriority = DB::table('sensor_readings')
-                ->where('created_at', '>=', DB::raw($intervalSql))
-                ->where('priority', 'HIGH')
-                ->count();
+            $highPriority = (int) $this->turso->queryOne(
+                "SELECT COUNT(*) as cnt FROM sensor_readings"
+                . " WHERE created_at >= datetime('now', '-{$sqliteRange}')"
+                . " AND priority = 'HIGH'"
+            )['cnt'] ?? 0;
 
             $instabilityPct = $readingsTotal > 0
                 ? round((($criticalReadings + $abnormalReadings) / $readingsTotal) * 100, 1)
                 : 0;
 
-            $poorSignal = DB::table('sensor_readings')
-                ->where('created_at', '>=', DB::raw($intervalSql))
-                ->where(function ($q) {
-                    $q->where('rssi', '<', -100)->orWhere('snr', '<', 5);
-                })
-                ->count();
+            $poorSignal = (int) $this->turso->queryOne(
+                "SELECT COUNT(*) as cnt FROM sensor_readings"
+                . " WHERE created_at >= datetime('now', '-{$sqliteRange}')"
+                . " AND (rssi < -100 OR snr < 5)"
+            )['cnt'] ?? 0;
 
             $signalIssuePct = $readingsTotal > 0
                 ? round(($poorSignal / $readingsTotal) * 100, 1)
@@ -442,21 +461,33 @@ class ExportController extends Controller
         $row++;
 
         try {
-            $activeSensorTypes = DB::table('sensor_data as sd')
-                ->join('sensor_readings as sr', 'sd.reading_id', '=', 'sr.id')
-                ->where('sr.created_at', '>=', DB::raw($intervalSql))
-                ->whereRaw('sd.value REGEXP \'^-?[0-9]+(\\.[0-9]+)?$\'')
-                ->select('sd.sensor',
-                    DB::raw('MIN(CAST(sd.value AS DECIMAL(10,2))) as min_val'),
-                    DB::raw('MAX(CAST(sd.value AS DECIMAL(10,2))) as max_val'),
-                    DB::raw('AVG(CAST(sd.value AS DECIMAL(10,2))) as avg_val'),
-                    DB::raw('STD(CAST(sd.value AS DECIMAL(10,2))) as std_val'),
-                    DB::raw('COUNT(*) as sample_count'))
-                ->groupBy('sd.sensor')
-                ->orderBy('sd.sensor')
-                ->get();
+            // Fetch all numeric sensor data for the range, compute stats in PHP
+            $sensorRows = $this->turso->query(
+                "SELECT sd.sensor, sd.value"
+                . " FROM sensor_data AS sd"
+                . " JOIN sensor_readings AS sr ON sd.reading_id = sr.id"
+                . " WHERE sr.created_at >= datetime('now', '-{$sqliteRange}')"
+                . " ORDER BY sd.sensor"
+            );
 
-            if ($activeSensorTypes->isNotEmpty()) {
+            // Group by sensor and compute stats in PHP
+            $sensorStats = [];
+            foreach ($sensorRows as $sr) {
+                if (!is_numeric($sr['value'])) continue;
+                $sensor = $sr['sensor'];
+                $val = (float) $sr['value'];
+                if (!isset($sensorStats[$sensor])) {
+                    $sensorStats[$sensor] = ['min' => $val, 'max' => $val, 'sum' => $val, 'count' => 1, 'values' => [$val]];
+                } else {
+                    $sensorStats[$sensor]['min'] = min($sensorStats[$sensor]['min'], $val);
+                    $sensorStats[$sensor]['max'] = max($sensorStats[$sensor]['max'], $val);
+                    $sensorStats[$sensor]['sum'] += $val;
+                    $sensorStats[$sensor]['count']++;
+                    $sensorStats[$sensor]['values'][] = $val;
+                }
+            }
+
+            if (!empty($sensorStats)) {
                 $headers = ['Sensor', 'Min', 'Max', 'Avg', 'Std Dev', 'Samples'];
                 $cols = ['A', 'B', 'C', 'D', 'E', 'F'];
                 foreach ($cols as $i => $col) {
@@ -466,18 +497,22 @@ class ExportController extends Controller
                 $row++;
 
                 $profiles = $this->getCachedProfiles();
-                foreach ($activeSensorTypes as $s) {
-                    $key = strtolower($s->sensor);
+                ksort($sensorStats);
+                foreach ($sensorStats as $sensor => $stats) {
+                    $key = strtolower($sensor);
                     $profile = $profiles[$key] ?? null;
                     $unit = $profile['unit'] ?? '';
-                    $sheet->setCellValue("A{$row}", $s->sensor . " ({$unit})");
-                    $sheet->setCellValue("B{$row}", round((float) $s->min_val, 1));
-                    $sheet->setCellValue("C{$row}", round((float) $s->max_val, 1));
-                    $sheet->setCellValue("D{$row}", round((float) $s->avg_val, 1));
-                    $sheet->setCellValue("E{$row}", round((float) $s->std_val, 2));
-                    $sheet->setCellValue("F{$row}", (int) $s->sample_count);
+                    $avg = $stats['sum'] / $stats['count'];
+                    $std = $this->stddev($stats['values'], $avg);
+
+                    $sheet->setCellValue("A{$row}", $sensor . " ({$unit})");
+                    $sheet->setCellValue("B{$row}", round($stats['min'], 1));
+                    $sheet->setCellValue("C{$row}", round($stats['max'], 1));
+                    $sheet->setCellValue("D{$row}", round($avg, 1));
+                    $sheet->setCellValue("E{$row}", round($std, 2));
+                    $sheet->setCellValue("F{$row}", $stats['count']);
+
                     if ($profile) {
-                        $avg = (float) $s->avg_val;
                         $avgStyle = $sheet->getStyle("D{$row}");
                         if ($avg < $profile['t_min'] || $avg > $profile['t_max']) {
                             $avgStyle->getFont()->getColor()->setARGB('FFEF4444');
@@ -559,19 +594,21 @@ class ExportController extends Controller
         $row++;
 
         try {
-            $modeBreakdown = DB::table('sensor_readings')
-                ->where('created_at', '>=', DB::raw($intervalSql))
-                ->select('report_mode', DB::raw('COUNT(*) as cnt'))
-                ->groupBy('report_mode')
-                ->orderBy('cnt', 'desc')
-                ->get();
+            $modeBreakdown = $this->turso->query(
+                "SELECT report_mode, COUNT(*) as cnt"
+                . " FROM sensor_readings"
+                . " WHERE created_at >= datetime('now', '-{$sqliteRange}')"
+                . " GROUP BY report_mode"
+                . " ORDER BY cnt DESC"
+            );
 
-            $prioBreakdown = DB::table('sensor_readings')
-                ->where('created_at', '>=', DB::raw($intervalSql))
-                ->select('priority', DB::raw('COUNT(*) as cnt'))
-                ->groupBy('priority')
-                ->orderBy('cnt', 'desc')
-                ->get();
+            $prioBreakdown = $this->turso->query(
+                "SELECT priority, COUNT(*) as cnt"
+                . " FROM sensor_readings"
+                . " WHERE created_at >= datetime('now', '-{$sqliteRange}')"
+                . " GROUP BY priority"
+                . " ORDER BY cnt DESC"
+            );
 
             $modeColors = ['NORMAL' => 'FF22C55E', 'ABNORMAL' => 'FFF59E0B', 'CRITICAL' => 'FFEF4444'];
             $prioColors = ['LOW' => 'FF22C55E', 'MEDIUM' => 'FFF59E0B', 'HIGH' => 'FFEF4444'];
@@ -581,10 +618,10 @@ class ExportController extends Controller
             $this->styleHeaderRow($sheet, $row, 2);
             $row++;
             foreach ($modeBreakdown as $m) {
-                $sheet->setCellValue("A{$row}", $m->report_mode ?? 'UNKNOWN');
-                $sheet->setCellValue("B{$row}", (int) $m->cnt);
+                $sheet->setCellValue("A{$row}", $m['report_mode'] ?? 'UNKNOWN');
+                $sheet->setCellValue("B{$row}", (int) $m['cnt']);
                 $sheet->getStyle("A{$row}")->getFont()->setBold(true);
-                $sheet->getStyle("A{$row}")->getFont()->getColor()->setARGB($modeColors[$m->report_mode] ?? 'FF64748B');
+                $sheet->getStyle("A{$row}")->getFont()->getColor()->setARGB($modeColors[$m['report_mode']] ?? 'FF64748B');
                 $row++;
             }
 
@@ -594,10 +631,10 @@ class ExportController extends Controller
             $this->styleHeaderRow($sheet, $row, 2);
             $row++;
             foreach ($prioBreakdown as $p) {
-                $sheet->setCellValue("A{$row}", $p->priority ?? 'UNKNOWN');
-                $sheet->setCellValue("B{$row}", (int) $p->cnt);
+                $sheet->setCellValue("A{$row}", $p['priority'] ?? 'UNKNOWN');
+                $sheet->setCellValue("B{$row}", (int) $p['cnt']);
                 $sheet->getStyle("A{$row}")->getFont()->setBold(true);
-                $sheet->getStyle("A{$row}")->getFont()->getColor()->setARGB($prioColors[$p->priority] ?? 'FF64748B');
+                $sheet->getStyle("A{$row}")->getFont()->getColor()->setARGB($prioColors[$p['priority']] ?? 'FF64748B');
                 $row++;
             }
         } catch (\Exception $e) {
@@ -687,27 +724,28 @@ class ExportController extends Controller
 
     private function getCachedProfiles()
     {
-        return \Illuminate\Support\Facades\Cache::remember("sensor_profiles", 300, function () {
+        return Cache::remember("sensor_profiles", 300, function () {
             return $this->fetchProfiles();
         });
     }
 
-    // ─── Helpers duplicated from DashboardController to keep export self-contained ───
+    // ─── Helpers ───────────────────────────────────────────────
 
     private function fetchProfiles()
     {
         try {
-            $rows = DB::table("sensor_profiles")->get();
+            $rows = $this->turso->query("SELECT * FROM sensor_profiles");
             $profiles = [];
             foreach ($rows as $row) {
-                $key = strtolower($row->sensor_name ?? '');
+                $key = strtolower($row['sensor_key'] ?? '');
+                if ($key === '') continue;
                 $profiles[$key] = [
-                    "label" => $row->display_name ?? $key,
-                    "unit"  => $row->unit ?? '',
-                    "icon"  => $row->icon ?? "❓",
-                    "color" => $row->color ?? "#22d3ee",
-                    "t_min" => (float) ($row->threshold_min ?? 0),
-                    "t_max" => (float) ($row->threshold_max ?? 100),
+                    "label" => $row['label'] ?? $key,
+                    "unit"  => $row['unit'] ?? '',
+                    "icon"  => $this->sensorIcon($row['family'] ?? ''),
+                    "color" => $row['accent'] ?? '#22d3ee',
+                    "t_min" => (float) ($row['threshold_min'] ?? 0),
+                    "t_max" => (float) ($row['threshold_max'] ?? 100),
                 ];
             }
             return $profiles;
@@ -732,20 +770,25 @@ class ExportController extends Controller
     private function getActiveSensors($profiles)
     {
         try {
-            $latest = DB::table("sensor_readings")->orderByDesc("id")->first();
+            $latest = $this->turso->queryOne(
+                "SELECT * FROM sensor_readings ORDER BY id DESC LIMIT 1"
+            );
             if (!$latest) return [];
 
-            $minutesSince = $latest->created_at
-                ? round((time() - strtotime($latest->created_at)) / 60, 1)
+            $minutesSince = $latest['created_at']
+                ? round((time() - strtotime($latest['created_at'])) / 60, 1)
                 : 0;
             if ($minutesSince > 5) return [];
 
-            $rows = DB::table("sensor_data")->where("reading_id", $latest->id)->limit(20)->get();
+            $rows = $this->turso->query(
+                "SELECT * FROM sensor_data WHERE reading_id = ? LIMIT 20",
+                [$latest['id']]
+            );
 
-            return $rows->map(function ($row) use ($profiles) {
-                $key = strtolower($row->sensor);
+            return array_values(array_map(function ($row) use ($profiles) {
+                $key = strtolower($row['sensor']);
                 $profile = $profiles[$key] ?? null;
-                $rawValue = $row->value;
+                $rawValue = $row['value'];
                 $value = ($rawValue === "nan" || $rawValue === "NaN") ? null : $rawValue;
 
                 $status = "normal";
@@ -757,17 +800,17 @@ class ExportController extends Controller
                 }
 
                 return [
-                    "key" => $key,
-                    "sensor" => $row->sensor,
-                    "pin" => $row->pin,
-                    "value" => $value,
+                    "key"    => $key,
+                    "sensor" => $row['sensor'],
+                    "pin"    => $row['pin'],
+                    "value"  => $value,
                     "status" => $status,
-                    "unit" => $profile["unit"] ?? "",
-                    "label" => $profile["label"] ?? $key,
-                    "icon" => $profile["icon"] ?? "❓",
-                    "color" => $profile["color"] ?? "#888888",
+                    "unit"   => $profile["unit"] ?? "",
+                    "label"  => $profile["label"] ?? $key,
+                    "icon"   => $profile["icon"] ?? "❓",
+                    "color"  => $profile["color"] ?? "#888888",
                 ];
-            })->values()->toArray();
+            }, $rows));
         } catch (\Exception $e) {
             return [];
         }
@@ -776,7 +819,11 @@ class ExportController extends Controller
     private function fetchAlerts()
     {
         try {
-            return DB::table("alerts")->where("status", "active")->orderByDesc("created_at")->limit(50)->get()->toArray();
+            $rows = $this->turso->query(
+                "SELECT * FROM alerts WHERE status = ? ORDER BY created_at DESC LIMIT 50",
+                ['active']
+            );
+            return $rows;
         } catch (\Exception $e) {
             return [];
         }
@@ -785,77 +832,99 @@ class ExportController extends Controller
     private function computeSignalStats($range)
     {
         try {
-            $stats = DB::table("sensor_readings")
-                ->where("created_at", ">=", DB::raw("NOW() - INTERVAL {$range}"))
-                ->selectRaw("COUNT(*) as total, AVG(rssi) as avg_rssi, MIN(rssi) as min_rssi, MAX(rssi) as max_rssi, AVG(snr) as avg_snr")
-                ->first();
+            $stats = $this->turso->queryOne(
+                "SELECT"
+                . " COUNT(*) as total,"
+                . " AVG(rssi) as avg_rssi,"
+                . " MIN(rssi) as min_rssi,"
+                . " MAX(rssi) as max_rssi,"
+                . " AVG(snr) as avg_snr"
+                . " FROM sensor_readings"
+                . " WHERE created_at >= datetime('now', '-{$this->sqliteRange($range)}')"
+            );
 
-            $total = (int) ($stats->total ?? 0);
+            $total = (int) ($stats['total'] ?? 0);
             $hasData = $total > 0;
 
-            $pd = DB::table("sensor_readings")
-                ->where("created_at", ">=", DB::raw("NOW() - INTERVAL {$range}"))
-                ->selectRaw("SUM(CASE WHEN rssi > -70 AND snr > 15 THEN 1 ELSE 0 END) as excellent, SUM(CASE WHEN rssi >= -85 AND snr >= 10 THEN 1 ELSE 0 END) as good, SUM(CASE WHEN rssi >= -100 AND snr >= 5 THEN 1 ELSE 0 END) as fair, SUM(CASE WHEN rssi >= -110 AND snr >= 0 THEN 1 ELSE 0 END) as poor, SUM(CASE WHEN rssi < -110 OR snr < 0 THEN 1 ELSE 0 END) as critical")
-                ->first();
+            $pd = $this->turso->queryOne(
+                "SELECT"
+                . " SUM(CASE WHEN rssi > -70 AND snr > 15 THEN 1 ELSE 0 END) as excellent,"
+                . " SUM(CASE WHEN rssi >= -85 AND snr >= 10 THEN 1 ELSE 0 END) as good,"
+                . " SUM(CASE WHEN rssi >= -100 AND snr >= 5 THEN 1 ELSE 0 END) as fair,"
+                . " SUM(CASE WHEN rssi >= -110 AND snr >= 0 THEN 1 ELSE 0 END) as poor,"
+                . " SUM(CASE WHEN rssi < -110 OR snr < 0 THEN 1 ELSE 0 END) as critical"
+                . " FROM sensor_readings"
+                . " WHERE created_at >= datetime('now', '-{$this->sqliteRange($range)}')"
+            );
 
-            $lastReading = DB::table("sensor_readings")->orderByDesc("id")->first();
-            $freshnessSeconds = $lastReading ? max(0, time() - strtotime($lastReading->created_at)) : null;
+            $lastReading = $this->turso->queryOne(
+                "SELECT created_at FROM sensor_readings ORDER BY id DESC LIMIT 1"
+            );
+            $freshnessSeconds = $lastReading
+                ? max(0, time() - strtotime($lastReading['created_at']))
+                : null;
 
             return [
-                "total" => $total,
-                "avg_rssi" => $hasData ? round((float) ($stats->avg_rssi ?? 0), 1) : null,
-                "min_rssi" => $hasData ? (int) ($stats->min_rssi ?? -120) : null,
-                "max_rssi" => $hasData ? (int) ($stats->max_rssi ?? 0) : null,
-                "avg_snr" => $hasData ? round((float) ($stats->avg_snr ?? 0), 1) : null,
-                "excellent" => (int) ($pd->excellent ?? 0),
-                "good" => (int) ($pd->good ?? 0),
-                "fair" => (int) ($pd->fair ?? 0),
-                "poor" => (int) ($pd->poor ?? 0),
-                "critical" => (int) ($pd->critical ?? 0),
+                "total"     => $total,
+                "avg_rssi"  => $hasData ? round((float) ($stats['avg_rssi'] ?? 0), 1) : null,
+                "min_rssi"  => $hasData ? (int) ($stats['min_rssi'] ?? -120) : null,
+                "max_rssi"  => $hasData ? (int) ($stats['max_rssi'] ?? 0) : null,
+                "avg_snr"   => $hasData ? round((float) ($stats['avg_snr'] ?? 0), 1) : null,
+                "excellent" => (int) ($pd['excellent'] ?? 0),
+                "good"      => (int) ($pd['good'] ?? 0),
+                "fair"      => (int) ($pd['fair'] ?? 0),
+                "poor"      => (int) ($pd['poor'] ?? 0),
+                "critical"  => (int) ($pd['critical'] ?? 0),
             ];
         } catch (\Exception $e) {
-            return ["total" => 0, "avg_rssi" => null, "avg_snr" => null, "excellent" => 0, "good" => 0, "fair" => 0, "poor" => 0, "critical" => 0];
+            return [
+                "total" => 0, "avg_rssi" => null, "avg_snr" => null,
+                "excellent" => 0, "good" => 0, "fair" => 0, "poor" => 0, "critical" => 0,
+            ];
         }
     }
 
     private function computeCommHealth()
     {
         try {
-            $last = DB::table("sensor_readings")->orderByDesc("id")->first();
-            $first = DB::table("sensor_readings")->orderBy("id", "asc")->first();
-            $cnt = DB::table("sensor_readings")->count();
+            $last  = $this->turso->queryOne("SELECT * FROM sensor_readings ORDER BY id DESC LIMIT 1");
+            $first = $this->turso->queryOne("SELECT created_at FROM sensor_readings ORDER BY id ASC LIMIT 1");
+            $cnt   = $this->turso->queryOne("SELECT COUNT(*) as cnt FROM sensor_readings");
 
-            $hasData = $cnt > 0;
+            $count = (int) ($cnt['cnt'] ?? 0);
+            $hasData = $count > 0;
 
-            $freshnessSeconds = $last ? max(0, time() - strtotime($last->created_at)) : 0;
-            $uptimeHours = $first ? round((time() - strtotime($first->created_at)) / 3600, 1) : 0;
+            $freshnessSeconds = $last ? max(0, time() - strtotime($last['created_at'])) : 0;
+            $uptimeHours = $first ? round((time() - strtotime($first['created_at'])) / 3600, 1) : 0;
 
             if (!$hasData) {
                 return [
-                    "delivery_rate" => null,
-                    "freshness_label" => "No data",
-                    "is_fresh" => false,
-                    "is_stale" => true,
-                    "last_seen" => null,
-                    "last_rssi" => null,
-                    "last_snr" => null,
-                    "uptime_hours" => 0,
+                    "delivery_rate"    => null,
+                    "freshness_label"  => "No data",
+                    "is_fresh"         => false,
+                    "is_stale"         => true,
+                    "last_seen"        => null,
+                    "last_rssi"        => null,
+                    "last_snr"         => null,
+                    "uptime_hours"     => 0,
                 ];
             }
 
             return [
-                "delivery_rate" => 100.0,
+                "delivery_rate"    => 100.0,
                 "freshness_seconds" => (int) $freshnessSeconds,
-                "freshness_label" => $this->formatFreshness($freshnessSeconds),
-                "is_fresh" => $freshnessSeconds < 60,
-                "is_stale" => $freshnessSeconds > 300,
-                "last_seen" => $last ? $last->created_at : null,
-                "last_rssi" => $last ? (int) $last->rssi : null,
-                "last_snr" => $last ? (float) $last->snr : null,
-                "uptime_hours" => (float) $uptimeHours,
+                "freshness_label"  => $this->formatFreshness($freshnessSeconds),
+                "is_fresh"         => $freshnessSeconds < 60,
+                "is_stale"         => $freshnessSeconds > 300,
+                "last_seen"        => $last['created_at'] ?? null,
+                "last_rssi"        => $last ? (int) $last['rssi'] : null,
+                "last_snr"         => $last ? (float) $last['snr'] : null,
+                "uptime_hours"     => (float) $uptimeHours,
             ];
         } catch (\Exception $e) {
-            return ["delivery_rate" => null, "freshness_label" => "No data", "uptime_hours" => 0];
+            return [
+                "delivery_rate" => null, "freshness_label" => "No data", "uptime_hours" => 0,
+            ];
         }
     }
 
@@ -871,5 +940,65 @@ class ExportController extends Controller
         return in_array(strtoupper($range), self::ALLOWED_RANGES, true)
             ? strtoupper($range)
             : '24 HOUR';
+    }
+
+    private function sensorIcon(string $family): string
+    {
+        $icons = [
+            'DHT22'            => '🌡️',
+            'Water Temperature' => '🌊',
+            'Water Quality'    => '🔬',
+            'Environment'      => '🌧️',
+        ];
+        return $icons[$family] ?? "❓";
+    }
+
+    /**
+     * Convert MySQL INTERVAL range string to SQLite-compatible suffix.
+     */
+    private function sqliteRange(string $range): string
+    {
+        $map = [
+            '1 HOUR'  => '1 hours',
+            '6 HOUR'  => '6 hours',
+            '24 HOUR' => '24 hours',
+            '7 DAY'   => '7 days',
+            '30 DAY'  => '30 days',
+        ];
+        return $map[$range] ?? '24 hours';
+    }
+
+    /**
+     * Replacement for Collection::nth(): return every $step-th element.
+     */
+    private function arrayNth(array $items, float $step): array
+    {
+        $result = [];
+        $i = 0;
+        foreach ($items as $item) {
+            if ($i % (int) $step === 0) {
+                $result[] = $item;
+            }
+            $i++;
+        }
+        return $result;
+    }
+
+    /**
+     * Compute population standard deviation from an array of values.
+     * Replaces MySQL STD() aggregate.
+     */
+    private function stddev(array $values, ?float $mean = null): float
+    {
+        $count = count($values);
+        if ($count < 2) return 0.0;
+        if ($mean === null) {
+            $mean = array_sum($values) / $count;
+        }
+        $variance = 0.0;
+        foreach ($values as $v) {
+            $variance += ($v - $mean) ** 2;
+        }
+        return sqrt($variance / $count);
     }
 }

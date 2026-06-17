@@ -13,7 +13,7 @@
 // ================= CONFIG =================
 const char* WIFI_SSID  = "Kimie";
 const char* WIFI_PASS  = "00008888";
-const char* API_URL    = "http://172.20.10.3/smartponic/receive_data.php";
+const char* API_URL    = "https://smartponic-dashboard.onrender.com/api/receive-data";
 
 #define LORA_SCK   7
 #define LORA_MISO  9
