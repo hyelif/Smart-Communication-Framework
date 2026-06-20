@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/dependency_injection.dart';
 import 'app.dart';
@@ -80,9 +81,11 @@ void main() async {
 
   // Show a splash / loading indicator while dependencies are set up.
   runApp(
-    _SplashWrapper(
-      future: setupDependencies(),
-      child: const MyApp(),
+    ProviderScope(
+      child: _SplashWrapper(
+        future: setupDependencies(),
+        child: const MyApp(),
+      ),
     ),
   );
 }

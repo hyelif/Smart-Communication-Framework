@@ -181,10 +181,10 @@ class StitchBottomNavigation extends StatelessWidget {
   });
 
   static const _items = [
-    _NavItem(Icons.flash_on_rounded, 'DEVICE'),
+    _NavItem(Icons.home_rounded, 'HOME'),
+    _NavItem(Icons.flash_on_rounded, 'DEVICES'),
     _NavItem(Icons.architecture_rounded, 'ARCHITECT'),
-    _NavItem(Icons.inventory_2_outlined, 'VAULT'),
-    _NavItem(Icons.tune_rounded, 'CALIBRATE'),
+    _NavItem(Icons.settings_rounded, 'SETTINGS'),
   ];
 
   @override

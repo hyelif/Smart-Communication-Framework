@@ -58,11 +58,16 @@ class ProfilesScreen extends StatefulWidget {
   final ValueListenable<int> activeTabListenable;
   final int tabIndex;
 
+  /// When embedded inside another screen (e.g. Settings), hide the top bar
+  /// to avoid duplicate headers.
+  final bool showTopBar;
+
   const ProfilesScreen({
     super.key,
     required this.onSelectProfile,
     required this.activeTabListenable,
     required this.tabIndex,
+    this.showTopBar = true,
   });
 
   @override
@@ -72,6 +77,7 @@ class ProfilesScreen extends StatefulWidget {
 class _ProfilesScreenState extends State<ProfilesScreen> {
   List<Map<String, dynamic>> profiles = [];
   bool _isRefreshing = false;
+  bool _hasLoadedOnce = false;
 
   @override
   void initState() {
@@ -89,7 +95,7 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
   }
 
   void _handleActiveTabChanged() {
-    if (widget.activeTabListenable.value == widget.tabIndex) {
+    if (widget.activeTabListenable.value == widget.tabIndex && !_hasLoadedOnce) {
       _refresh();
     }
   }
@@ -115,6 +121,7 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
       if (!_sameProfiles(data, profiles)) {
         setState(() => profiles = data);
       }
+      _hasLoadedOnce = true;
     } finally {
       if (mounted) {
         setState(() => _isRefreshing = false);
@@ -127,9 +134,10 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
     return StitchScaffold(
       body: Column(
         children: [
-          StitchTopBar(
-            section: 'Vault',
-            trailing: IconButton(
+          if (widget.showTopBar)
+            StitchTopBar(
+              section: 'Vault',
+              trailing: IconButton(
               onPressed: _isRefreshing ? null : _refresh,
               icon: _isRefreshing
                   ? const SizedBox(

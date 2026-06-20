@@ -69,6 +69,9 @@ class _DeviceScreenState extends State<DeviceScreen>
   void _handleActiveTabChanged() {
     if (widget.activeTabListenable.value == widget.tabIndex) {
       _loadCurrentConfig(showLoader: !_hasLoadedOnce);
+    } else {
+      // Stop entrance animation when not visible to save resources
+      _entranceController.reset();
     }
   }
 

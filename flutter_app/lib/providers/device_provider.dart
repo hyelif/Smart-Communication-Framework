@@ -1,49 +1,56 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../repositories/device_repository.dart';
 import '../services/nfc_service.dart';
 import '../core/dependency_injection.dart';
 
-class DeviceProvider extends ChangeNotifier {
-  final DeviceRepository _repository = getIt<DeviceRepository>();
+/// State for device-related data.
+class DeviceState {
+  final List<Map<String, dynamic>> liveSensors;
+  final bool isLoading;
+  final bool nfcAvailable;
+  final String? error;
 
-  List<Map<String, dynamic>> _liveSensors = [];
-  bool _isLoading = false;
-  bool _nfcAvailable = false;
-  String? _error;
-  bool _disposed = false;
+  const DeviceState({
+    this.liveSensors = const [],
+    this.isLoading = false,
+    this.nfcAvailable = false,
+    this.error,
+  });
 
-  List<Map<String, dynamic>> get liveSensors => _liveSensors;
-  bool get isLoading => _isLoading;
-  bool get nfcAvailable => _nfcAvailable;
-  String? get error => _error;
-
-  @override
-  void dispose() {
-    _disposed = true;
-    super.dispose();
+  DeviceState copyWith({
+    List<Map<String, dynamic>>? liveSensors,
+    bool? isLoading,
+    bool? nfcAvailable,
+    String? error,
+  }) {
+    return DeviceState(
+      liveSensors: liveSensors ?? this.liveSensors,
+      isLoading: isLoading ?? this.isLoading,
+      nfcAvailable: nfcAvailable ?? this.nfcAvailable,
+      error: error,
+    );
   }
+}
 
-  void _notifyListeners() {
-    if (!_disposed) notifyListeners();
-  }
+/// Riverpod provider for device state.
+class DeviceNotifier extends StateNotifier<DeviceState> {
+  final DeviceRepository _repository;
+
+  DeviceNotifier(this._repository) : super(const DeviceState());
 
   Future<void> checkNfcAvailability() async {
-    _nfcAvailable = await _repository.isNfcAvailable();
-    _notifyListeners();
+    final available = await _repository.isNfcAvailable();
+    state = state.copyWith(nfcAvailable: available);
   }
 
   Future<void> fetchLiveSensors() async {
-    _isLoading = true;
-    _error = null;
-    _notifyListeners();
-
+    state = state.copyWith(isLoading: true, error: null);
     try {
-      _liveSensors = await _repository.fetchLiveSensors();
+      final sensors = await _repository.fetchLiveSensors();
+      state = state.copyWith(liveSensors: sensors, isLoading: false);
     } catch (e) {
-      _error = e.toString();
-    } finally {
-      _isLoading = false;
-      _notifyListeners();
+      state = state.copyWith(error: e.toString(), isLoading: false);
     }
   }
 
@@ -52,23 +59,17 @@ class DeviceProvider extends ChangeNotifier {
     required String securityKey,
     required String aesKey,
   }) async {
-    _isLoading = true;
-    _error = null;
-    _notifyListeners();
-
+    state = state.copyWith(isLoading: true, error: null);
     try {
       final result = await _repository.writeSmartPonicTag(
         configPayload: configPayload,
         securityKey: securityKey,
         aesKey: aesKey,
       );
-      _isLoading = false;
-      _notifyListeners();
+      state = state.copyWith(isLoading: false);
       return result;
     } catch (e) {
-      _error = e.toString();
-      _isLoading = false;
-      _notifyListeners();
+      state = state.copyWith(error: e.toString(), isLoading: false);
       return null;
     }
   }
@@ -78,23 +79,17 @@ class DeviceProvider extends ChangeNotifier {
     required String securityKey,
     required String aesKey,
   }) async {
-    _isLoading = true;
-    _error = null;
-    _notifyListeners();
-
+    state = state.copyWith(isLoading: true, error: null);
     try {
       final result = await _repository.prepareDirectPhoneTap(
         configPayload: configPayload,
         securityKey: securityKey,
         aesKey: aesKey,
       );
-      _isLoading = false;
-      _notifyListeners();
+      state = state.copyWith(isLoading: false);
       return result;
     } catch (e) {
-      _error = e.toString();
-      _isLoading = false;
-      _notifyListeners();
+      state = state.copyWith(error: e.toString(), isLoading: false);
       return null;
     }
   }
@@ -111,3 +106,8 @@ class DeviceProvider extends ChangeNotifier {
     return _repository.decrypt(input, key);
   }
 }
+
+/// The Riverpod provider for [DeviceNotifier].
+final deviceProvider = StateNotifierProvider<DeviceNotifier, DeviceState>((ref) {
+  return DeviceNotifier(getIt<DeviceRepository>());
+});

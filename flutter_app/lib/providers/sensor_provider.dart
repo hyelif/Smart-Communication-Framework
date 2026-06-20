@@ -1,99 +1,105 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../models/sensor_model.dart';
 import '../repositories/sensor_repository.dart';
 import '../core/dependency_injection.dart';
 
-class SensorProvider extends ChangeNotifier {
-  final SensorRepository _repository = getIt<SensorRepository>();
+/// State for sensor configuration data.
+class SensorState {
+  final List<SensorModel> sensors;
+  final List<Map<String, dynamic>> rawConfig;
+  final bool isLoading;
+  final String? error;
 
-  List<SensorModel> _sensors = [];
-  List<Map<String, dynamic>> _rawConfig = [];
-  bool _isLoading = false;
-  String? _error;
-  bool _disposed = false;
+  const SensorState({
+    this.sensors = const [],
+    this.rawConfig = const [],
+    this.isLoading = false,
+    this.error,
+  });
 
-  List<SensorModel> get sensors => _sensors;
-  List<Map<String, dynamic>> get rawConfig => _rawConfig;
-  bool get isLoading => _isLoading;
-  String? get error => _error;
-
-  @override
-  void dispose() {
-    _disposed = true;
-    super.dispose();
+  SensorState copyWith({
+    List<SensorModel>? sensors,
+    List<Map<String, dynamic>>? rawConfig,
+    bool? isLoading,
+    String? error,
+  }) {
+    return SensorState(
+      sensors: sensors ?? this.sensors,
+      rawConfig: rawConfig ?? this.rawConfig,
+      isLoading: isLoading ?? this.isLoading,
+      error: error,
+    );
   }
+}
 
-  void _notifyListeners() {
-    if (!_disposed) notifyListeners();
-  }
+/// Riverpod provider for sensor configuration state.
+class SensorNotifier extends StateNotifier<SensorState> {
+  final SensorRepository _repository;
+
+  SensorNotifier(this._repository) : super(const SensorState());
 
   Future<void> fetchConfig(String securityKey) async {
-    _isLoading = true;
-    _error = null;
-    _notifyListeners();
-
+    state = state.copyWith(isLoading: true, error: null);
     try {
       final result = await _repository.fetchConfig(securityKey);
       if (result['ok'] == true && result['data'] != null) {
-        _rawConfig = List<Map<String, dynamic>>.from(result['data']['config'] ?? []);
-        _sensors = _rawConfig.map((json) => SensorModel.fromMap(json)).toList();
+        final rawConfig = List<Map<String, dynamic>>.from(
+          result['data']['config'] ?? [],
+        );
+        final sensors = rawConfig.map((json) => SensorModel.fromMap(json)).toList();
+        state = state.copyWith(
+          rawConfig: rawConfig,
+          sensors: sensors,
+          isLoading: false,
+        );
       } else {
-        _error = result['body'] ?? 'Failed to fetch config';
+        state = state.copyWith(
+          error: result['body']?.toString() ?? 'Failed to fetch config',
+          isLoading: false,
+        );
       }
     } catch (e) {
-      _error = e.toString();
-    } finally {
-      _isLoading = false;
-      _notifyListeners();
+      state = state.copyWith(error: e.toString(), isLoading: false);
     }
   }
 
   Future<bool> sendConfig(List<Map<String, dynamic>> config, String securityKey) async {
-    _isLoading = true;
-    _error = null;
-    _notifyListeners();
-
+    state = state.copyWith(isLoading: true, error: null);
     try {
       final result = await _repository.sendConfig(config, securityKey);
-      _isLoading = false;
-      _notifyListeners();
-      return result['ok'] == true;
+      final success = result['ok'] == true;
+      state = state.copyWith(isLoading: false);
+      return success;
     } catch (e) {
-      _error = e.toString();
-      _isLoading = false;
-      _notifyListeners();
+      state = state.copyWith(error: e.toString(), isLoading: false);
       return false;
     }
   }
 
   Future<void> loadSavedConfig() async {
-    _isLoading = true;
-    _notifyListeners();
-
+    state = state.copyWith(isLoading: true);
     try {
-      _rawConfig = await _repository.loadConfig();
-      _sensors = _rawConfig.map((json) => SensorModel.fromMap(json)).toList();
+      final rawConfig = await _repository.loadConfig();
+      final sensors = rawConfig.map((json) => SensorModel.fromMap(json)).toList();
+      state = state.copyWith(rawConfig: rawConfig, sensors: sensors, isLoading: false);
     } catch (e) {
-      _error = e.toString();
-    } finally {
-      _isLoading = false;
-      _notifyListeners();
+      state = state.copyWith(error: e.toString(), isLoading: false);
     }
   }
 
   Future<void> saveConfig(List<Map<String, dynamic>> config, String key) async {
     try {
       await _repository.saveConfig(config, key);
-      _rawConfig = config;
-      _sensors = config.map((json) => SensorModel.fromMap(json)).toList();
-      _notifyListeners();
+      final sensors = config.map((json) => SensorModel.fromMap(json)).toList();
+      state = state.copyWith(rawConfig: config, sensors: sensors);
     } catch (e) {
-      _error = e.toString();
-      _notifyListeners();
+      state = state.copyWith(error: e.toString());
     }
   }
-
-  Future<void> loadSavedSensors() async {
-    await loadSavedConfig();
-  }
 }
+
+/// The Riverpod provider for [SensorNotifier].
+final sensorProvider = StateNotifierProvider<SensorNotifier, SensorState>((ref) {
+  return SensorNotifier(getIt<SensorRepository>());
+});

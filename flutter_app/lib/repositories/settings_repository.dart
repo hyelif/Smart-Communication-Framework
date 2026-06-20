@@ -42,6 +42,6 @@ class SettingsRepository {
   }
 
   String decrypt(String input, String key) {
-    return _encryptionService.decrypt(input, key);
+    return _encryptionService.decrypt(input, key) ?? input;
   }
 }

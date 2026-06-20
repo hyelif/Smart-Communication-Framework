@@ -1,6 +1,7 @@
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/storage_service.dart';
 import '../widgets/app_theme.dart';
@@ -48,21 +49,26 @@ const int _formatDecimalPlaces = 4;
 // CalibrationScreen
 // ---------------------------------------------------------------------------
 
-class CalibrationScreen extends StatefulWidget {
+class CalibrationScreen extends ConsumerStatefulWidget {
   final ValueListenable<int> activeTabListenable;
   final int tabIndex;
+
+  /// When embedded inside another screen (e.g. Settings), hide the top bar
+  /// to avoid duplicate headers.
+  final bool showTopBar;
 
   const CalibrationScreen({
     super.key,
     required this.activeTabListenable,
     required this.tabIndex,
+    this.showTopBar = true,
   });
 
   @override
-  State<CalibrationScreen> createState() => _CalibrationScreenState();
+  ConsumerState<CalibrationScreen> createState() => _CalibrationScreenState();
 }
 
-class _CalibrationScreenState extends State<CalibrationScreen> {
+class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
   Map<String, dynamic> _profiles = {};
   bool _isLoading = true;
   bool _isSaving = false;
@@ -119,6 +125,8 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
     if (showLoader) setState(() => _isLoading = true);
 
     try {
+      // Use StorageService directly to avoid Riverpod listener lifecycle issues
+      // when the widget is inside a TabBarView and gets disposed during async ops.
       final result = await StorageService.loadCalibrationProfiles();
       if (!mounted) return;
 
@@ -203,9 +211,10 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
           : null,
       body: Column(
         children: [
-          StitchTopBar(
-            section: 'Calibration',
-            trailing: IconButton(
+          if (widget.showTopBar)
+            StitchTopBar(
+              section: 'Calibration',
+              trailing: IconButton(
               onPressed: _isLoading ? null : _loadProfiles,
               icon: _isLoading
                   ? const SizedBox(

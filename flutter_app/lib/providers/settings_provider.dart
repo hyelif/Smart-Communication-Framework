@@ -1,70 +1,73 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../repositories/settings_repository.dart';
 import '../core/dependency_injection.dart';
 
-class SettingsProvider extends ChangeNotifier {
-  final SettingsRepository _repository = getIt<SettingsRepository>();
+/// State for settings-related data.
+class SettingsState {
+  final Map<String, dynamic> config;
+  final List<Map<String, dynamic>> profiles;
+  final Map<String, dynamic> calibrationProfiles;
+  final bool isLoading;
+  final String? error;
 
-  Map<String, dynamic> _config = {};
-  List<Map<String, dynamic>> _profiles = [];
-  Map<String, dynamic> _calibrationProfiles = {};
-  bool _isLoading = false;
-  String? _error;
-  bool _disposed = false;
+  const SettingsState({
+    this.config = const {},
+    this.profiles = const [],
+    this.calibrationProfiles = const {},
+    this.isLoading = false,
+    this.error,
+  });
 
-  Map<String, dynamic> get config => _config;
-  List<Map<String, dynamic>> get profiles => _profiles;
-  Map<String, dynamic> get calibrationProfiles => _calibrationProfiles;
-  bool get isLoading => _isLoading;
-  String? get error => _error;
-
-  @override
-  void dispose() {
-    _disposed = true;
-    super.dispose();
+  SettingsState copyWith({
+    Map<String, dynamic>? config,
+    List<Map<String, dynamic>>? profiles,
+    Map<String, dynamic>? calibrationProfiles,
+    bool? isLoading,
+    String? error,
+  }) {
+    return SettingsState(
+      config: config ?? this.config,
+      profiles: profiles ?? this.profiles,
+      calibrationProfiles: calibrationProfiles ?? this.calibrationProfiles,
+      isLoading: isLoading ?? this.isLoading,
+      error: error,
+    );
   }
+}
 
-  void _notifyListeners() {
-    if (!_disposed) notifyListeners();
-  }
+/// Riverpod provider for settings state.
+class SettingsNotifier extends StateNotifier<SettingsState> {
+  final SettingsRepository _repository;
+
+  SettingsNotifier(this._repository) : super(const SettingsState());
 
   Future<void> loadConfig() async {
-    _isLoading = true;
-    _error = null;
-    _notifyListeners();
-
+    state = state.copyWith(isLoading: true, error: null);
     try {
-      _config = await _repository.loadConfig();
+      final config = await _repository.loadConfig();
+      state = state.copyWith(config: config, isLoading: false);
     } catch (e) {
-      _error = e.toString();
-    } finally {
-      _isLoading = false;
-      _notifyListeners();
+      state = state.copyWith(error: e.toString(), isLoading: false);
     }
   }
 
   Future<void> saveConfig(List<Map<String, dynamic>> config, String key) async {
     try {
       await _repository.saveConfig(config, key);
-      _config = {'config': config, 'key': key};
-      _notifyListeners();
+      state = state.copyWith(config: {'config': config, 'key': key});
     } catch (e) {
-      _error = e.toString();
-      _notifyListeners();
+      state = state.copyWith(error: e.toString());
     }
   }
 
   Future<void> loadProfiles() async {
-    _isLoading = true;
-    _notifyListeners();
-
+    state = state.copyWith(isLoading: true);
     try {
-      _profiles = await _repository.getProfiles();
+      final profiles = await _repository.getProfiles();
+      state = state.copyWith(profiles: profiles, isLoading: false);
     } catch (e) {
-      _error = e.toString();
-    } finally {
-      _isLoading = false;
-      _notifyListeners();
+      state = state.copyWith(error: e.toString(), isLoading: false);
     }
   }
 
@@ -73,44 +76,36 @@ class SettingsProvider extends ChangeNotifier {
       await _repository.saveAsNewProfile(name, config);
       await loadProfiles();
     } catch (e) {
-      _error = e.toString();
-      _notifyListeners();
+      state = state.copyWith(error: e.toString());
     }
   }
 
   Future<void> deleteProfile(int index) async {
     try {
       await _repository.deleteProfile(index);
-      _profiles.removeAt(index);
-      _notifyListeners();
+      final updated = List<Map<String, dynamic>>.from(state.profiles)..removeAt(index);
+      state = state.copyWith(profiles: updated);
     } catch (e) {
-      _error = e.toString();
-      _notifyListeners();
+      state = state.copyWith(error: e.toString());
     }
   }
 
   Future<void> loadCalibrationProfiles() async {
-    _isLoading = true;
-    _notifyListeners();
-
+    state = state.copyWith(isLoading: true);
     try {
-      _calibrationProfiles = await _repository.loadCalibrationProfiles();
+      final profiles = await _repository.loadCalibrationProfiles();
+      state = state.copyWith(calibrationProfiles: profiles, isLoading: false);
     } catch (e) {
-      _error = e.toString();
-    } finally {
-      _isLoading = false;
-      _notifyListeners();
+      state = state.copyWith(error: e.toString(), isLoading: false);
     }
   }
 
   Future<void> saveCalibrationProfiles(Map<String, dynamic> profiles) async {
     try {
       await _repository.saveCalibrationProfiles(profiles);
-      _calibrationProfiles = profiles;
-      _notifyListeners();
+      state = state.copyWith(calibrationProfiles: profiles);
     } catch (e) {
-      _error = e.toString();
-      _notifyListeners();
+      state = state.copyWith(error: e.toString());
     }
   }
 
@@ -122,3 +117,8 @@ class SettingsProvider extends ChangeNotifier {
     return _repository.decrypt(data, key);
   }
 }
+
+/// The Riverpod provider for [SettingsNotifier].
+final settingsProvider = StateNotifierProvider<SettingsNotifier, SettingsState>((ref) {
+  return SettingsNotifier(getIt<SettingsRepository>());
+});

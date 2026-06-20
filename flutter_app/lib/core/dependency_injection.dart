@@ -8,6 +8,7 @@ import '../services/location_service.dart';
 import '../services/nfc_payload_service.dart';
 import '../services/nfc_service.dart';
 import '../services/storage_service.dart';
+import '../services/turso_service.dart';
 import '../repositories/sensor_repository.dart';
 import '../repositories/device_repository.dart';
 import '../repositories/settings_repository.dart';
@@ -18,6 +19,7 @@ Future<void> setupDependencies() async {
   // Services
   getIt.registerLazySingleton<StorageService>(() => StorageService());
   getIt.registerLazySingleton<ApiService>(() => ApiService());
+  getIt.registerLazySingleton<TursoService>(() => TursoService());
   getIt.registerLazySingleton<EncryptionService>(() => EncryptionService());
   getIt.registerLazySingleton<LocationService>(() => LocationService());
   getIt.registerLazySingleton<NfcService>(() => NfcService());

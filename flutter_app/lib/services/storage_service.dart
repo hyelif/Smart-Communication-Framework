@@ -4,6 +4,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 class StorageService {
   StorageService._(); // Private constructor to prevent instantiation.
 
+  /// Public factory for dependency injection.
+  factory StorageService() => _instance;
+  static final StorageService _instance = StorageService._();
+
   // ---------------------------------------------------------------------------
   // Named string key constants
   // ---------------------------------------------------------------------------

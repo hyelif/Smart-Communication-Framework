@@ -9,6 +9,10 @@ import 'package:pointycastle/stream/ctr.dart';
 class NfcPayloadService {
   NfcPayloadService._(); // Private constructor to prevent instantiation.
 
+  /// Public factory for dependency injection.
+  factory NfcPayloadService() => _instance;
+  static final NfcPayloadService _instance = NfcPayloadService._();
+
   // ---------------------------------------------------------------------------
   // Named constants
   // ---------------------------------------------------------------------------
@@ -78,8 +82,8 @@ class NfcPayloadService {
   static String _normalizeAesKey(String value) {
     final key = value.trim();
     if (key.length != aesKeyLength) {
-      throw FormatException(
-        'NFC AES key must be exactly $aesKeyLength characters.',
+      throw const FormatException(
+        'NFC AES key must be exactly 16 characters.',
       );
     }
     return key;

@@ -183,7 +183,7 @@ class AppTheme {
   );
 
   /// Temperature bar gradient from secondaryContainer to primaryContainer.
-  static final LinearGradient tempGradient = LinearGradient(
+  static const LinearGradient tempGradient = LinearGradient(
     colors: [
       StitchColors.secondaryContainer,
       StitchColors.primaryContainer,

@@ -5,6 +5,10 @@ import 'package:permission_handler/permission_handler.dart';
 class LocationService {
   LocationService._(); // Private constructor to prevent instantiation.
 
+  /// Public factory for dependency injection.
+  factory LocationService() => _instance;
+  static final LocationService _instance = LocationService._();
+
   // ---------------------------------------------------------------------------
   // Named constants
   // ---------------------------------------------------------------------------

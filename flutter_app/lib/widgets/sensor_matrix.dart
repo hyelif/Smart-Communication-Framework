@@ -118,12 +118,12 @@ class SensorMatrix extends StatelessWidget {
           width: double.infinity,
           child: StitchGhostButton(
             onPressed: () => onLoad(deviceConfig),
-            child: Row(
+            child: const Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.tune_rounded, size: 16),
-                const SizedBox(width: 8),
-                const AutoSizeText(
+                Icon(Icons.tune_rounded, size: 16),
+                SizedBox(width: 8),
+                AutoSizeText(
                   'EDIT IN ARCHITECT',
                   maxLines: 1,
                   minFontSize: 10,
@@ -137,19 +137,31 @@ class SensorMatrix extends StatelessWidget {
   }
 
   Widget _buildSkeleton() {
-    return Column(
+    return const Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
+          padding: EdgeInsets.symmetric(horizontal: 4),
           child: StitchShimmer(height: 16, width: 180, borderRadius: 4),
         ),
-        const SizedBox(height: 14),
-        ...List.generate(3, (i) => Padding(
-          padding: EdgeInsets.only(bottom: i < 2 ? 12 : 0),
-          child: const StitchSkeletonPanel(height: 80, lineCount: 2),
-        )),
+        SizedBox(height: 14),
+        SkeletonList(),
       ],
+    );
+  }
+}
+
+/// Internal helper to render skeleton items without dynamic generation.
+class SkeletonList extends StatelessWidget {
+  const SkeletonList({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: List.generate(3, (i) => Padding(
+        padding: EdgeInsets.only(bottom: i < 2 ? 12 : 0),
+        child: const StitchSkeletonPanel(height: 80, lineCount: 2),
+      )),
     );
   }
 }
