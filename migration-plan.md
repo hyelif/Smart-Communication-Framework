@@ -4,18 +4,25 @@
 
 Migrate SmartPonic v2 from localhost (XAMPP + MySQL) to cloud services.
 
-| Component | Current | Target |
-|-----------|---------|--------|
-| **Database** | MySQL (local XAMPP) | **Turso** (libSQL/SQLite-based, serverless) |
-| **Backend API** | Standalone PHP (local Apache) | **Laravel controllers** (merged into dashboard app) |
-| **Dashboard** | Laravel + Vue SPA (local artisan) | **Render.com** (deployed web service) |
-| **ESP32 → Cloud** | LoRa → HQ Gateway → localhost | LoRa → HQ Gateway → **Render.com URL** |
-| **Telegram Bot** | PHP poll script (local) | **Render.com** (background worker or cron) |
-| **Version Control** | Local only | **GitHub** (private repo) |
+| Component | Current | Target | Status |
+|-----------|---------|--------|--------|
+| **Database** | MySQL (local XAMPP) | **Turso** (libSQL/SQLite-based, serverless) | ✅ Done |
+| **Backend API** | Standalone PHP (local Apache) | **Laravel controllers** (merged into dashboard app) | ✅ Done |
+| **Dashboard** | Laravel + Vue SPA (local artisan) | **Render.com** (deployed web service) | ✅ Done |
+| **ESP32 → Cloud** | LoRa → HQ Gateway → localhost | LoRa → HQ Gateway → **Render.com URL** | 🔧 Code updated, not yet flashed |
+| **Telegram Bot** | PHP poll script (local) | **Render.com** (background worker or cron) | 🔧 Artisan command created, not deployed |
+| **Version Control** | Local only | **GitHub** (private repo) | ✅ Done |
 
 ---
 
-## Phase 1: Turso Database Setup
+## Phase 1: Turso Database Setup ✅
+
+| Task | Status |
+|------|--------|
+| Turso account & database created | ✅ Done |
+| Schema converted & tables created | ✅ Done |
+| Seed data inserted (profiles, settings) | ✅ Done |
+| Historical data migrated (693 readings, 1,155 data points) | ⚠️ Partial |
 
 ### 1.1 Create Turso Account & Database
 
@@ -275,7 +282,17 @@ INSERT OR IGNORE INTO dashboard_settings (setting_key, setting_value) VALUES
 
 ---
 
-## Phase 2: Backend Migration (PHP → Laravel)
+## Phase 2: Backend Migration (PHP → Laravel) ✅
+
+| Task | Status |
+|------|--------|
+| ReceiveDataController created | ✅ Done |
+| ControlQueueController created | ✅ Done |
+| API routes registered | ✅ Done |
+| DashboardController → TursoService | ✅ Done |
+| ExportController → TursoService | ✅ Done |
+| Zero `DB::` references in `app/` | ✅ Done |
+| TursoService uses `env()` (no config:cache) | ✅ Done |
 
 ### 2.1 Install Turso Laravel Driver
 
@@ -676,7 +693,19 @@ TELEGRAM_ALLOWED_CHAT_IDS=your-chat-id
 
 ---
 
-## Phase 3: Deploy to Render.com
+## Phase 3: Deploy to Render.com ✅
+
+| Task | Status |
+|------|--------|
+| Dockerfile created (php:8.2-cli) | ✅ Done |
+| render.yaml created (Docker runtime) | ✅ Done |
+| start.sh created | ✅ Done |
+| .env.production template created | ✅ Done |
+| GitHub repo `render-host` created | ✅ Done |
+| Dashboard live at `smartponic-dashboard.onrender.com` | ✅ Done |
+| Health endpoint working | ✅ Done |
+| Data ingestion working (POST /api/receive-data) | ✅ Done |
+| cron-job.org keep-alive | ⏳ Not yet set up |
 
 ### 3.1 Prepare the Laravel App for Render
 
@@ -798,7 +827,12 @@ git push -u origin main
 
 ---
 
-## Phase 4: ESP32 HQ Gateway Update
+## Phase 4: ESP32 HQ Gateway Update 🔧
+
+| Task | Status |
+|------|--------|
+| Firmware URLs updated in code | ✅ Done |
+| Physical device flashed with new firmware | ❌ Not yet |
 
 ### 4.1 Update Firmware Endpoint URL
 
@@ -829,7 +863,13 @@ pio run --target upload
 
 ---
 
-## Phase 5: Telegram Bot Migration
+## Phase 5: Telegram Bot Migration 🔧
+
+| Task | Status |
+|------|--------|
+| `app/Console/Commands/TelegramPoll.php` created | ✅ Done |
+| `php artisan telegram:poll` registered | ✅ Done |
+| Running on Render (cron-job.org or Supervisor) | ❌ Not yet |
 
 ### 5.1 Convert Telegram Poll Script
 
@@ -1003,18 +1043,18 @@ Render doesn't have a built-in cron for free tier. Alternatives:
 
 ---
 
-## Phase 6: Verification
+## Phase 6: Verification ⚠️
 
 ### 6.1 Test Checklist
 
-- [ ] Turso database created and tables exist
-- [ ] Laravel connects to Turso locally
-- [ ] `POST /api/receive-data` accepts ESP32 data
-- [ ] `POST /api/control-queue` returns pending commands
-- [ ] Dashboard loads on Render.com URL
-- [ ] Dashboard polls and displays live sensor data
-- [ ] ESP32 HQ Gateway sends data to Render URL
-- [ ] Telegram bot responds to commands
+- [x] Turso database created and tables exist
+- [x] Laravel connects to Turso locally
+- [x] `POST /api/receive-data` accepts ESP32 data (tested on Render ✅)
+- [x] `POST /api/control-queue` returns pending commands
+- [x] Dashboard loads on Render.com URL
+- [x] Dashboard polls and displays live sensor data
+- [ ] ESP32 HQ Gateway sends data to Render URL (code updated, device not flashed)
+- [ ] Telegram bot responds to commands (command created, not deployed)
 - [ ] Alerts trigger correctly
 - [ ] Relay commands flow dashboard → ESP32
 
@@ -1094,15 +1134,15 @@ If something goes wrong:
 
 ## Timeline Estimate
 
-| Phase | Tasks | Estimated Time |
-|-------|-------|----------------|
-| **Phase 1** | Turso setup, schema conversion, table creation | 1-2 hours |
-| **Phase 2** | Laravel controllers, routes, Turso driver config | 3-4 hours |
-| **Phase 3** | GitHub push, Render deployment, env config | 1-2 hours |
-| **Phase 4** | ESP32 firmware update, flash | 1 hour |
-| **Phase 5** | Telegram bot migration | 1-2 hours |
-| **Phase 6** | Testing, verification, rollback prep | 2-3 hours |
-| **Total** | | **~9-14 hours** |
+| Phase | Tasks | Estimated Time | Actual |
+|-------|-------|----------------|--------|
+| **Phase 1** | Turso setup, schema conversion, table creation | 1-2 hours | ✅ Done |
+| **Phase 2** | Laravel controllers, routes, Turso driver config | 3-4 hours | ✅ Done |
+| **Phase 3** | GitHub push, Render deployment, env config | 1-2 hours | ✅ Done |
+| **Phase 4** | ESP32 firmware update, flash | 1 hour | 🔧 Code done, not flashed |
+| **Phase 5** | Telegram bot migration | 1-2 hours | 🔧 Command done, not deployed |
+| **Phase 6** | Testing, verification, rollback prep | 2-3 hours | ⚠️ Partial |
+| **Total** | | **~9-14 hours** | **~8 hours completed** |
 
 ---
 

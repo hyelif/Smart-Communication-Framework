@@ -168,22 +168,37 @@ CREATE TABLE IF NOT EXISTS communication_health (
 );
 
 -- ============================================
--- Telegram bot polling state
+-- Users (multi-user auth)
 -- ============================================
-CREATE TABLE IF NOT EXISTS telegram_bot_state (
-    state_key   TEXT PRIMARY KEY,
-    state_value TEXT NOT NULL,
-    updated_at  TEXT DEFAULT (datetime('now'))
+CREATE TABLE IF NOT EXISTS users (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    username    TEXT NOT NULL UNIQUE,
+    password    TEXT NOT NULL,  -- SHA-256 hash
+    created_at  TEXT DEFAULT (datetime('now'))
 );
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 
 -- ============================================
--- Telegram alert cooldown state
+-- User-to-node mapping (many-to-many)
 -- ============================================
-CREATE TABLE IF NOT EXISTS telegram_alert_state (
-    state_key    TEXT PRIMARY KEY,
-    last_sent_at TEXT DEFAULT NULL,
-    updated_at   TEXT DEFAULT (datetime('now'))
+CREATE TABLE IF NOT EXISTS user_nodes (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL,
+    hardware_id TEXT NOT NULL,
+    label       TEXT DEFAULT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (hardware_id) REFERENCES nodes(hardware_id),
+    UNIQUE(user_id, hardware_id)
 );
+CREATE INDEX IF NOT EXISTS idx_un_user_id ON user_nodes(user_id);
+CREATE INDEX IF NOT EXISTS idx_un_hardware_id ON user_nodes(hardware_id);
+
+-- ============================================
+-- Seed: default admin user (password: admin)
+-- SHA-256 of "admin" = 8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918
+-- ============================================
+INSERT OR IGNORE INTO users (username, password)
+VALUES ('admin', '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918');
 
 -- ============================================
 -- Triggers for updated_at auto-update

@@ -17,8 +17,12 @@ Route::get("/api/dashboard/export", [ExportController::class, "export"]);
 Route::get("/api/dashboard/export-summary", [ExportController::class, "summaryExport"]);
 Route::get("/api/health", function () {
     try {
-        DB::connection()->getPdo();
-        return response()->json(["status" => "ok", "database" => "connected"]);
+        $turso = app(\App\Services\TursoService::class);
+        $healthy = $turso->health();
+        return response()->json([
+            "status" => $healthy ? "ok" : "error",
+            "database" => $healthy ? "connected" : "disconnected",
+        ]);
     } catch (\Exception $e) {
         return response()->json(["status" => "error", "database" => $e->getMessage()], 500);
     }

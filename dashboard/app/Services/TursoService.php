@@ -30,8 +30,11 @@ class TursoService
 
     public function __construct()
     {
-        $this->baseUrl   = rtrim(env('TURSO_DATABASE_URL', ''), '/');
-        $this->authToken = env('TURSO_AUTH_TOKEN', '');
+        // Use env() — reads from .env file AND OS environment variables.
+        // Note: after php artisan config:cache, env() stops working,
+        // so we must NOT run config:cache in the Docker CMD.
+        $this->baseUrl   = rtrim((string) env('TURSO_DATABASE_URL', ''), '/');
+        $this->authToken = (string) env('TURSO_AUTH_TOKEN', '');
 
         // Convert libsql:// to https:// for HTTP API
         if (str_starts_with($this->baseUrl, 'libsql://')) {
