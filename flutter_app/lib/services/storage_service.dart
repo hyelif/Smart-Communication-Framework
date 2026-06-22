@@ -1,27 +1,23 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Local storage for ESP32 configuration, profiles, and calibration data.
+///
+/// All public methods handle errors gracefully — returning empty/default
+/// values instead of throwing.
 class StorageService {
-  StorageService._(); // Private constructor to prevent instantiation.
+  StorageService._();
 
-  /// Public factory for dependency injection.
   factory StorageService() => _instance;
   static final StorageService _instance = StorageService._();
 
   // ---------------------------------------------------------------------------
-  // Named string key constants
+  // Keys
   // ---------------------------------------------------------------------------
 
-  /// SharedPreferences key for the ESP32 config data JSON.
   static const String configKey = 'esp_config_data';
-
-  /// SharedPreferences key for the ESP32 profiles list JSON.
   static const String profilesKey = 'esp_profiles_list';
-
-  /// SharedPreferences key for the ESP32 AES key.
   static const String aesKey = 'esp_aes_key';
-
-  /// SharedPreferences key for the ESP32 calibration profiles JSON.
   static const String calibrationKey = 'esp_calibration_profiles';
 
   // ---------------------------------------------------------------------------
@@ -40,48 +36,89 @@ class StorageService {
   static String? _cachedCalibrationJson;
   static Map<String, dynamic>? _cachedCalibrationParsed;
 
+  /// Clear all cached data. Call when switching accounts or resetting.
+  static void clearCache() {
+    _configLoaded = false;
+    _profilesLoaded = false;
+    _keyLoaded = false;
+    _calibrationLoaded = false;
+    _cachedConfigJson = null;
+    _cachedProfilesJson = null;
+    _cachedProfilesParsed = null;
+    _cachedKey = null;
+    _cachedCalibrationJson = null;
+    _cachedCalibrationParsed = null;
+  }
+
   static Future<SharedPreferences> _prefs() {
     return _prefsFuture ??= SharedPreferences.getInstance();
   }
 
   static Future<void> _ensureConfigCache() async {
     if (_configLoaded) return;
-    final prefs = await _prefs();
-    _cachedConfigJson = prefs.getString(configKey);
+    try {
+      final prefs = await _prefs();
+      _cachedConfigJson = prefs.getString(configKey);
+    } catch (_) {
+      _cachedConfigJson = null;
+    }
     _configLoaded = true;
   }
 
   static Future<void> _ensureProfilesCache() async {
     if (_profilesLoaded) return;
-    final prefs = await _prefs();
-    _cachedProfilesJson = prefs.getString(profilesKey);
+    try {
+      final prefs = await _prefs();
+      _cachedProfilesJson = prefs.getString(profilesKey);
+    } catch (_) {
+      _cachedProfilesJson = null;
+    }
     _profilesLoaded = true;
   }
 
   static Future<void> _ensureKeyCache() async {
     if (_keyLoaded) return;
-    final prefs = await _prefs();
-    _cachedKey = prefs.getString(aesKey);
+    try {
+      final prefs = await _prefs();
+      _cachedKey = prefs.getString(aesKey);
+    } catch (_) {
+      _cachedKey = null;
+    }
     _keyLoaded = true;
   }
 
   static Future<void> _ensureCalibrationCache() async {
     if (_calibrationLoaded) return;
-    final prefs = await _prefs();
-    _cachedCalibrationJson = prefs.getString(calibrationKey);
+    try {
+      final prefs = await _prefs();
+      _cachedCalibrationJson = prefs.getString(calibrationKey);
+    } catch (_) {
+      _cachedCalibrationJson = null;
+    }
     _calibrationLoaded = true;
   }
 
+  // ---------------------------------------------------------------------------
+  // Public API
+  // ---------------------------------------------------------------------------
+
+  /// Save ESP32 config and AES key to local storage.
   static Future<void> saveConfig(List<Map<String, dynamic>> config, String key) async {
-    final prefs = await _prefs();
-    _cachedConfigJson = jsonEncode(config);
-    _cachedKey = key;
-    _configLoaded = true;
-    _keyLoaded = true;
-    await prefs.setString(configKey, _cachedConfigJson!);
-    await prefs.setString(aesKey, key);
+    try {
+      final prefs = await _prefs();
+      final json = jsonEncode(config);
+      await prefs.setString(configKey, json);
+      await prefs.setString(aesKey, key);
+      _cachedConfigJson = json;
+      _cachedKey = key;
+      _configLoaded = true;
+      _keyLoaded = true;
+    } catch (_) {
+      // Silently fail — next save will retry.
+    }
   }
 
+  /// Load ESP32 config and AES key from local storage.
   static Future<Map<String, dynamic>> loadConfig() async {
     await Future.wait([
       _ensureConfigCache(),
@@ -93,56 +130,81 @@ class StorageService {
     };
   }
 
+  /// Get all saved profiles.
   static Future<List<Map<String, dynamic>>> getProfiles() async {
     await _ensureProfilesCache();
     if (_cachedProfilesParsed != null) return _cachedProfilesParsed!;
     final data = _cachedProfilesJson;
     if (data == null) return [];
-    _cachedProfilesParsed = List<Map<String, dynamic>>.from(jsonDecode(data));
-    return _cachedProfilesParsed!;
+    try {
+      final decoded = jsonDecode(data);
+      if (decoded is List) {
+        _cachedProfilesParsed = List<Map<String, dynamic>>.from(decoded);
+      }
+    } catch (_) {
+      // Corrupted data — return empty.
+      _cachedProfilesParsed = [];
+    }
+    return _cachedProfilesParsed ?? [];
   }
 
-  // Calibration profiles are stored as:
-  // { "temperature": {threshold_min, threshold_max, calibration_a, calibration_b, calibration_c}, ... }
+  /// Load calibration profiles from local storage.
   static Future<Map<String, dynamic>> loadCalibrationProfiles() async {
     await _ensureCalibrationCache();
     if (_cachedCalibrationParsed != null) return _cachedCalibrationParsed!;
     final data = _cachedCalibrationJson;
     if (data == null || data.isEmpty) return {};
-    final decoded = jsonDecode(data);
-    if (decoded is Map<String, dynamic>) {
-      _cachedCalibrationParsed = decoded;
-      return decoded;
+    try {
+      final decoded = jsonDecode(data);
+      if (decoded is Map<String, dynamic>) {
+        _cachedCalibrationParsed = decoded;
+        return decoded;
+      }
+    } catch (_) {
+      // Corrupted data — return empty.
     }
     return {};
   }
 
+  /// Save calibration profiles to local storage.
   static Future<void> saveCalibrationProfiles(Map<String, dynamic> profiles) async {
-    final prefs = await _prefs();
-    _cachedCalibrationJson = jsonEncode(profiles);
-    _cachedCalibrationParsed = profiles;
-    _calibrationLoaded = true;
-    await prefs.setString(calibrationKey, _cachedCalibrationJson!);
+    try {
+      final prefs = await _prefs();
+      final json = jsonEncode(profiles);
+      await prefs.setString(calibrationKey, json);
+      _cachedCalibrationJson = json;
+      _cachedCalibrationParsed = profiles;
+      _calibrationLoaded = true;
+    } catch (_) {
+      // Silently fail.
+    }
   }
 
+  /// Save a new profile to the profiles list.
   static Future<void> saveAsNewProfile(
     String name,
     List<Map<String, dynamic>> config,
   ) async {
-    final prefs = await _prefs();
-    final profiles = await getProfiles();
-    final newProfile = {
-      'name': name,
-      'time': DateTime.now().toIso8601String(),
-      'config': config,
-    };
-    final updated = [newProfile, ...profiles];
-    _cachedProfilesJson = jsonEncode(updated);
-    _cachedProfilesParsed = updated;
-    _profilesLoaded = true;
-    await prefs.setString(profilesKey, _cachedProfilesJson!);
+    try {
+      final prefs = await _prefs();
+      final profiles = await getProfiles();
+      final newProfile = {
+        'name': name,
+        'time': DateTime.now().toIso8601String(),
+        'config': config,
+      };
+      final updated = [newProfile, ...profiles];
+      final json = jsonEncode(updated);
+      await prefs.setString(profilesKey, json);
+      _cachedProfilesJson = json;
+      _cachedProfilesParsed = updated;
+      _profilesLoaded = true;
+    } catch (_) {
+      // Silently fail.
+    }
   }
 
+  /// Save a profile (legacy wrapper for [saveAsNewProfile]).
   static Future<void> saveProfile(
     String name,
     List<Map<String, dynamic>> config,
@@ -150,15 +212,21 @@ class StorageService {
     await saveAsNewProfile(name, config);
   }
 
+  /// Delete a profile by index.
   static Future<void> deleteProfile(int index) async {
-    final prefs = await _prefs();
-    final profiles = await getProfiles();
-    if (index >= 0 && index < profiles.length) {
-      final updated = List<Map<String, dynamic>>.from(profiles)..removeAt(index);
-      _cachedProfilesJson = jsonEncode(updated);
-      _cachedProfilesParsed = updated;
-      _profilesLoaded = true;
-      await prefs.setString(profilesKey, _cachedProfilesJson!);
+    try {
+      final prefs = await _prefs();
+      final profiles = await getProfiles();
+      if (index >= 0 && index < profiles.length) {
+        final updated = List<Map<String, dynamic>>.from(profiles)..removeAt(index);
+        final json = jsonEncode(updated);
+        await prefs.setString(profilesKey, json);
+        _cachedProfilesJson = json;
+        _cachedProfilesParsed = updated;
+        _profilesLoaded = true;
+      }
+    } catch (_) {
+      // Silently fail.
     }
   }
 }

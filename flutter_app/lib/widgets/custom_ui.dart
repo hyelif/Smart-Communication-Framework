@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 import 'app_theme.dart';
+import '../utils/performance_config.dart';
 
 class StitchBounce extends StatefulWidget {
   final Widget child;
@@ -18,19 +19,19 @@ class StitchBounce extends StatefulWidget {
   State<StitchBounce> createState() => _StitchBounceState();
 }
 
-class _StitchBounceState extends State<StitchBounce> with SingleTickerProviderStateMixin {
+class _StitchBounceState extends State<StitchBounce>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
-  late final Animation<double> _scaleAnimation;
+
+  // Target scale when pressed — springs back via Curves.elasticOut.
+  static const double _pressedScale = 0.95;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 80),
-    );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.96).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOutCubic),
+      value: 1.0, // start at full scale
     );
   }
 
@@ -41,15 +42,31 @@ class _StitchBounceState extends State<StitchBounce> with SingleTickerProviderSt
   }
 
   void _onTapDown(TapDownDetails _) {
-    if (widget.onTap != null) _controller.forward();
+    if (widget.onTap == null) return;
+    _controller.animateTo(
+      _pressedScale,
+      duration: const Duration(milliseconds: 80),
+      curve: Curves.easeOut,
+    );
   }
 
   void _onTapUp(TapUpDetails _) {
-    if (widget.onTap != null) _controller.reverse();
+    if (widget.onTap == null) return;
+    // Spring back to full scale with a natural overshoot.
+    _controller.animateTo(
+      1.0,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.elasticOut,
+    );
   }
 
   void _onTapCancel() {
-    if (widget.onTap != null) _controller.reverse();
+    if (widget.onTap == null) return;
+    _controller.animateTo(
+      1.0,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.elasticOut,
+    );
   }
 
   @override
@@ -61,9 +78,9 @@ class _StitchBounceState extends State<StitchBounce> with SingleTickerProviderSt
       onTap: widget.onTap,
       behavior: HitTestBehavior.opaque,
       child: AnimatedBuilder(
-        animation: _scaleAnimation,
+        animation: _controller,
         builder: (context, child) => Transform.scale(
-          scale: _scaleAnimation.value,
+          scale: _controller.value,
           child: child,
         ),
         child: widget.child,
@@ -180,84 +197,113 @@ class StitchBottomNavigation extends StatelessWidget {
     required this.onTap,
   });
 
-  static const _items = [
-    _NavItem(Icons.home_rounded, 'HOME'),
-    _NavItem(Icons.flash_on_rounded, 'DEVICES'),
-    _NavItem(Icons.architecture_rounded, 'ARCHITECT'),
-    _NavItem(Icons.settings_rounded, 'SETTINGS'),
-  ];
+  static const int itemCount = 3;
 
   @override
   Widget build(BuildContext context) {
+    const items = _navItems;
+
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+
     return RepaintBoundary(
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-        decoration: const BoxDecoration(
-          color: StitchColors.surfaceLowest,
-          border: Border(
-            top: BorderSide(color: StitchColors.outlineVariant),
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: Padding(
+          padding: EdgeInsets.only(
+            bottom: bottomInset + 12,
           ),
-        ),
-        child: SafeArea(
-          top: false,
-          child: Row(
-            children: List.generate(_items.length, (index) {
-              final item = _items[index];
-              final selected = index == currentIndex;
-              return Expanded(
-                child: StitchBounce(
-                  onTap: () => onTap(index),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeOutCubic,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 8,
-                    ),
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? StitchColors.surfaceContainer
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: selected
-                          ? StitchColors.outlineVariant.withValues(alpha: 0.5)
-                          : Colors.transparent,
-                      width: 1,
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
+          child: SizedBox(
+            height: 62,
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 300),
+              decoration: BoxDecoration(
+                color: StitchColors.surfaceLowest,
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(
+                  color: StitchColors.outlineVariant.withValues(alpha: 0.5),
+                  width: 1,
+                ),
+                boxShadow: AppTheme.subtleShadow,
+              ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final itemWidth = constraints.maxWidth / itemCount;
+                  const double indicatorWidth = 64;
+                  const double indicatorHeight = 48;
+                  final leftPosition =
+                      (currentIndex * itemWidth) + (itemWidth / 2) - (indicatorWidth / 2);
+
+                  return Stack(
                     children: [
-                      AnimatedScale(
-                        scale: selected ? 1.12 : 1.0,
-                        duration: const Duration(milliseconds: 180),
-                        curve: Curves.easeOutBack,
-                        child: Icon(
-                          item.icon,
-                          color: selected
-                              ? StitchColors.primaryContainer
-                              : StitchColors.onSurfaceVariant,
-                          size: 22,
+                      // Animated pill indicator — iOS-style pill shape
+                      AnimatedPositioned(
+                        duration: const Duration(milliseconds: 400),
+                        curve: Curves.easeInOutCubicEmphasized,
+                        left: leftPosition,
+                        top: (62 - indicatorHeight) / 2,
+                        child: Container(
+                          width: indicatorWidth,
+                          height: indicatorHeight,
+                          decoration: BoxDecoration(
+                            color: StitchColors.surfaceContainer
+                                .withValues(alpha: 0.6),
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(
+                              color: StitchColors.outlineVariant
+                                  .withValues(alpha: 0.3),
+                              width: 1,
+                            ),
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        item.label,
-                        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                              color: selected
-                                  ? StitchColors.primaryContainer
-                                  : StitchColors.onSurfaceVariant,
-                              fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                              letterSpacing: 1.0,
+
+                      // Nav items
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: List.generate(itemCount, (index) {
+                          final item = items[index];
+                          final selected = index == currentIndex;
+
+                          return SizedBox(
+                            width: itemWidth,
+                            height: 62,
+                            child: StitchBounce(
+                              onTap: () => onTap(index),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    selected ? item.activeIcon : item.icon,
+                                    color: selected
+                                        ? StitchColors.primaryContainer
+                                        : StitchColors.onSurfaceVariant,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    item.label,
+                                    style: TextStyle(
+                                      color: selected
+                                          ? StitchColors.primaryContainer
+                                          : StitchColors.onSurfaceVariant,
+                                      fontSize: 9,
+                                      fontWeight: selected
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                      letterSpacing: 0.3,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
+                          );
+                        }),
                       ),
                     ],
-                  ),
-                ),
+                  );
+                },
               ),
-            );
-            }),
+            ),
           ),
         ),
       ),
@@ -265,11 +311,18 @@ class StitchBottomNavigation extends StatelessWidget {
   }
 }
 
+const List<_NavItem> _navItems = [
+  _NavItem(Icons.home_outlined, Icons.home_rounded, 'Home'),
+  _NavItem(Icons.flash_on_outlined, Icons.flash_on_rounded, 'Devices'),
+  _NavItem(Icons.settings_outlined, Icons.settings_rounded, 'Settings'),
+];
+
 class _NavItem {
   final IconData icon;
+  final IconData activeIcon;
   final String label;
 
-  const _NavItem(this.icon, this.label);
+  const _NavItem(this.icon, this.activeIcon, this.label);
 }
 
 class StitchPanel extends StatelessWidget {
@@ -283,7 +336,7 @@ class StitchPanel extends StatelessWidget {
   const StitchPanel({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(20),
+    this.padding = const EdgeInsets.all(StitchSpacing.xl),
     this.color,
     this.glow = false,
     this.glass = false,
@@ -293,7 +346,7 @@ class StitchPanel extends StatelessWidget {
   const StitchPanel.glass({
     Key? key,
     required Widget child,
-    EdgeInsetsGeometry padding = const EdgeInsets.all(20),
+    EdgeInsetsGeometry padding = const EdgeInsets.all(StitchSpacing.xl),
     BorderRadius? borderRadius,
   }) : this(
          key: key,
@@ -306,37 +359,82 @@ class StitchPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final panel = Container(
-      padding: padding,
-      decoration: BoxDecoration(
-        color: glass
-            ? StitchColors.glassSurface
-            : (color ?? StitchColors.surfaceLow),
-        borderRadius: borderRadius ?? BorderRadius.circular(20),
+    final radius = borderRadius ?? StitchRadius.cardBorder;
+    final perf = PerformanceConfig.of(context);
+
+    // Build the base panel decoration.
+    BoxDecoration decoration;
+    Widget panelContent = child;
+
+    if (glass) {
+      // Glass panel with gradient sheen and specular highlight.
+      decoration = BoxDecoration(
+        gradient: AppTheme.glassGradient,
+        borderRadius: radius,
         border: Border.all(
-          color: glass
-              ? StitchColors.glassBorder
-              : StitchColors.outlineVariant.withValues(alpha: 0.8),
+          color: StitchColors.glassBorder,
           width: 1,
         ),
         boxShadow: glow
             ? AppTheme.cyanGlowShadow
-            : (glass ? AppTheme.glassShadow : AppTheme.subtleShadow),
-      ),
-      child: child,
+            : AppTheme.glassShadow,
+      );
+
+      // Specular highlight strip at the top edge.
+      panelContent = Stack(
+        children: [
+          child,
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              height: 1,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    StitchColors.glassSpecular.withValues(alpha: 0.0),
+                    StitchColors.glassSpecular,
+                    StitchColors.glassSpecular.withValues(alpha: 0.0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    } else {
+      // Solid panel.
+      decoration = BoxDecoration(
+        color: color ?? StitchColors.surfaceLow,
+        borderRadius: radius,
+        border: Border.all(
+          color: StitchColors.outlineVariant.withValues(alpha: 0.8),
+          width: 1,
+        ),
+        boxShadow: glow
+            ? AppTheme.cyanGlowShadow
+            : AppTheme.subtleShadow,
+      );
+    }
+
+    final panel = Container(
+      padding: padding,
+      decoration: decoration,
+      child: panelContent,
     );
 
-    if (!glass) return panel;
+    if (!glass || !perf.enableBlur) return panel;
 
-    // Performance note: BackdropFilter with blur is GPU-intensive.
-    // sigma 6 provides a strong frosted-glass look while being ~4x cheaper
-    // than sigma 12 on most mobile GPUs. The RepaintBoundary prevents
-    // the filter from being re-applied when ancestor widgets repaint.
+    // Performance-aware glass blur.
     return ClipRRect(
-      borderRadius: borderRadius ?? BorderRadius.circular(20),
+      borderRadius: radius,
       child: RepaintBoundary(
         child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+          filter: ui.ImageFilter.blur(
+            sigmaX: perf.maxBlurSigma,
+            sigmaY: perf.maxBlurSigma,
+          ),
           child: panel,
         ),
       ),

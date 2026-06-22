@@ -23,11 +23,9 @@ final authControllerProvider =
 /// 5. [logout] clears session
 class AuthController extends StateNotifier<AuthState> {
   AuthController() : super(const AuthState.unauthenticated()) {
-    _init();
-  }
-
-  Future<void> _init() async {
-    await checkSession();
+    // Use microtask to avoid blocking the constructor. The listener in
+    // DeviceListController/HomeController will fire when state changes.
+    Future.microtask(() => checkSession());
   }
 
   static const String _prefsKeyUsername = 'auth_username';
@@ -44,51 +42,130 @@ class AuthController extends StateNotifier<AuthState> {
   /// On success, persists the session to SharedPreferences.
   /// On failure, returns an error message.
   Future<String?> login(String username, String password) async {
-    // First check Turso connectivity so we give a useful error
-    String? connError;
-    final connected = await TursoService.checkConnection(
-      onError: (msg) => connError = msg,
-    );
-    if (!connected) {
-      return connError ?? 'Cannot reach the database. Check your Turso configuration.';
+    try {
+      // First check Turso connectivity so we give a useful error
+      String? connError;
+      final connected = await TursoService.checkConnection(
+        onError: (msg) => connError = msg,
+      );
+      if (!connected) {
+        return connError ?? 'Cannot reach the database. Check your Turso configuration.';
+      }
+
+      final hashed = _hashPassword(password);
+
+      final rows = await TursoService.query(
+        'SELECT id, username FROM users WHERE username = ? AND password = ?',
+        [username, hashed],
+      );
+
+      if (rows.isEmpty) {
+        return 'Invalid username or password.';
+      }
+
+      final userId = rows[0]['id'] as int;
+
+      // Load allowed nodes for this user
+      final nodeRows = await TursoService.query(
+        'SELECT hardware_id, label FROM user_nodes WHERE user_id = ?',
+        [userId],
+      );
+
+      final hardwareIds = nodeRows
+          .map((r) => r['hardware_id'] as String)
+          .toList();
+
+      // Persist session
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_prefsKeyUsername, username);
+      await prefs.setInt(_prefsKeyUserId, userId);
+      await prefs.setStringList(_prefsKeyHardwareIds, hardwareIds);
+
+      state = AuthState.authenticated(
+        username: username,
+        userId: userId,
+        allowedHardwareIds: hardwareIds,
+      );
+
+      return null; // success
+    } on TursoException catch (e) {
+      return _tursoErrorMessage(e);
+    } catch (e) {
+      return 'Login error: ${e.toString()}';
+    }
+  }
+
+  /// Claim a node by hardware ID for the current user.
+  ///
+  /// Checks if the node exists in the `nodes` table, then links it
+  /// to this user via `user_nodes`. Returns `null` on success, or an
+  /// error message on failure.
+  Future<String?> claimNode(String hardwareId) async {
+    if (!state.isLoggedIn) return 'Not logged in.';
+    if (state.allowedHardwareIds.contains(hardwareId)) {
+      return 'Node already linked to your account.';
     }
 
-    final hashed = _hashPassword(password);
+    try {
+      // Check if node exists in the nodes table
+      final rows = await TursoService.query(
+        'SELECT hardware_id FROM nodes WHERE hardware_id = ?',
+        [hardwareId],
+      );
+      if (rows.isEmpty) {
+        return 'Node not found. Check the hardware ID and try again.';
+      }
 
-    final rows = await TursoService.query(
-      'SELECT id, username FROM users WHERE username = ? AND password = ?',
-      [username, hashed],
-    );
+      // Remove node from any previous owner, then link to current user.
+      // This ensures a node can only be claimed by one account at a time.
+      await TursoService.execute(
+        'DELETE FROM user_nodes WHERE hardware_id = ?',
+        [hardwareId],
+      );
+      final id = await TursoService.execute(
+        'INSERT INTO user_nodes (user_id, hardware_id) VALUES (?, ?)',
+        [state.userId, hardwareId],
+      );
+      if (id == null) return 'Failed to claim node.';
 
-    if (rows.isEmpty) {
-      return 'Invalid username or password.';
+      // Update local state
+      final updatedIds = [...state.allowedHardwareIds, hardwareId];
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_prefsKeyHardwareIds, updatedIds);
+
+      state = state.copyWith(allowedHardwareIds: updatedIds);
+
+      return null; // success
+    } catch (e) {
+      return 'Error claiming node: ${e.toString()}';
     }
+  }
 
-    final userId = rows[0]['id'] as int;
+  /// Re-fetch the user's allowed hardware IDs from Turso.
+  ///
+  /// Call this before loading the device list to ensure the list is
+  /// up-to-date (e.g. after another user claimed a node that was
+  /// previously linked to this account).
+  Future<void> refreshHardwareIds() async {
+    if (!state.isLoggedIn || state.userId == null) return;
+    try {
+      final rows = await TursoService.query(
+        'SELECT hardware_id FROM user_nodes WHERE user_id = ?',
+        [state.userId],
+      );
+      final ids = rows.map((r) => r['hardware_id'] as String).toList();
 
-    // Load allowed nodes for this user
-    final nodeRows = await TursoService.query(
-      'SELECT hardware_id, label FROM user_nodes WHERE user_id = ?',
-      [userId],
-    );
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_prefsKeyHardwareIds, ids);
 
-    final hardwareIds = nodeRows
-        .map((r) => r['hardware_id'] as String)
-        .toList();
-
-    // Persist session
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_prefsKeyUsername, username);
-    await prefs.setInt(_prefsKeyUserId, userId);
-    await prefs.setStringList(_prefsKeyHardwareIds, hardwareIds);
-
-    state = AuthState.authenticated(
-      username: username,
-      userId: userId,
-      allowedHardwareIds: hardwareIds,
-    );
-
-    return null; // success
+      state = state.copyWith(allowedHardwareIds: ids);
+    } on TursoException catch (e) {
+      // ignore: avoid_print
+      print('[Auth] refreshHardwareIds failed: $e');
+    } catch (e) {
+      // ignore: avoid_print
+      print('[Auth] refreshHardwareIds unexpected error: $e');
+    }
   }
 
   /// Log out the current user.
@@ -126,8 +203,84 @@ class AuthController extends StateNotifier<AuthState> {
   }
 
   // ---------------------------------------------------------------------------
+  // Registration
+  // ---------------------------------------------------------------------------
+
+  /// Create a new user account and auto-login.
+  ///
+  /// Returns `null` on success, or an error message on failure.
+  Future<String?> register(String username, String password) async {
+    try {
+      // Check Turso connectivity
+      String? connError;
+      final connected = await TursoService.checkConnection(
+        onError: (msg) => connError = msg,
+      );
+      if (!connected) {
+        return connError ?? 'Cannot reach the database.';
+      }
+
+      // Check if username already exists
+      final existing = await TursoService.query(
+        'SELECT id FROM users WHERE username = ?',
+        [username],
+      );
+      if (existing.isNotEmpty) {
+        return 'Username already taken.';
+      }
+
+      // Hash password and insert
+      final hashed = _hashPassword(password);
+      final id = await TursoService.execute(
+        'INSERT INTO users (username, password) VALUES (?, ?)',
+        [username, hashed],
+      );
+
+      if (id == null) {
+        return 'Failed to create account. Database may not have write permissions.';
+      }
+
+      // Auto-login after registration
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_prefsKeyUsername, username);
+      await prefs.setInt(_prefsKeyUserId, id);
+      await prefs.setStringList(_prefsKeyHardwareIds, []);
+
+      state = AuthState.authenticated(
+        username: username,
+        userId: id,
+        allowedHardwareIds: [],
+      );
+
+      return null; // success
+    } on TursoException catch (e) {
+      return _tursoErrorMessage(e);
+    } catch (e) {
+      return 'Registration error: ${e.toString()}';
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
+
+  /// Map a [TursoException] to a user-friendly message.
+  static String _tursoErrorMessage(TursoException e) {
+    switch (e.type) {
+      case TursoErrorType.auth:
+        return 'Database authentication failed. Check your Turso token configuration.';
+      case TursoErrorType.network:
+        return 'Cannot reach the database. Check your internet connection.';
+      case TursoErrorType.timeout:
+        return 'Database is not responding. Try again in a moment.';
+      case TursoErrorType.sql:
+        return 'A database error occurred. Please try again.';
+      case TursoErrorType.parse:
+        return 'Unexpected response from the database.';
+      case TursoErrorType.unknown:
+        return 'A database error occurred: ${e.message}';
+    }
+  }
 
   /// Compute SHA-256 hex digest of [input].
   static String _hashPassword(String input) {

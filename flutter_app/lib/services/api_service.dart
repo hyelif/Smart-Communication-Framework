@@ -12,6 +12,11 @@ class ApiService {
 
   static final http.Client _client = http.Client();
 
+  /// Dispose the underlying HTTP client. Call on app shutdown.
+  static void dispose() {
+    _client.close();
+  }
+
   static const int _maxRetries = 2;
   static const Duration _retryDelay = Duration(milliseconds: 500);
 

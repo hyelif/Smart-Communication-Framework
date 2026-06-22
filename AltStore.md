@@ -1,110 +1,64 @@
-# Plan: Install Smartponic V2 on iPhone Using a Windows Laptop
+# Progress: Sideload Smartponic V2 on iPhone
 
-This plan outlines the process of building this Flutter iOS application in the cloud using [Codemagic](https://codemagic.io) and sideloading it onto a physical iPhone using AltStore on a Windows environment.
-
-**Your project details (for reference):**
-- App name: `Smartponic V2`
-- Bundle ID: `com.example.smartponicV2`
-- Git branch with your changes: `dev-optimization`
-- iOS code signing style: Automatic
+**Last updated:** 2026-06-20
+**Branch:** `dev-optimization` (on `Smart-Communication-Framework`)
+**Remote repo:** `hyelif/Smart-Communication-Framework.git`
+**Build platform:** Codemagic
+**Sideload tool:** AltStore
 
 ---
 
-## Phase 0: Prepare Your Code for iOS
+## ✅ What's Done
 
-> ⚠️ **Do this FIRST before the build step.**
-
-- [ ] **Commit or stash your local changes** — Codemagic builds from the remote repo, so local uncommitted changes won't be included:
-  ```bash
-  git add -A
-  git commit -m "prep for iOS testing build"
-  git push origin dev-optimization
-  ```
-- [ ] Alternatively, create a dedicated branch for iOS testing:
-  ```bash
-  git checkout -b ios-testing
-  git push origin ios-testing
-  ```
+- [x] Flutter project analyzed — **0 errors**, 29 style hints only
+- [x] `codemagic.yaml` created at repo root — builds debug, packages `.ipa`
+- [x] `NSLocationWhenInUseUsageDescription` added to Info.plist (for `geolocator`)
+- [x] `DEVELOPMENT_TEAM = AAAAAAAAAA` dummy placeholder in project.pbxproj Debug config (satisfies Flutter 3.11 validation)
+- [x] `import 'package:flutter/cupertino.dart'` added to app_theme.dart (fixes `CupertinoPageTransitionsBuilder`)
+- [x] AltStore installed on iPhone 14 Pro (iOS 26.4)
+- [x] Latest working code committed & pushed to `dev-optimization`
 
 ---
 
-## Phase 1: Prerequisites
+## ❌ Remaining Problem: App crashes on launch
 
-- [ ] Enable **Developer Mode** on your iPhone via **Settings > Privacy & Security > Developer Mode**, then restart.
-- [ ] Ensure you have an Apple ID ready (a free one works for 7-day testing).
-- [ ] If your Apple ID has **2FA enabled** (likely), generate an **App-Specific Password**:
-  1. Go to [appleid.apple.com](https://appleid.apple.com) and sign in.
-  2. Navigate to **App-Specific Passwords** → **Generate**.
-  3. Copy the password (it looks like `xxxx-xxxx-xxxx-xxxx`).
-  4. You'll use this instead of your normal password during AltStore provisioning.
+**Symptom:** White screen for ~1 second → app force closes.
+**iPhone:** 14 Pro, iOS 26.4
+**How build was done:** Codemagic via `codemagic.yaml` with `--no-codesign`
 
----
+### Root Cause Analysis
 
-## Phase 2: Cloud Build Configuration (Codemagic)
+The white screen means the Flutter engine **does** start (UIKit loads, main() runs), but something fails immediately at the native level. Three possible causes:
 
-Codemagic has a free tier with 500 build minutes/month — more than enough for testing.
+| Cause | Likelihood | Explanation |
+|-------|-----------|-------------|
+| **1. Code still has errors** | Medium | The build that crashed used old `ios-testing` branch code (286 VS Code issues). We fixed the Cupertino import and pushed clean code — a rebuild is needed to test. |
+| **2. `--no-codesign` corrupts framework structure** | High | `--no-codesign` tells Xcode to skip embedding code-signing structures in `Flutter.framework` and `App.framework`. When AltStore re-signs the .ipa, these frameworks may not get proper signing slots → Flutter engine loads then crashes trying to link. |
+| **3. Missing or broken framework symlinks in .ipa** | Low | Already fixed with `cp -Rp` in the packaging step. |
 
-- [ ] Create a [Codemagic](https://codemagic.io) account using your GitHub credentials.
-- [ ] Click **Add application** and select your remote repository (`hyelif/SmartPonic-Optimization` or `hyelif/Flutter-Apps-Development`).
-- [ ] In **Workflow settings**, disable Android and enable **iOS** builds.
-- [ ] Configure the **Build** tab options:
-  - **Flutter version** — select the latest stable (matching `^3.11.3` SDK requirement).
-  - **Xcode version** — latest stable.
-  - **Build mode** → **Debug** (required — AltStore can only resign debug builds).
-  - **iOS code signing** → set **Export method** to **Development** with **Automatic signing**.
-- [ ] Set the **Branch** to `dev-optimization` (or your testing branch).
-- [ ] Click **Start New Build** and wait (~5–10 minutes).
-- [ ] Once complete, **download** the generated `runner.app.zip` (or if you set up code signing properly, a `.ipa` file directly).
+### Theory on Fix (not yet tested)
 
-> 💡 **Tip:** If Codemagic produces a `.ipa` directly (happens when export method is set correctly), you can skip Phase 3 entirely and jump straight to Phase 4.
+The cleanest fix is probably to drop `--no-codesign` entirely. Instead:
 
----
+1. Set `DEVELOPMENT_TEAM` to a real or dummy value
+2. Build normally (Xcode will sign with the dummy team)
+3. The `.app` will have **properly structured** `Flutter.framework` with valid code-signing slots
+4. AltStore will strip the dummy signature and replace it with its own
 
-## Phase 3: Binary Packaging on Windows
+The concern was that Flutter would reject a build without a real Apple Developer team. But `AAAAAAAAAA` already satisfied Flutter's validation — the question is whether Xcode will actually sign an `.app` with it. If yes, AltStore should have no problem re-signing it.
 
-Only needed if Codemagic gave you a `.zip` instead of an `.ipa`.
+### Alternative: Switch to Sidestore.io
 
-- [ ] Extract the downloaded `runner.app.zip`.
-- [ ] Locate the `Runner.app` folder. If you find an `.xcarchive` instead, dig deeper:
-  ```
-  Runner.xcarchive/Products/Applications/Runner.app
-  ```
-- [ ] Create a new directory named exactly `Payload` (case-sensitive).
-- [ ] Move/copy `Runner.app` **into** the `Payload` folder.
-- [ ] Compress the `Payload` folder into a `.zip` file (right-click → **Compress**).
-- [ ] Rename the resulting file from `Payload.zip` → `SmartponicV2.ipa`.
+If AltStore keeps having issues with `--no-codesign` builds, an alternative is [SideStore](https://sidestore.io/) — it's AltStore-compatible but open source and handles some edge cases better.
 
 ---
 
-## Phase 4: Device Sideloading (AltStore)
+## 🔜 Next Steps
 
-- [ ] Download and install **iTunes** and **iCloud** directly from [Apple's website](https://www.apple.com/itunes/) — **do NOT use the Microsoft Store versions**, as those lack Bonjour and other components AltServer needs.
-- [ ] Sign in to **iCloud for Windows** with the same Apple ID you'll use for AltStore provisioning.
-- [ ] Download and install [**AltServer for Windows**](https://altstore.io/).
-- [ ] Connect your iPhone via USB, and select **Trust This Computer** on the device.
-- [ ] **Ensure Wi-Fi is ON on the iPhone** — AltStore needs it even over USB.
-- [ ] In the Windows system tray, find the **AltServer** icon (diamond-shaped), click it → **Install AltStore** → select your iPhone.
-- [ ] When prompted, enter your Apple ID credentials:
-  - **Email:** your Apple ID
-  - **Password:** the **App-Specific Password** you generated in Phase 1 (not your normal password if 2FA is on).
-- [ ] On the iPhone, go to **Settings > General > VPN & Device Management** (or just **Device Management** on newer iOS) and **trust** the Apple ID profile.
-- [ ] Open the **AltStore** app on your iPhone → tap the **+** icon → select `SmartponicV2.ipa` → tap **Install**.
-
----
-
-## Phase 5: Ongoing Maintenance ⚠️
-
-> **This is the part most guides forget — and why your app will stop working after 7 days.**
-
-Free Apple Developer profiles expire every **7 days**. You must refresh before then:
-
-- [ ] Set a recurring **calendar reminder for day 6** to refresh.
-- [ ] On refresh day:
-  1. Connect iPhone to your Windows laptop (or same Wi-Fi with AltServer running).
-  2. Open **AltStore** on the iPhone.
-  3. Tap **Refresh All**.
-  4. Enter your App-Specific Password again if prompted.
-- [ ] The app will continue working for another 7 days. Repeat indefinitely.
+1. **Rebuild on Codemagic** with current `dev-optimization` (after Cupertino fix)
+2. If it still crashes → try building **without** `--no-codesign` (let Xcode sign with dummy team)
+3. If still crashes → try `flutter build ios --debug --no-codesign` + use `ditto` instead of `cp` for packaging
+4. Last resort → SideStore or Apple Developer Program ($99/year)
 
 ---
 
@@ -112,18 +66,7 @@ Free Apple Developer profiles expire every **7 days**. You must refresh before t
 
 | Problem | Likely Fix |
 |---------|-----------|
-| AltServer says "Cannot find iPhone" | Reinstall iTunes (non-Microsoft Store), restart AltServer, reconnect USB |
-| Installation fails with error | Ensure iCloud is signed in with the same Apple ID used in AltServer |
-| App crashes on launch | Rebuild with Codemagic in **Debug** mode (Release builds can't be resigned by AltStore) |
-| "Untrusted Developer" on iPhone | Go to **Settings > General > VPN & Device Management** and trust the profile |
-| 7-day expiry warning | Refresh in AltStore (Phase 5) — don't delete the app or you'll lose its data |
-
----
-
-## Future: App Store Distribution
-
-When you're ready for real distribution (no 7-day limit, no USB tethering):
-1. [ ] Join the [Apple Developer Program](https://developer.apple.com/) ($99/year).
-2. [ ] Change the bundle ID from `com.example.smartponicV2` to something unique.
-3. [ ] Set up production certificates in Codemagic.
-4. [ ] Build in **Release** mode and submit via App Store Connect.
+| White screen → crash | Try building without `--no-codesign` (see theory above) |
+| AltServer can't find iPhone | Reinstall iTunes from Apple's site (not MS Store) |
+| "Untrusted Developer" | Settings > General > VPN & Device Management → Trust |
+| 7-day expiry | Refresh in AltStore before day 7 |

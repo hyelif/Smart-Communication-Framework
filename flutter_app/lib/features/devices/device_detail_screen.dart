@@ -54,11 +54,11 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
   Widget _buildBody(DeviceDetailState state) {
     if (state.busy && state.readings.isEmpty) {
       return ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+        padding: const EdgeInsets.fromLTRB(StitchSpacing.lg, StitchSpacing.lg, StitchSpacing.lg, StitchSpacing.pageBottom),
         children: List.generate(
           5,
           (_) => const Padding(
-            padding: EdgeInsets.only(bottom: 12),
+            padding: EdgeInsets.only(bottom: StitchSpacing.md),
             child: StitchSkeletonPanel(height: 80, lineCount: 2),
           ),
         ),
@@ -85,12 +85,12 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
         physics: const BouncingScrollPhysics(
           parent: AlwaysScrollableScrollPhysics(),
         ),
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+        padding: const EdgeInsets.fromLTRB(StitchSpacing.lg, StitchSpacing.lg, StitchSpacing.lg, StitchSpacing.pageBottom),
         children: [
           // Comm health card
           if (state.commHealth != null)
             _CommHealthCard(health: state.commHealth!),
-          if (state.commHealth != null) const SizedBox(height: 16),
+          if (state.commHealth != null) const SizedBox(height: StitchSpacing.lg),
 
           // Active alerts
           if (state.alerts.isNotEmpty) ...[

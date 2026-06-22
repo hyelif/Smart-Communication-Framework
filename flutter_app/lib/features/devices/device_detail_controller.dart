@@ -115,20 +115,34 @@ class DeviceDetailController extends StateNotifier<DeviceDetailState> {
   Future<void> loadAll() async {
     state = state.copyWith(busy: true, clearError: true);
 
-    try {
-      await Future.wait([
-        _loadReadings(),
-        _loadCommHealth(),
-        _loadAlerts(),
-      ]);
+    // Run each sub-load independently so a single failure doesn't
+    // discard results from the other two.
+    await Future.wait([
+      _safeLoadReadings(),
+      _safeLoadCommHealth(),
+      _safeLoadAlerts(),
+    ]);
 
-      state = state.copyWith(busy: false);
-    } catch (e) {
-      state = state.copyWith(
-        busy: false,
-        error: 'Failed to load device data: ${e.toString()}',
-      );
-    }
+    state = state.copyWith(busy: false);
+  }
+
+  /// Wrapper that catches errors so one failure doesn't block others.
+  Future<void> _safeLoadReadings() async {
+    try {
+      await _loadReadings();
+    } catch (_) {}
+  }
+
+  Future<void> _safeLoadCommHealth() async {
+    try {
+      await _loadCommHealth();
+    } catch (_) {}
+  }
+
+  Future<void> _safeLoadAlerts() async {
+    try {
+      await _loadAlerts();
+    } catch (_) {}
   }
 
   Future<void> _loadReadings() async {

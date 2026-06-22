@@ -38,6 +38,21 @@ class AuthState {
         userId = null,
         allowedHardwareIds = const [];
 
+  /// Create a copy with updated fields.
+  AuthState copyWith({
+    bool? isLoggedIn,
+    String? username,
+    int? userId,
+    List<String>? allowedHardwareIds,
+  }) {
+    return AuthState(
+      isLoggedIn: isLoggedIn ?? this.isLoggedIn,
+      username: username ?? this.username,
+      userId: userId ?? this.userId,
+      allowedHardwareIds: allowedHardwareIds ?? this.allowedHardwareIds,
+    );
+  }
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -45,7 +60,7 @@ class AuthState {
           isLoggedIn == other.isLoggedIn &&
           username == other.username &&
           userId == other.userId &&
-          listEquals(allowedHardwareIds, other.allowedHardwareIds);
+          _listEquals(allowedHardwareIds, other.allowedHardwareIds);
 
   @override
   int get hashCode =>
@@ -55,13 +70,13 @@ class AuthState {
   String toString() =>
       'AuthState(isLoggedIn: $isLoggedIn, username: $username, '
       'userId: $userId, nodes: ${allowedHardwareIds.length})';
-}
 
-/// Equality helper for lists used in [AuthState.==].
-bool listEquals(List<String> a, List<String> b) {
-  if (a.length != b.length) return false;
-  for (var i = 0; i < a.length; i++) {
-    if (a[i] != b[i]) return false;
+  /// Equality helper for lists.
+  static bool _listEquals(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
-  return true;
 }

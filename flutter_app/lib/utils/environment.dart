@@ -5,7 +5,17 @@
 /// - [staging]: Local development server.
 /// - [prod]: Remote production server.
 ///
-/// Override at compile time with `--dart-define`:
+/// ## Turso Tokens
+///
+/// Turso API tokens are **not** hardcoded in source. They are loaded from
+/// a local `.env` file (gitignored) via `run.ps1`, which passes them as
+/// `--dart-define` flags at compile time.
+///
+/// ```sh
+/// .\run.ps1
+/// ```
+///
+/// Override individual fields at compile time with `--dart-define`:
 /// ```sh
 /// flutter run --dart-define=SMARTPONIC_ENV=staging
 /// flutter run --dart-define=SMARTPONIC_API_BASE_URL=http://10.0.0.1
@@ -44,17 +54,16 @@ class EnvironmentConfig {
   // Built-in profiles
   // ---------------------------------------------------------------------------
 
-  /// Development profile -- direct ESP32 access point + Turso dev database.
+  /// Development profile -- direct ESP32 access point.
   ///
   /// Connects to the node's own Wi-Fi AP at the default ESP32 address.
-  /// Turso tokens are hardcoded for development convenience.
-  /// Override any field with `--dart-define` (see doc comment above).
+  /// **Turso tokens are not hardcoded** — use `.\run.ps1` to inject them.
   static const EnvironmentConfig dev = EnvironmentConfig(
     apiBaseUrl: 'http://192.168.4.1',
     nfcConfigUrl: 'http://192.168.4.1/nfc',
     tursoUrl: 'https://smartponic-db-hyelif.aws-ap-northeast-1.turso.io/v2/pipeline',
-    tursoReadToken: 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODE4OTAyMjMsImlkIjoiMDE5ZWQ0ZWYtMmMwMS03Nzk5LTg1YWItYmI2ZDNiYjQ0NTFlIiwicmlkIjoiNDBmY2YyOWYtYmFlZC00OGNjLThkNmQtNzM0ODg3N2NlYTQ5In0.jO6yq10BZC5xWiPpLP1x3YpaMFauW3SsDkEECBKkKKJv8WO9aX1V2J0PKg2WrydzuJbl2uxgZULsQe7nHqx0BA',
-    tursoWriteToken: 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODE4OTAyMjMsImlkIjoiMDE5ZWQ0ZWYtMmMwMS03Nzk5LTg1YWItYmI2ZDNiYjQ0NTFlIiwicmlkIjoiNDBmY2YyOWYtYmFlZC00OGNjLThkNmQtNzM0ODg3N2NlYTQ5In0.jO6yq10BZC5xWiPpLP1x3YpaMFauW3SsDkEECBKkKKJv8WO9aX1V2J0PKg2WrydzuJbl2uxgZULsQe7nHqx0BA',
+    tursoReadToken: '',
+    tursoWriteToken: '',
     isProduction: false,
   );
 
@@ -63,20 +72,20 @@ class EnvironmentConfig {
     apiBaseUrl: 'http://192.168.1.100:8080',
     nfcConfigUrl: 'http://192.168.1.100:8080/nfc',
     tursoUrl: 'https://smartponic-db-hyelif.aws-ap-northeast-1.turso.io/v2/pipeline',
-    tursoReadToken: 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODE4OTAyMjMsImlkIjoiMDE5ZWQ0ZWYtMmMwMS03Nzk5LTg1YWItYmI2ZDNiYjQ0NTFlIiwicmlkIjoiNDBmY2YyOWYtYmFlZC00OGNjLThkNmQtNzM0ODg3N2NlYTQ5In0.jO6yq10BZC5xWiPpLP1x3YpaMFauW3SsDkEECBKkKKJv8WO9aX1V2J0PKg2WrydzuJbl2uxgZULsQe7nHqx0BA',
-    tursoWriteToken: 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODE4OTAyMjMsImlkIjoiMDE5ZWQ0ZWYtMmMwMS03Nzk5LTg1YWItYmI2ZDNiYjQ0NTFlIiwicmlkIjoiNDBmY2YyOWYtYmFlZC00OGNjLThkNmQtNzM0ODg3N2NlYTQ5In0.jO6yq10BZC5xWiPpLP1x3YpaMFauW3SsDkEECBKkKKJv8WO9aX1V2J0PKg2WrydzuJbl2uxgZULsQe7nHqx0BA',
+    tursoReadToken: '',
+    tursoWriteToken: '',
     isProduction: false,
   );
 
   /// Production profile -- remote server.
   ///
-  /// In production, pass tokens via `--dart-define` instead of hardcoding.
+  /// **All tokens must be provided via `--dart-define`** in production.
   static const EnvironmentConfig prod = EnvironmentConfig(
     apiBaseUrl: 'https://api.smartponic.example.com',
     nfcConfigUrl: 'https://api.smartponic.example.com/nfc',
     tursoUrl: 'https://smartponic-db-hyelif.aws-ap-northeast-1.turso.io/v2/pipeline',
-    tursoReadToken: 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODE4OTAyMjMsImlkIjoiMDE5ZWQ0ZWYtMmMwMS03Nzk5LTg1YWItYmI2ZDNiYjQ0NTFlIiwicmlkIjoiNDBmY2YyOWYtYmFlZC00OGNjLThkNmQtNzM0ODg3N2NlYTQ5In0.jO6yq10BZC5xWiPpLP1x3YpaMFauW3SsDkEECBKkKKJv8WO9aX1V2J0PKg2WrydzuJbl2uxgZULsQe7nHqx0BA',
-    tursoWriteToken: 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODE4OTAyMjMsImlkIjoiMDE5ZWQ0ZWYtMmMwMS03Nzk5LTg1YWItYmI2ZDNiYjQ0NTFlIiwicmlkIjoiNDBmY2YyOWYtYmFlZC00OGNjLThkNmQtNzM0ODg3N2NlYTQ5In0.jO6yq10BZC5xWiPpLP1x3YpaMFauW3SsDkEECBKkKKJv8WO9aX1V2J0PKg2WrydzuJbl2uxgZULsQe7nHqx0BA',
+    tursoReadToken: '',
+    tursoWriteToken: '',
     isProduction: true,
   );
 
@@ -99,6 +108,10 @@ class EnvironmentConfig {
   ///    overrides (partial overrides merge with the profile selected by
   ///    `SMARTPONIC_ENV`, or [dev] if unset).
   /// 3. Defaults to [dev].
+  ///
+  /// **Turso tokens must be provided via `--dart-define`** (use `.\run.ps1`).
+  /// The built-in profiles have empty token values. If tokens are missing,
+  /// [TursoService] will return a clear error message at runtime.
   static EnvironmentConfig get current {
     const env = String.fromEnvironment(_envKey, defaultValue: 'dev');
     final base = switch (env) {

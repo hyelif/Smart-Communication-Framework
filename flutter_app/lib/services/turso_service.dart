@@ -1,8 +1,42 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
 import '../utils/environment.dart';
+
+// ---------------------------------------------------------------------------
+// Exception
+// ---------------------------------------------------------------------------
+
+/// Categorised error from the Turso pipeline API.
+///
+/// Callers should catch this and map [type] to a user-facing message:
+/// - [TursoErrorType.auth] → "Invalid credentials. Check your Turso token."
+/// - [TursoErrorType.network] → "Cannot reach database. Check your connection."
+/// - [TursoErrorType.timeout] → "Database is slow. Try again."
+/// - [TursoErrorType.sql] → "A database error occurred."
+/// - [TursoErrorType.parse] → "Unexpected response from database."
+class TursoException implements Exception {
+  final TursoErrorType type;
+  final String message;
+  final String? detail;
+
+  const TursoException({
+    required this.type,
+    required this.message,
+    this.detail,
+  });
+
+  @override
+  String toString() => 'TursoException($type): $message${detail != null ? ' ($detail)' : ''}';
+}
+
+enum TursoErrorType { auth, network, timeout, sql, parse, unknown }
+
+// ---------------------------------------------------------------------------
+// Service
+// ---------------------------------------------------------------------------
 
 /// HTTP client for the Turso (libSQL) database pipeline API.
 ///
@@ -10,21 +44,9 @@ import '../utils/environment.dart';
 /// - [readToken] — for SELECT queries (login, data viewing)
 /// - [writeToken] — for INSERT/UPDATE/DELETE (relay commands)
 ///
-/// Turso pipeline endpoint: `POST /v2/pipeline`
-///
-/// ## Usage
-/// ```dart
-/// final rows = await TursoService.query(
-///   'SELECT * FROM users WHERE username = ?',
-///   ['admin'],
-/// );
-///
-/// final id = await TursoService.execute(
-///   'INSERT INTO relay_commands (hardware_id, relay_id, action, status) '
-///   'VALUES (?, ?, ?, ?)',
-///   ['abc123', 0, 'ON', 'pending'],
-/// );
-/// ```
+/// ## Error handling
+/// All public methods throw [TursoException] on failure. Callers should
+/// catch it and map [TursoException.type] to a user-facing message.
 class TursoService {
   TursoService();
 
@@ -42,6 +64,11 @@ class TursoService {
   /// Write token for INSERT/UPDATE/DELETE.
   static String get _writeToken => EnvironmentConfig.current.tursoWriteToken;
 
+  /// Dispose the underlying HTTP client. Call on app shutdown.
+  static void dispose() {
+    _client.close();
+  }
+
   // ---------------------------------------------------------------------------
   // Public API
   // ---------------------------------------------------------------------------
@@ -49,16 +76,19 @@ class TursoService {
   /// Check whether the Turso API is reachable and the tokens work.
   ///
   /// Runs `SELECT 1` and returns `true` on success.
-  /// The [error] out parameter receives the failure reason if any.
+  /// The [onError] callback receives the failure reason if any.
   static Future<bool> checkConnection({void Function(String)? onError}) async {
-    // First try a raw HTTP call to capture the exact error
     final token = _readToken;
     if (token.isEmpty) {
-      onError?.call('Turso read token is empty.');
+      onError?.call(
+        'Turso read token is empty. Pass --dart-define=SMARTPONIC_TURSO_READ_TOKEN=...',
+      );
       return false;
     }
     if (_baseUrl.isEmpty) {
-      onError?.call('Turso URL is empty.');
+      onError?.call(
+        'Turso URL is empty. Pass --dart-define=SMARTPONIC_TURSO_URL=...',
+      );
       return false;
     }
 
@@ -74,9 +104,7 @@ class TursoService {
           )
           .timeout(const Duration(seconds: 10));
 
-      if (response.statusCode == 200) {
-        return true;
-      }
+      if (response.statusCode == 200) return true;
 
       onError?.call(
         'Turso returned HTTP ${response.statusCode}: ${response.body}',
@@ -91,27 +119,28 @@ class TursoService {
   /// Execute a SELECT query and return the result rows.
   ///
   /// Each row is a `Map<String, dynamic>` keyed by column name.
-  /// Returns an empty list on error or no results.
+  /// Throws [TursoException] on failure.
   static Future<List<Map<String, dynamic>>> query(
     String sql, [
     List<dynamic>? args,
   ]) async {
     final response = await _pipeline(sql, args, useWriteToken: false);
-    if (response == null) return [];
-
     return _parseRows(response);
   }
 
   /// Execute an INSERT/UPDATE/DELETE and return the last inserted row ID,
   /// or `null` if no row was inserted.
+  /// Throws [TursoException] on failure.
   static Future<int?> execute(
     String sql, [
     List<dynamic>? args,
   ]) async {
     final response = await _pipeline(sql, args, useWriteToken: true);
-    if (response == null) return null;
 
-    return response['last_insert_rowid'] as int?;
+    final raw = response['last_insert_rowid'];
+    if (raw == null) return null;
+    if (raw is int) return raw;
+    return int.tryParse(raw.toString());
   }
 
   // ---------------------------------------------------------------------------
@@ -120,20 +149,25 @@ class TursoService {
 
   /// Send a single-statement pipeline request to Turso.
   ///
-  /// Returns the first result's `response` object, or `null` on failure.
-  static Future<Map<String, dynamic>?> _pipeline(
+  /// Returns the first result's `response` object.
+  /// Throws [TursoException] on any failure.
+  static Future<Map<String, dynamic>> _pipeline(
     String sql,
     List<dynamic>? args, {
     required bool useWriteToken,
   }) async {
     final token = useWriteToken ? _writeToken : _readToken;
     if (token.isEmpty) {
-      // ignore: avoid_print
-      print('[TursoService] No ${useWriteToken ? 'write' : 'read'} token configured');
-      return null;
+      final kind = useWriteToken ? 'write' : 'read';
+      throw TursoException(
+        type: TursoErrorType.auth,
+        message: 'No Turso $kind token configured.',
+        detail: 'Pass --dart-define=SMARTPONIC_TURSO_${kind.toUpperCase()}_TOKEN=...',
+      );
     }
 
     final body = _buildRequestBody(sql, args);
+    String? lastError;
 
     for (var attempt = 0; attempt < _maxRetries; attempt++) {
       try {
@@ -146,40 +180,104 @@ class TursoService {
               },
               body: jsonEncode(body),
             )
-            .timeout(const Duration(seconds: 10));
+            .timeout(const Duration(seconds: 5));
 
         if (response.statusCode == 200) {
-          final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-          final results = decoded['results'] as List<dynamic>?;
-          if (results == null || results.isEmpty) return null;
-
-          final first = results[0] as Map<String, dynamic>;
-          if (first['type'] == 'error') {
-            // ignore: avoid_print
-            print('[TursoService] SQL error: ${first['response']}');
-            return null;
+          final decoded = jsonDecode(response.body);
+          if (decoded is! Map<String, dynamic>) {
+            throw TursoException(
+              type: TursoErrorType.parse,
+              message: 'Unexpected response format from Turso.',
+            );
           }
 
-          return first['response']?['result'] as Map<String, dynamic>?;
+          final results = decoded['results'] as List<dynamic>?;
+          if (results == null || results.isEmpty) {
+            throw TursoException(
+              type: TursoErrorType.parse,
+              message: 'Empty response from Turso.',
+            );
+          }
+
+          final first = results[0];
+          if (first is! Map<String, dynamic>) {
+            throw TursoException(
+              type: TursoErrorType.parse,
+              message: 'Unexpected result format from Turso.',
+            );
+          }
+
+          if (first['type'] == 'error') {
+            final errMsg = first['response']?.toString() ?? 'Unknown SQL error';
+            throw TursoException(
+              type: TursoErrorType.sql,
+              message: 'Database error.',
+              detail: errMsg,
+            );
+          }
+
+          final result = first['response']?['result'];
+          if (result is! Map<String, dynamic>) {
+            // This can happen for INSERT/UPDATE — the result may be
+            // {"type": "ok", "response": {"last_insert_rowid": ...}}
+            // where the top-level response IS the result.
+            final topResult = first['response'];
+            if (topResult is Map<String, dynamic>) {
+              return topResult;
+            }
+            throw TursoException(
+              type: TursoErrorType.parse,
+              message: 'Unexpected result structure from Turso.',
+            );
+          }
+
+          return result;
+        }
+
+        if (response.statusCode == 401 || response.statusCode == 403) {
+          throw TursoException(
+            type: TursoErrorType.auth,
+            message: 'Turso authentication failed.',
+            detail: 'HTTP ${response.statusCode}',
+          );
         }
 
         if (response.statusCode < 500) {
-          // Client error — no point retrying
-          // ignore: avoid_print
-          print('[TursoService] HTTP ${response.statusCode}: ${response.body}');
-          return null;
+          throw TursoException(
+            type: TursoErrorType.sql,
+            message: 'Turso returned HTTP ${response.statusCode}.',
+            detail: response.body,
+          );
         }
+
+        // Server error (5xx) — retry
+        lastError = 'Turso returned HTTP ${response.statusCode}';
+      } on TursoException {
+        rethrow;
+      } on http.ClientException catch (e) {
+        lastError = 'Network error: $e';
       } catch (e) {
-        // ignore: avoid_print
-        print('[TursoService] Attempt $attempt failed: $e');
+        if (e is TimeoutException) {
+          lastError = 'Request timed out after 5s.';
+        } else {
+          lastError = 'Unexpected error: $e';
+        }
       }
 
       if (attempt < _maxRetries - 1) {
-        await Future.delayed(_retryDelay);
+        await Future.delayed(_retryDelay * (attempt + 1)); // exponential: 500ms, 1s
       }
     }
 
-    return null;
+    // All retries exhausted
+    final isTimeout = lastError?.contains('timed out') ?? false;
+    final isNetwork = lastError?.contains('Network error') ?? false;
+    throw TursoException(
+      type: isTimeout
+          ? TursoErrorType.timeout
+          : (isNetwork ? TursoErrorType.network : TursoErrorType.unknown),
+      message: lastError ?? 'Request failed after $_maxRetries attempts.',
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -208,10 +306,6 @@ class TursoService {
   }
 
   /// Convert a Dart value to a Turso typed argument.
-  ///
-  /// Turso requires ALL `value` fields to be JSON strings, even for
-  /// integers and reals. The `type` discriminator tells the server how
-  /// to interpret the string.
   static Map<String, dynamic> _toTypedArg(dynamic value) {
     if (value == null) {
       return {'type': 'null', 'value': null};
@@ -225,7 +319,6 @@ class TursoService {
     if (value is bool) {
       return {'type': 'integer', 'value': value ? '1' : '0'};
     }
-    // Default to text for String and everything else
     return {'type': 'text', 'value': value.toString()};
   }
 
@@ -235,14 +328,6 @@ class TursoService {
 
   /// Parse the `result` object from a Turso pipeline response into
   /// a list of column-keyed maps.
-  ///
-  /// Turso returns rows as arrays of typed objects:
-  /// ```json
-  /// {"cols": [{"name": "id"}, {"name": "username"}],
-  ///  "rows": [[{"type": "integer", "value": "1"}, {"type": "text", "value": "admin"}]]}
-  /// ```
-  /// The `value` is always a JSON string — this method converts it to the
-  /// appropriate Dart type (int, double, or String) based on the `type` field.
   static List<Map<String, dynamic>> _parseRows(
     Map<String, dynamic> result,
   ) {
@@ -264,13 +349,9 @@ class TursoService {
   }
 
   /// Convert a typed Turso value to the appropriate Dart type.
-  ///
-  /// Turso always encodes `value` as a JSON string, even for integers and
-  /// reals. This method converts based on the `type` discriminator.
   static dynamic _convertValue(Map<String, dynamic> typed) {
     final type = typed['type'] as String?;
     final value = typed['value'];
-    // value can be null (for SQL NULL)
     if (value == null) return null;
 
     switch (type) {

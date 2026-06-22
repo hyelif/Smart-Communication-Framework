@@ -4,7 +4,6 @@ import '../features/devices/device_list_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../widgets/custom_ui.dart';
-import 'config_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -44,19 +43,12 @@ class _MainNavigationState extends State<MainNavigation> {
           tabIndex: 1,
         ),
       ),
-      // ARCHITECT tab
-      RepaintBoundary(
-        child: ConfigScreen(
-          configNotifier: globalConfig,
-          activeTabListenable: activeTab,
-          tabIndex: 2,
-        ),
-      ),
-      // SETTINGS tab (Vault + Calibration)
+      // SETTINGS tab (Vault, Calibrate, Account, Architect)
       RepaintBoundary(
         child: SettingsScreen(
           activeTabListenable: activeTab,
-          tabIndex: 3,
+          tabIndex: 2,
+          configNotifier: globalConfig,
           onSelectProfile: (cfg) {
             globalConfig.value =
                 List<Map<String, dynamic>>.from(cfg.map((e) => Map<String, dynamic>.from(e)));
@@ -88,13 +80,20 @@ class _MainNavigationState extends State<MainNavigation> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: activeTab.value,
-        children: _pages,
-      ),
-      bottomNavigationBar: StitchBottomNavigation(
-        currentIndex: activeTab.value,
-        onTap: _setIndex,
+      extendBody: true,
+      body: Stack(
+        children: [
+          // Main content — fills entire screen, scrolls behind nav
+          IndexedStack(
+            index: activeTab.value,
+            children: _pages,
+          ),
+          // Floating nav overlay
+          StitchBottomNavigation(
+            currentIndex: activeTab.value,
+            onTap: _setIndex,
+          ),
+        ],
       ),
     );
   }

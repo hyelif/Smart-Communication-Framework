@@ -7,7 +7,7 @@ import 'auth_controller.dart';
 
 /// Login screen shown when the user is not authenticated.
 ///
-/// Queries Turso directly via [AuthController.login].
+/// Also supports account creation via the "Create Account" link.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -19,14 +19,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmController = TextEditingController();
   bool _obscurePassword = true;
   bool _busy = false;
   String? _error;
+  bool _isRegistering = false;
 
   @override
   void dispose() {
     _usernameController.dispose();
     _passwordController.dispose();
+    _confirmController.dispose();
     super.dispose();
   }
 
@@ -44,10 +47,46 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         );
 
     if (!mounted) return;
-
     setState(() {
       _busy = false;
       if (error != null) _error = error;
+    });
+  }
+
+  Future<void> _handleRegister() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    if (_passwordController.text != _confirmController.text) {
+      setState(() => _error = 'Passwords do not match.');
+      return;
+    }
+
+    if (_passwordController.text.length < 6) {
+      setState(() => _error = 'Password must be at least 6 characters.');
+      return;
+    }
+
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+
+    final error = await ref.read(authControllerProvider.notifier).register(
+          _usernameController.text.trim(),
+          _passwordController.text,
+        );
+
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      if (error != null) _error = error;
+    });
+  }
+
+  void _toggleMode() {
+    setState(() {
+      _isRegistering = !_isRegistering;
+      _error = null;
     });
   }
 
@@ -87,7 +126,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Sign in to manage your devices',
+                  _isRegistering
+                      ? 'Create a new account'
+                      : 'Sign in to manage your devices',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: StitchColors.onSurfaceVariant,
                       ),
@@ -137,8 +178,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                   textInputAction: TextInputAction.next,
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Enter your username' : null,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'Enter your username';
+                    if (v.trim().length < 3) return 'Username must be at least 3 characters';
+                    if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(v.trim())) {
+                      return 'Username can only contain letters, numbers, and underscores';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 14),
 
@@ -163,19 +210,48 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  textInputAction: TextInputAction.done,
-                  onFieldSubmitted: (_) => _handleLogin(),
+                  textInputAction:
+                      _isRegistering ? TextInputAction.next : TextInputAction.done,
+                  onFieldSubmitted: (_) =>
+                      _isRegistering ? null : _handleLogin(),
                   validator: (v) =>
                       (v == null || v.isEmpty) ? 'Enter your password' : null,
                 ),
+
+                // Confirm password (only for registration)
+                if (_isRegistering) ...[
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: _confirmController,
+                    enabled: !_busy,
+                    obscureText: _obscurePassword,
+                    decoration: InputDecoration(
+                      labelText: 'Confirm Password',
+                      prefixIcon: const Icon(Icons.lock_outline_rounded),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => _handleRegister(),
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Confirm your password';
+                      if (v != _passwordController.text) return 'Passwords do not match';
+                      return null;
+                    },
+                  ),
+                ],
+
                 const SizedBox(height: 24),
 
-                // Login button
+                // Action button
                 SizedBox(
                   width: double.infinity,
                   height: 50,
                   child: StitchPrimaryButton(
-                    onPressed: _busy ? null : _handleLogin,
+                    onPressed: _busy
+                        ? null
+                        : (_isRegistering ? _handleRegister : _handleLogin),
                     child: _busy
                         ? const SizedBox(
                             width: 20,
@@ -185,13 +261,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               color: Colors.black,
                             ),
                           )
-                        : const Text(
-                            'SIGN IN',
-                            style: TextStyle(
+                        : Text(
+                            _isRegistering ? 'CREATE ACCOUNT' : 'SIGN IN',
+                            style: const TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w900,
                             ),
                           ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Toggle login/register
+                TextButton(
+                  onPressed: _busy ? null : _toggleMode,
+                  child: Text(
+                    _isRegistering
+                        ? 'Already have an account? Sign in'
+                        : "Don't have an account? Create one",
+                    style: TextStyle(
+                      color: StitchColors.primaryContainer,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ],

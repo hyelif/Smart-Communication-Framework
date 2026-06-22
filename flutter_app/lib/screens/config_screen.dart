@@ -107,7 +107,7 @@ class _ConfigScreenState extends ConsumerState<ConfigScreen> {
     return StitchScaffold(
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 20),
+        padding: const EdgeInsets.only(bottom: 100),
         child: DecoratedBox(
           decoration: BoxDecoration(
             gradient: AppTheme.ctaGradient,
@@ -151,34 +151,7 @@ class _ConfigScreenState extends ConsumerState<ConfigScreen> {
           ),
         ),
       ),
-      body: Column(
-        children: [
-          StitchTopBar(
-            section: 'Architect',
-            trailing: IconButton(
-              onPressed: state.isRefreshingPage
-                  ? null
-                  : () => controller.saveSnapshot().then((_) {
-                        final s = ref.read(configControllerProvider);
-                        if (s.feedbackMessage != null) {
-                          _showFeedback(s.feedbackMessage!,
-                              isError: s.feedbackIsError);
-                          controller.clearFeedback();
-                        }
-                      }),
-              icon: state.isRefreshingPage
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(
-                      Icons.bookmark_add_outlined,
-                      color: StitchColors.primaryContainer,
-                    ),
-            ),
-          ),
-          Expanded(
+      body: Expanded(
             child: RefreshIndicator(
               onRefresh: () => controller.loadFromNode().then((_) {
                 final s = ref.read(configControllerProvider);
@@ -335,8 +308,6 @@ class _ConfigScreenState extends ConsumerState<ConfigScreen> {
                 ],
               ),
             ),
-          ),
-        ],
       ),
     );
   }

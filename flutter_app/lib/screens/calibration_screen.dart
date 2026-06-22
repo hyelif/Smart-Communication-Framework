@@ -75,6 +75,11 @@ class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
   bool _hasLoadedOnce = false;
   String? _errorMessage;
 
+  // Cache TextEditingControllers per sensor key per field.
+  // Created once in _initControllers(), reused across builds.
+  // Key: sensorKey, Value: {fieldName: controller}
+  final Map<String, Map<String, TextEditingController>> _controllers = {};
+
   static const List<String> _sensorOrder = [
     'temperature',
     'humidity',
@@ -95,13 +100,18 @@ class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
     'rain':        {'label': 'Rain',        'unit': ''},
   };
 
+  static const List<String> _numberFields = [
+    _fieldThresholdMin,
+    _fieldThresholdMax,
+    _fieldCalibrationA,
+    _fieldCalibrationB,
+    _fieldCalibrationC,
+  ];
+
   @override
   void initState() {
     super.initState();
     widget.activeTabListenable.addListener(_handleActiveTabChanged);
-    // Important: allow the initial load to run even though we start in a "loading" state.
-    // Previously `_loadProfiles()` would early-return because `_isLoading` was true,
-    // leaving the page stuck on the spinner.
     _isLoading = false;
     if (widget.activeTabListenable.value == widget.tabIndex) {
       _loadProfiles(showLoader: true);
@@ -111,7 +121,38 @@ class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
   @override
   void dispose() {
     widget.activeTabListenable.removeListener(_handleActiveTabChanged);
+    // Dispose all cached controllers.
+    for (final fields in _controllers.values) {
+      for (final c in fields.values) {
+        c.dispose();
+      }
+    }
     super.dispose();
+  }
+
+  /// Build or rebuild controllers from the current [_profiles] data.
+  /// Call this after loading new data to sync controller text.
+  void _initControllers() {
+    // Dispose old controllers.
+    for (final fields in _controllers.values) {
+      for (final c in fields.values) {
+        c.dispose();
+      }
+    }
+    _controllers.clear();
+
+    for (final key in _sensorOrder) {
+      final profile = _profiles[key] as Map<String, dynamic>?;
+      final fieldMap = <String, TextEditingController>{};
+      for (final field in _numberFields) {
+        final value = profile?[field];
+        final text = value != null
+            ? (value is double ? _formatDouble(value) : value.toString())
+            : '';
+        fieldMap[field] = TextEditingController(text: text);
+      }
+      _controllers[key] = fieldMap;
+    }
   }
 
   void _handleActiveTabChanged() {
@@ -132,6 +173,7 @@ class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
 
       setState(() {
         _profiles = Map<String, dynamic>.from(result);
+        _initControllers();
         _errorMessage = null;
         _hasLoadedOnce = true;
       });
@@ -522,9 +564,9 @@ class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
     required dynamic value,
     String? hint,
   }) {
-    final controller = TextEditingController(
-      text: value != null ? (value is double ? _formatDouble(value) : value.toString()) : '',
-    );
+    // Use cached controller — created once in _initControllers().
+    // This avoids creating 35 new TextEditingControllers on every build.
+    final controller = _controllers[key]?[field] ?? TextEditingController();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

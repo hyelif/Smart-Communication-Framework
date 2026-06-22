@@ -31,6 +31,11 @@ class StitchColors {
   static const Color glassSurface = Color(0x1A1D263B);
   static const Color glassBorder = Color(0x1A334163);
 
+  // Glass gradient sheen colors (used for improved glass effect)
+  static const Color glassSheenCyan = Color(0x0D00F5FF);
+  static const Color glassSheenPurple = Color(0x0DB08CFF);
+  static const Color glassSpecular = Color(0x08FFFFFF);
+
   // Shimmer
   static const Color shimmerBase = Color(0xFF151B29);
   static const Color shimmerHighlight = Color(0xFF1D263B);
@@ -41,16 +46,74 @@ class StitchColors {
   static const Color trendStable = Color(0xFFA5B2CD);
 }
 
+/// Design tokens — spacing and border radius constants.
+///
+/// All spacing values follow a 4px grid for visual rhythm consistency.
+/// Use these constants instead of raw numbers throughout the app.
+class StitchSpacing {
+  StitchSpacing._();
+
+  /// 4px — smallest gap (icon to text, small elements)
+  static const double xs = 4;
+
+  /// 8px — small gap (badge to text, small sections)
+  static const double sm = 8;
+
+  /// 12px — medium gap (between related elements)
+  static const double md = 12;
+
+  /// 16px — large gap (card padding, between cards)
+  static const double lg = 16;
+
+  /// 20px — extra large (screen edge padding, section spacing)
+  static const double xl = 20;
+
+  /// 24px — double extra large (section spacing, top padding)
+  static const double xxl = 24;
+
+  /// 32px — section separator
+  static const double xxxl = 32;
+
+  /// 40px — major section break
+  static const double section = 40;
+
+  /// 48px — page-level padding
+  static const double page = 48;
+
+  /// 120px — bottom padding to clear navigation bar
+  static const double pageBottom = 120;
+}
+
+/// Border radius tokens for consistent corner rounding.
+class StitchRadius {
+  StitchRadius._();
+
+  /// 6px — small badges, tags, pills
+  static const double badge = 6;
+
+  /// 12px — buttons, icon containers, small cards
+  static const double button = 12;
+
+  /// 16px — input fields, text form fields
+  static const double input = 16;
+
+  /// 20px — cards, panels, default containers
+  static const double card = 20;
+
+  /// 28px — bottom sheets, modals
+  static const double sheet = 28;
+
+  /// BorderRadius objects for convenience.
+  static const BorderRadius badgeBorder = BorderRadius.all(Radius.circular(badge));
+  static const BorderRadius buttonBorder = BorderRadius.all(Radius.circular(button));
+  static const BorderRadius inputBorder = BorderRadius.all(Radius.circular(input));
+  static const BorderRadius cardBorder = BorderRadius.all(Radius.circular(card));
+  static const BorderRadius sheetBorder = BorderRadius.all(Radius.circular(sheet));
+}
+
 /// Theme data and visual assets for the SmartPonic v2 dark theme.
 class AppTheme {
   AppTheme._(); // Private constructor to prevent instantiation.
-
-  // ---------------------------------------------------------------------------
-  // Border radius constants
-  // ---------------------------------------------------------------------------
-
-  /// Default border radius used for input fields.
-  static const double _inputBorderRadius = 16;
 
   // ---------------------------------------------------------------------------
   // Theme data
@@ -136,15 +199,15 @@ class AppTheme {
         filled: true,
         fillColor: StitchColors.surfaceLowest,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(_inputBorderRadius),
+          borderRadius: StitchRadius.inputBorder,
           borderSide: const BorderSide(color: StitchColors.outlineVariant, width: 1),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(_inputBorderRadius),
+          borderRadius: StitchRadius.inputBorder,
           borderSide: const BorderSide(color: StitchColors.outlineVariant, width: 1),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(_inputBorderRadius),
+          borderRadius: StitchRadius.inputBorder,
           borderSide: const BorderSide(color: StitchColors.primaryContainer, width: 1.5),
         ),
       ),
@@ -167,6 +230,17 @@ class AppTheme {
   /// Call-to-action gradient from primaryContainer to secondaryContainer.
   static const LinearGradient ctaGradient = LinearGradient(
     colors: [StitchColors.primaryContainer, StitchColors.secondaryContainer],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  /// Glass panel gradient — subtle cyan-to-purple sheen over the glass surface.
+  static const LinearGradient glassGradient = LinearGradient(
+    colors: [
+      StitchColors.glassSheenCyan,
+      StitchColors.glassSurface,
+      StitchColors.glassSheenPurple,
+    ],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
